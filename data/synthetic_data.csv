@@ -1,0 +1,21 @@
+id,exporter_company,exporter_country_code,exporter_country_name,exporter_city,importer_company,importer_country_code,importer_country_name,importer_city,material,category_name,quantity,unit,price,total_value,transaction_date,status
+t001,TSMC,TW,Taiwan,Hsinchu,Apple Inc,US,United States,Cupertino,5nm Wafers,Raw Material,5000,pieces,16000,80000000,2023-01-15T10:00:00Z,completed
+t002,Samsung Electronics,KR,South Korea,Seoul,Intel Corporation,US,United States,Santa Clara,LPDDR5 RAM,Memory,100000,pieces,450,45000000,2023-02-20T14:30:00Z,completed
+t003,ASML,NL,Netherlands,Eindhoven,TSMC,TW,Taiwan,Taipei,EUV Lithography System,Equipment,2,units,175000000,350000000,2023-03-10T09:00:00Z,in-transit
+t004,Tokyo Electron,JP,Japan,Tokyo,SMIC,CN,China,Shanghai,Photoresist,Raw Material,200,kg,60000,12000000,2023-04-05T11:20:00Z,completed
+t005,GlobalFoundries,DE,Germany,Dresden,Samsung Electronics,KR,South Korea,Suwon,Automotive MCUs,Logic,25000,pieces,1200,30000000,2023-05-18T08:45:00Z,completed
+t006,TSMC,TW,Taiwan,Taichung,Tokyo Electron,JP,Japan,Osaka,AI Accelerators,Logic,1500,pieces,40000,60000000,2023-06-20T12:00:00Z,in-transit
+t007,ASML,NL,Netherlands,Amsterdam,Samsung Electronics,KR,South Korea,Pyeongtaek,EUV Components,Equipment,5,units,30000000,150000000,2023-07-15T08:00:00Z,in-transit
+t008,Intel Corporation,US,United States,Austin,SMIC,CN,China,Beijing,14nm Processors,Logic,8000,pieces,2500,20000000,2023-08-10T14:30:00Z,completed
+t009,Samsung Electronics,KR,South Korea,Seoul,Apple Inc,US,United States,Cupertino,OLED Display Drivers,Logic,50000,pieces,800,40000000,2023-09-05T10:15:00Z,completed
+t010,TSMC,TW,Taiwan,Hsinchu,Qualcomm,US,United States,San Diego,7nm Snapdragon Chips,Logic,12000,pieces,3500,42000000,2023-10-12T09:30:00Z,completed
+t011,SK Hynix,KR,South Korea,Suwon,Apple Inc,US,United States,Cupertino,NAND Flash Memory,Memory,200000,pieces,300,60000000,2023-11-18T11:00:00Z,completed
+t012,Applied Materials,US,United States,Santa Clara,TSMC,TW,Taiwan,Taipei,Etching Equipment,Equipment,3,units,50000000,150000000,2023-12-01T08:20:00Z,pending
+t013,Tokyo Electron,JP,Japan,Kyoto,GlobalFoundries,DE,Germany,Munich,Deposition Tools,Equipment,4,units,40000000,160000000,2024-01-15T10:00:00Z,completed
+t014,SMIC,CN,China,Shenzhen,MediaTek,TW,Taiwan,Hsinchu,28nm Chipsets,Logic,30000,pieces,1500,45000000,2024-02-20T14:00:00Z,completed
+t015,ASML,NL,Netherlands,Eindhoven,Intel Corporation,US,United States,Santa Clara,High-NA EUV System,Equipment,1,units,300000000,300000000,2024-03-10T09:00:00Z,in-transit
+t016,TSMC,TW,Taiwan,Taipei,Samsung Electronics,KR,South Korea,Seoul,3nm Wafers,Raw Material,3000,pieces,25000,75000000,2024-04-05T11:30:00Z,completed
+t017,Micron Technology,US,United States,Boise,Xiaomi,CN,China,Beijing,DRAM Modules,Memory,150000,pieces,500,75000000,2024-05-18T08:00:00Z,completed
+t018,Tokyo Electron,JP,Japan,Tokyo,TSMC,TW,Taiwan,Taichung,Coating Materials,Raw Material,500,liters,80000,40000000,2024-06-20T12:15:00Z,completed
+t019,GlobalFoundries,DE,Germany,Berlin,Apple Inc,US,United States,Cupertino,RF Chips,Logic,40000,pieces,2000,80000000,2024-07-15T10:30:00Z,completed
+t020,ASML,NL,Netherlands,Rotterdam,SMIC,CN,China,Shenzhen,DUV Lithography System,Equipment,2,units,80000000,160000000,2024-08-10T09:45:00Z,pending

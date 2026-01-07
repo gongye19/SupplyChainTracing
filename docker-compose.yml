@@ -1,0 +1,77 @@
+services:
+  db:
+    image: postgres:16
+    container_name: supplychain_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123456
+      POSTGRES_DB: supplychain
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./database/data:/var/lib/postgresql/data
+      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - supplychain-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: supplychain_backend
+    restart: unless-stopped
+    ports:
+      - "8001:8000"  # 使用8001端口避免冲突
+    environment:
+      DATABASE_URL: postgresql://postgres:123456@db:5432/supplychain
+      CORS_ORIGINS: http://localhost:3001
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend/app:/app/app
+    networks:
+      - supplychain-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: supplychain_frontend
+    restart: unless-stopped
+    ports:
+      - "3001:3000"  # 使用3001端口避免冲突
+    environment:
+      VITE_API_URL: http://localhost:8001
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - supplychain-network
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: supplychain_pgadmin
+    restart: unless-stopped
+    ports:
+      - "5051:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    volumes:
+      - ./database/pgadmin:/var/lib/pgadmin
+    networks:
+      - supplychain-network
+
+networks:
+  supplychain-network:
+    driver: bridge
+
