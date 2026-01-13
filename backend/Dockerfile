@@ -19,5 +19,6 @@ COPY app/ ./app/
 EXPOSE 8000
 
 # 启动命令（生产环境，去掉 --reload）
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# 使用环境变量 PORT（Railway 会自动设置），如果没有则默认 8000
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
 
