@@ -6,8 +6,10 @@ from .routes import categories, transactions, companies, locations
 
 app = FastAPI(title="Supply Chain API", version="1.0.0")
 
-# CORS配置
-cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3001").split(",")
+# CORS配置 - 支持多域名（开发和生产环境）
+cors_origins_str = os.getenv("CORS_ORIGINS", "http://localhost:3001,http://localhost:3000")
+# 支持逗号分隔的多个域名
+cors_origins = [origin.strip() for origin in cors_origins_str.split(",") if origin.strip()]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,

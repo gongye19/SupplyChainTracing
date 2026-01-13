@@ -1,0 +1,27 @@
+# Railway 忽略文件
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+.env
+.env.local
+.git/
+.gitignore
+README.md
+*.md
+database/data/
+data/
+*.csv
+*.xlsx
+*.pdf
+.DS_Store
+frontend/
+check_data.sh
+start.sh
+docker-compose.yml
+
