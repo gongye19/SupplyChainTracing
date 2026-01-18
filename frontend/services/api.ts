@@ -68,7 +68,12 @@ export interface TransactionStats {
 }
 
 export const transactionsAPI = {
-  getTransactions: async (filters?: Partial<Filters>, page: number = 1, limit: number = 1000): Promise<TransactionListResponse> => {
+  getTransactions: async (
+    filters?: Partial<Filters>,
+    page: number = 1,
+    limit: number = 1000,
+    options?: { signal?: AbortSignal }
+  ): Promise<TransactionListResponse> => {
     const params = new URLSearchParams();
     if (filters?.startDate) params.append('start_date', filters.startDate);
     if (filters?.endDate) params.append('end_date', filters.endDate);
@@ -88,7 +93,9 @@ export const transactionsAPI = {
     params.append('page', page.toString());
     params.append('limit', limit.toString());
 
-    const response = await fetchAPI<any>(`/api/transactions?${params.toString()}`);
+    const response = await fetchAPI<any>(`/api/transactions?${params.toString()}`, {
+      signal: options?.signal
+    });
     
     // 转换字段名从下划线格式到驼峰格式
     const transactions = response.transactions.map((t: any) => ({

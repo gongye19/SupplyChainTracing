@@ -29,14 +29,20 @@ const App: React.FC = () => {
   const [companies, setCompanies] = useState<CompanyWithLocation[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
   const [filterLoading, setFilterLoading] = useState(false);
+  const [isInteracting, setIsInteracting] = useState(false); // 是否正在交互(拖动/快速点击)
   const [stats, setStats] = useState({
     transactions: 0,
     suppliers: 0,
     categories: 0
   });
   
-  // 防抖定时器
-  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // Refs for preview/final scheduling
+  const filtersRef = useRef(filters);
+  useEffect(() => { filtersRef.current = filters; }, [filters]);
+  const abortRef = useRef<AbortController | null>(null);
+  const finalTimerRef = useRef<number | null>(null);
+  // 标记是否正在拖动（用于时间滑块）
+  const isDraggingRef = useRef<boolean>(false);
 
   // 加载初始数据
   useEffect(() => {
@@ -74,60 +80,91 @@ const App: React.FC = () => {
     loadInitialData();
   }, []);
 
-  // 加载交易数据的函数
-  const loadTransactions = useCallback(async (filtersToUse: Filters) => {
+  // 加载交易数据的函数 - 支持 preview/final 模式
+  const loadTransactions = useCallback(async (filtersToUse: Filters, mode: 'preview' | 'final') => {
+    // 取消之前的请求
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    const limit = mode === 'preview' ? 200 : 1000;
+
     try {
-      setFilterLoading(true);
-      console.log('Loading transactions with filters:', filtersToUse);
-      const response = await transactionsAPI.getTransactions(filtersToUse, 1, 1000);
-      console.log('Transactions loaded:', response.transactions.length);
+      if (mode === 'final') setFilterLoading(true);
+
+      console.log(`Loading transactions (${mode}) with filters:`, filtersToUse);
+      const response = await transactionsAPI.getTransactions(filtersToUse, 1, limit, { signal: controller.signal });
+
+      if (controller.signal.aborted) return;
+
+      console.log(`Transactions loaded (${mode}):`, response.transactions.length);
       setTransactions(response.transactions);
-      
-      // 更新统计信息
-      const uniqueCountries = new Set<string>();
-      const uniqueCategories = new Set<string>();
-      response.transactions.forEach(t => {
-        uniqueCountries.add(t.exporterCountryCode);
-        uniqueCountries.add(t.importerCountryCode);
-        uniqueCategories.add(t.categoryId);
-      });
-      setStats({
-        transactions: response.transactions.length,
-        suppliers: uniqueCountries.size,
-        categories: uniqueCategories.size
-      });
-    } catch (error) {
-      console.error('Failed to load transactions:', error);
-      alert('无法加载交易数据。错误: ' + (error as Error).message);
+
+      // stats 建议只在 final 更新（preview 不必算，省 CPU）
+      if (mode === 'final') {
+        const uniqueCountries = new Set<string>();
+        const uniqueCategories = new Set<string>();
+        response.transactions.forEach(t => {
+          uniqueCountries.add(t.exporterCountryCode);
+          uniqueCountries.add(t.importerCountryCode);
+          uniqueCategories.add(t.categoryId);
+        });
+        setStats({
+          transactions: response.transactions.length,
+          suppliers: uniqueCountries.size,
+          categories: uniqueCategories.size
+        });
+      }
+    } catch (e: any) {
+      if (e?.name === 'AbortError') return;
+      console.error('Failed to load transactions:', e);
+      if (mode === 'final') {
+        alert('无法加载交易数据。错误: ' + (e as Error).message);
+      }
     } finally {
-      setFilterLoading(false);
+      if (mode === 'final' && !controller.signal.aborted) {
+        setFilterLoading(false);
+      }
     }
   }, []);
 
-  // 根据筛选条件加载交易数据（带防抖）
+  // 调度器：任何 filters 变化 => 立刻 preview + 延迟 final
+  const scheduleFetch = useCallback((nextFilters: Filters, reason: 'drag' | 'click') => {
+    // 进入交互状态（用于 SupplyMap preview 渲染）
+    setIsInteracting(true);
+
+    // 立刻发 preview（取消旧请求）
+    loadTransactions(nextFilters, 'preview');
+
+    // 延迟触发 final：用户停止 220ms 后再发
+    if (finalTimerRef.current) window.clearTimeout(finalTimerRef.current);
+    finalTimerRef.current = window.setTimeout(() => {
+      setIsInteracting(false);
+      loadTransactions(filtersRef.current, 'final');
+    }, reason === 'drag' ? 260 : 220);
+  }, [loadTransactions]);
+
+  // 暴露拖动状态控制函数给子组件
+  const setDragging = useCallback((dragging: boolean) => {
+    isDraggingRef.current = dragging;
+    setIsInteracting(dragging); // 拖动时 SupplyMap 进入 preview mode
+  }, []);
+
+  // 统一监听 filters 变化：触发 scheduleFetch
   useEffect(() => {
     // 只有在categories和companies加载完成后才加载交易数据
     if (categories.length === 0 || companies.length === 0) {
       return;
     }
-    
-    // 清除之前的定时器
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
-    
-    // 设置防抖：拖动时延迟 300ms 再请求
-    debounceTimerRef.current = setTimeout(() => {
-      loadTransactions(filters);
-    }, 300);
-    
-    // 清理函数
+
+    // 拖动期间 filters 会频繁变更：这里直接走 scheduleFetch
+    const reason: 'drag' | 'click' = isDraggingRef.current ? 'drag' : 'click';
+    scheduleFetch(filters, reason);
+
     return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
+      if (finalTimerRef.current) window.clearTimeout(finalTimerRef.current);
     };
-  }, [filters, categories.length, companies.length, loadTransactions]);
+  }, [filters, categories.length, companies.length, scheduleFetch]);
 
   // 将Transaction转换为Shipment格式（用于地图组件）- 使用 useMemo 优化
   const shipments = useMemo(() => {
@@ -224,6 +261,7 @@ const App: React.FC = () => {
              setFilters={setFilters}
              categories={categories}
              countries={countries}
+             onDragChange={setDragging}
            />
            
            <div className="mt-auto pt-8 border-t border-black/5 space-y-4">
@@ -277,6 +315,7 @@ const App: React.FC = () => {
                     countries={countries}
                     companies={companies}
                     categories={categories}
+                    isPreview={isInteracting}
                   />
                 </>
               )}

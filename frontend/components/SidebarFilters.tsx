@@ -8,15 +8,20 @@ interface SidebarFiltersProps {
   setFilters: React.Dispatch<React.SetStateAction<Filters>>;
   categories: Category[];
   countries: CountryLocation[];
+  onDragChange?: (isDragging: boolean) => void;
 }
 
-const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, categories, countries }) => {
+const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, categories, countries, onDragChange }) => {
   const [countriesOpen, setCountriesOpen] = useState(false);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
   const [activeThumb, setActiveThumb] = useState<'start' | 'end' | null>(null);
   const countriesRef = useRef<HTMLDivElement>(null);
   const categoriesRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
+  
+  // rAF throttle for smooth dragging
+  const rafRef = useRef<number | null>(null);
+  const latestXRef = useRef<number | null>(null);
 
   // 点击外部关闭下拉框
   useEffect(() => {
@@ -48,6 +53,11 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, ca
     return () => {
       document.removeEventListener('pointerup', handlePointerUp);
     };
+  }, []);
+
+  // 清理 rAF
+  useEffect(() => () => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
   }, []);
 
   const START_DATE = new Date('2023-01-01');
@@ -139,26 +149,43 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, ca
     e.preventDefault();
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     setActiveThumb(thumb);
+    // 通知父组件开始拖动
+    onDragChange?.(true);
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
     if (!activeThumb) return;
-    const nextIdx = getIndexFromClientX(e.clientX);
 
-    setFilters(prev => {
-      const curL = toMonthIndex(prev.startDate);
-      const curR = toMonthIndex(prev.endDate);
+    latestXRef.current = e.clientX;
 
-      const res =
-        activeThumb === 'start'
-          ? applyDragLeft(nextIdx, curL, curR, totalMonths)
-          : applyDragRight(nextIdx, curL, curR, totalMonths);
+    if (rafRef.current != null) return;
 
-      return { ...prev, startDate: fromMonthIndex(res.left), endDate: fromMonthIndex(res.right) };
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null;
+      const x = latestXRef.current;
+      if (x == null) return;
+
+      const nextIdx = getIndexFromClientX(x);
+
+      setFilters(prev => {
+        const curL = toMonthIndex(prev.startDate);
+        const curR = toMonthIndex(prev.endDate);
+
+        const res =
+          activeThumb === 'start'
+            ? applyDragLeft(nextIdx, curL, curR, totalMonths)
+            : applyDragRight(nextIdx, curL, curR, totalMonths);
+
+        return { ...prev, startDate: fromMonthIndex(res.left), endDate: fromMonthIndex(res.right) };
+      });
     });
   };
 
-  const onPointerUp = () => setActiveThumb(null);
+  const onPointerUp = () => {
+    setActiveThumb(null);
+    // 通知父组件拖动结束
+    onDragChange?.(false);
+  };
 
   const toggleCountry = (code: string) => {
     setFilters(prev => ({
