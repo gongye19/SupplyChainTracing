@@ -90,14 +90,32 @@ const App: React.FC = () => {
     const limit = mode === 'preview' ? 200 : 1000;
 
     try {
-      if (mode === 'final') setFilterLoading(true);
+      // final 模式：智能 loading - 只在请求耗时超过 100ms 时显示
+      let loadingTimer: number | null = null;
+      if (mode === 'final') {
+        loadingTimer = window.setTimeout(() => {
+          if (!controller.signal.aborted) {
+            setFilterLoading(true);
+          }
+        }, 100); // 如果 100ms 内完成就不显示 loading
+      }
 
       console.log(`Loading transactions (${mode}) with filters:`, filtersToUse);
+      const startTime = performance.now();
       const response = await transactionsAPI.getTransactions(filtersToUse, 1, limit, { signal: controller.signal });
+      const duration = performance.now() - startTime;
 
-      if (controller.signal.aborted) return;
+      if (controller.signal.aborted) {
+        if (loadingTimer) window.clearTimeout(loadingTimer);
+        return;
+      }
 
-      console.log(`Transactions loaded (${mode}):`, response.transactions.length);
+      // 如果请求很快完成（<100ms），取消显示 loading
+      if (loadingTimer && duration < 100) {
+        window.clearTimeout(loadingTimer);
+      }
+
+      console.log(`Transactions loaded (${mode}) in ${duration.toFixed(0)}ms:`, response.transactions.length);
       setTransactions(response.transactions);
 
       // stats 建议只在 final 更新（preview 不必算，省 CPU）
@@ -136,12 +154,12 @@ const App: React.FC = () => {
     // 立刻发 preview（取消旧请求）
     loadTransactions(nextFilters, 'preview');
 
-    // 延迟触发 final：用户停止 220ms 后再发
+    // 延迟触发 final：用户停止后快速触发（减少延迟时间）
     if (finalTimerRef.current) window.clearTimeout(finalTimerRef.current);
     finalTimerRef.current = window.setTimeout(() => {
       setIsInteracting(false);
       loadTransactions(filtersRef.current, 'final');
-    }, reason === 'drag' ? 260 : 220);
+    }, reason === 'drag' ? 180 : 120); // 从 260/220ms 减少到 180/120ms
   }, [loadTransactions]);
 
   // 暴露拖动状态控制函数给子组件
