@@ -3,9 +3,10 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import SupplyMap from './components/SupplyMap';
 import StatsPanel from './components/StatsPanel';
 import SidebarFilters from './components/SidebarFilters';
+import AIAssistant from './components/AIAssistant';
 import { Transaction, Filters, Category, CountryLocation, Location, CompanyWithLocation } from './types';
 import { transactionsAPI, categoriesAPI, locationsAPI, companiesAPI } from './services/api';
-import { Globe, BarChart3, Bell, Map as MapIcon, Package, TrendingUp, Users, Settings, Search, ChevronRight } from 'lucide-react';
+import { Globe, BarChart3, Bell, Map as MapIcon, Package, TrendingUp, Users, Settings, ChevronRight } from 'lucide-react';
 
 const App: React.FC = () => {
   const [activeView, setActiveView] = useState<'map' | 'stats'>('map');
@@ -221,15 +222,6 @@ const App: React.FC = () => {
             </div>
             <h1 className="text-lg font-bold tracking-tight">GlobalSupplyChainMap</h1>
           </div>
-          <div className="h-4 w-[1px] bg-black/10"></div>
-          <div className="relative hidden lg:block">
-            <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-black/30" />
-            <input 
-              type="text" 
-              placeholder="Search supply network..." 
-              className="bg-black/5 border-transparent focus:bg-black/10 rounded-full pl-9 pr-4 py-2 text-[13px] w-64 transition-all outline-none font-medium"
-            />
-          </div>
         </div>
 
         <div className="flex items-center gap-4">
@@ -355,6 +347,9 @@ const App: React.FC = () => {
           )}
         </section>
       </main>
+
+      {/* AI 助手 */}
+      <AIAssistant />
     </div>
   );
 };
