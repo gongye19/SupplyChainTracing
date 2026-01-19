@@ -96,7 +96,7 @@ def update_categories_chinese(engine):
     """更新品类显示名称为中文"""
     print("正在更新品类显示名称为中文...")
     try:
-        with engine.connect() as conn:
+        with engine.begin() as conn:
             updates = [
                 ("equipment", "设备"),
                 ("raw_material", "原材料"),
@@ -147,8 +147,7 @@ def update_categories_chinese(engine):
                         print(f"  ✓ 插入品类 '{category_id}': {display_name}")
                     except Exception as e:
                         print(f"  ⚠ 品类 '{category_id}' 处理失败: {e}")
-            
-            conn.commit()
+        
         print("✓ 品类更新完成")
         return True
     except Exception as e:
@@ -170,7 +169,7 @@ def init_database(engine):
         sql_content = f.read()
     
     try:
-        with engine.connect() as conn:
+        with engine.begin() as conn:
             # 执行 SQL 语句（按分号分割）
             statements = [s.strip() for s in sql_content.split(';') if s.strip() and not s.strip().startswith('--')]
             for statement in statements:
@@ -181,7 +180,6 @@ def init_database(engine):
                         # 忽略已存在的错误（表已存在等）
                         if 'already exists' not in str(e).lower() and 'duplicate' not in str(e).lower():
                             print(f"警告: {e}")
-            conn.commit()
         print("✓ 数据库表结构初始化完成")
         
         # 初始化完成后，更新品类为中文
