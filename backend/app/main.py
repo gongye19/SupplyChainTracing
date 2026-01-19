@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import os
 
-from .routes import categories, transactions, companies, locations
+from .routes import categories, transactions, companies, locations, chat
 
 app = FastAPI(title="Supply Chain API", version="1.0.0")
 
@@ -23,6 +23,7 @@ app.include_router(categories.router, prefix="/api/categories", tags=["categorie
 app.include_router(transactions.router, prefix="/api/transactions", tags=["transactions"])
 app.include_router(companies.router, prefix="/api/companies", tags=["companies"])
 app.include_router(locations.router, prefix="/api/locations", tags=["locations"])
+app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 
 @app.get("/")
 def root():

@@ -5,7 +5,7 @@ import StatsPanel from './components/StatsPanel';
 import SidebarFilters from './components/SidebarFilters';
 import AIAssistant from './components/AIAssistant';
 import { Transaction, Filters, Category, CountryLocation, Location, CompanyWithLocation } from './types';
-import { transactionsAPI, categoriesAPI, locationsAPI, companiesAPI } from './services/api';
+import { transactionsAPI, categoriesAPI, locationsAPI, companiesAPI, chatAPI, ChatMessage } from './services/api';
 import { Globe, BarChart3, Bell, Map as MapIcon, Package, TrendingUp, Users, Settings, ChevronRight } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -96,7 +96,7 @@ const App: React.FC = () => {
       if (mode === 'final') {
         loadingTimer = window.setTimeout(() => {
           if (!controller.signal.aborted) {
-            setFilterLoading(true);
+      setFilterLoading(true);
           }
         }, 100); // 如果 100ms 内完成就不显示 loading
       }
@@ -118,21 +118,21 @@ const App: React.FC = () => {
 
       console.log(`Transactions loaded (${mode}) in ${duration.toFixed(0)}ms:`, response.transactions.length);
       setTransactions(response.transactions);
-
+      
       // stats 建议只在 final 更新（preview 不必算，省 CPU）
       if (mode === 'final') {
-        const uniqueCountries = new Set<string>();
-        const uniqueCategories = new Set<string>();
-        response.transactions.forEach(t => {
-          uniqueCountries.add(t.exporterCountryCode);
-          uniqueCountries.add(t.importerCountryCode);
-          uniqueCategories.add(t.categoryId);
-        });
-        setStats({
-          transactions: response.transactions.length,
-          suppliers: uniqueCountries.size,
-          categories: uniqueCategories.size
-        });
+      const uniqueCountries = new Set<string>();
+      const uniqueCategories = new Set<string>();
+      response.transactions.forEach(t => {
+        uniqueCountries.add(t.exporterCountryCode);
+        uniqueCountries.add(t.importerCountryCode);
+        uniqueCategories.add(t.categoryId);
+      });
+      setStats({
+        transactions: response.transactions.length,
+        suppliers: uniqueCountries.size,
+        categories: uniqueCategories.size
+      });
       }
     } catch (e: any) {
       if (e?.name === 'AbortError') return;
@@ -142,7 +142,7 @@ const App: React.FC = () => {
       }
     } finally {
       if (mode === 'final' && !controller.signal.aborted) {
-        setFilterLoading(false);
+      setFilterLoading(false);
       }
     }
   }, []);
@@ -175,7 +175,7 @@ const App: React.FC = () => {
     if (categories.length === 0 || companies.length === 0) {
       return;
     }
-
+    
     // 拖动期间 filters 会频繁变更：这里直接走 scheduleFetch
     const reason: 'drag' | 'click' = isDraggingRef.current ? 'drag' : 'click';
     scheduleFetch(filters, reason);
@@ -350,7 +350,11 @@ const App: React.FC = () => {
       </main>
 
       {/* AI 助手 */}
-      <AIAssistant />
+      <AIAssistant 
+        onSendMessage={async (message: string, history: ChatMessage[]) => {
+          return await chatAPI.sendMessage(message, history);
+        }}
+      />
     </div>
   );
 };

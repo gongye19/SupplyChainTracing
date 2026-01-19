@@ -275,3 +275,34 @@ export const companiesAPI = {
   },
 };
 
+// 聊天API
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface ChatRequest {
+  message: string;
+  history?: ChatMessage[];
+}
+
+export interface ChatResponse {
+  response: string;
+}
+
+export const chatAPI = {
+  sendMessage: async (message: string, history?: ChatMessage[]): Promise<string> => {
+    const request: ChatRequest = {
+      message,
+      history: history || []
+    };
+    
+    const response = await fetchAPI<ChatResponse>('/api/chat', {
+      method: 'POST',
+      body: JSON.stringify(request)
+    });
+    
+    return response.response;
+  },
+};
+

@@ -9,8 +9,8 @@ interface Message {
 }
 
 interface AIAssistantProps {
-  // 后端 API 接口（暂时留空）
-  onSendMessage?: (message: string) => Promise<string>;
+  // 后端 API 接口
+  onSendMessage?: (message: string, history: Array<{ role: 'user' | 'assistant'; content: string }>) => Promise<string>;
 }
 
 const AIAssistant: React.FC<AIAssistantProps> = ({ onSendMessage }) => {
@@ -25,11 +25,6 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onSendMessage }) => {
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [position, setPosition] = useState({ x: window.innerWidth - 100, y: window.innerHeight - 100 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
-  const buttonRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -39,66 +34,6 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onSendMessage }) => {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, isOpen]);
-
-  // 拖动按钮逻辑
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (!isOpen && buttonRef.current) {
-      setDragStartPos({ x: e.clientX, y: e.clientY });
-      setIsDragging(true);
-      const rect = buttonRef.current.getBoundingClientRect();
-      setDragOffset({
-        x: e.clientX - rect.left - rect.width / 2,
-        y: e.clientY - rect.top - rect.height / 2
-      });
-    }
-  };
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (isDragging && !isOpen) {
-        const newX = e.clientX - dragOffset.x;
-        const newY = e.clientY - dragOffset.y;
-        
-        // 限制在视窗内
-        const maxX = window.innerWidth - 60;
-        const maxY = window.innerHeight - 60;
-        const minX = 0;
-        const minY = 0;
-        
-        setPosition({
-          x: Math.max(minX, Math.min(maxX, newX)),
-          y: Math.max(minY, Math.min(maxY, newY))
-        });
-      }
-    };
-
-    const handleMouseUp = (e: MouseEvent) => {
-      if (isDragging) {
-        // 如果移动距离很小，认为是点击而不是拖动
-        const moveDistance = Math.sqrt(
-          Math.pow(e.clientX - dragStartPos.x, 2) + 
-          Math.pow(e.clientY - dragStartPos.y, 2)
-        );
-        
-        if (moveDistance < 5) {
-          // 点击，打开对话框
-          setIsOpen(true);
-        }
-        
-        setIsDragging(false);
-      }
-    };
-
-    if (isDragging) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-    }
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isDragging, dragOffset, isOpen, dragStartPos]);
 
   // 发送消息
   const handleSend = async () => {
@@ -116,10 +51,18 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onSendMessage }) => {
     setIsLoading(true);
 
     try {
-      // 调用后端 API（暂时模拟）
+      // 调用后端 API
       let assistantResponse = '';
       if (onSendMessage) {
-        assistantResponse = await onSendMessage(inputValue);
+        // 构建对话历史（排除初始欢迎消息）
+        const history = messages
+          .filter(msg => msg.id !== '1') // 排除初始欢迎消息
+          .map(msg => ({
+            role: msg.role,
+            content: msg.content
+          }));
+        
+        assistantResponse = await onSendMessage(inputValue, history);
       } else {
         // 模拟响应
         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -158,20 +101,12 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onSendMessage }) => {
     <>
       {/* 浮动按钮 */}
       {!isOpen && (
-        <div
-          ref={buttonRef}
-          style={{
-            position: 'fixed',
-            left: `${position.x}px`,
-            top: `${position.y}px`,
-            zIndex: 1000,
-            cursor: isDragging ? 'grabbing' : 'grab'
-          }}
-          onMouseDown={handleMouseDown}
-          className="w-14 h-14 bg-gradient-to-br from-[#007AFF] to-[#5856D6] rounded-full shadow-lg hover:shadow-xl transition-all flex items-center justify-center cursor-grab active:cursor-grabbing hover:scale-110"
+        <button
+          onClick={() => setIsOpen(true)}
+          className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-br from-[#007AFF] to-[#5856D6] rounded-full shadow-lg hover:shadow-xl transition-all flex items-center justify-center hover:scale-110 z-50"
         >
           <MessageCircle className="w-6 h-6 text-white" />
-        </div>
+        </button>
       )}
 
       {/* 对话框 */}
