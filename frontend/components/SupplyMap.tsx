@@ -217,106 +217,106 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
     gFlows.selectAll('*').remove();
 
     // 创建公司节点位置映射
-    const companyNodePositions = new Map<string, [number, number]>();
-    
-    // 只在有交易数据时才显示公司节点
-    if (shipments.length > 0 && activeCompanies.length > 0) {
-      const companiesByLocation = new Map<string, CompanyWithLocation[]>();
-      activeCompanies.forEach(company => {
-        const key = `${company.countryCode}_${company.city}_${company.latitude}_${company.longitude}`;
-        if (!companiesByLocation.has(key)) {
-          companiesByLocation.set(key, []);
-        }
-        companiesByLocation.get(key)!.push(company);
-      });
+      const companyNodePositions = new Map<string, [number, number]>();
+      
+      // 只在有交易数据时才显示公司节点
+      if (shipments.length > 0 && activeCompanies.length > 0) {
+        const companiesByLocation = new Map<string, CompanyWithLocation[]>();
+        activeCompanies.forEach(company => {
+          const key = `${company.countryCode}_${company.city}_${company.latitude}_${company.longitude}`;
+          if (!companiesByLocation.has(key)) {
+            companiesByLocation.set(key, []);
+          }
+          companiesByLocation.get(key)!.push(company);
+        });
 
       companiesByLocation.forEach((cityCompanies) => {
-        const baseCompany = cityCompanies[0];
-        const basePos = projection([baseCompany.longitude, baseCompany.latitude])!;
-        
-        cityCompanies.forEach((company, index) => {
-          const offset = cityCompanies.length > 1 ? {
+          const baseCompany = cityCompanies[0];
+          const basePos = projection([baseCompany.longitude, baseCompany.latitude])!;
+          
+          cityCompanies.forEach((company, index) => {
+            const offset = cityCompanies.length > 1 ? {
             x: (index - (cityCompanies.length - 1) / 2) * 1.5,
-            y: (index - (cityCompanies.length - 1) / 2) * 1.5
-          } : { x: 0, y: 0 };
-          
-          const nodePos: [number, number] = [basePos[0] + offset.x, basePos[1] + offset.y];
-          companyNodePositions.set(company.id, nodePos);
-          
+              y: (index - (cityCompanies.length - 1) / 2) * 1.5
+            } : { x: 0, y: 0 };
+            
+            const nodePos: [number, number] = [basePos[0] + offset.x, basePos[1] + offset.y];
+            companyNodePositions.set(company.id, nodePos);
+            
           const companyNode = gNodes.append('g')
-            .attr('class', 'company-node')
+              .attr('class', 'company-node')
             .datum(company)
-            .attr('transform', `translate(${nodePos[0]}, ${nodePos[1]})`);
+              .attr('transform', `translate(${nodePos[0]}, ${nodePos[1]})`);
 
-          const baseRadius = 2.2;
-          const baseStrokeWidth = 1.2;
+            const baseRadius = 2.2;
+            const baseStrokeWidth = 1.2;
           const nodeFillColor = '#007AFF';
-          const isSelected = selectedCountries.includes(company.countryCode);
-          
+            const isSelected = selectedCountries.includes(company.countryCode);
+            
           companyNode.append('circle')
-            .attr('cx', 0)
-            .attr('cy', 0)
-            .attr('r', baseRadius)
+              .attr('cx', 0)
+              .attr('cy', 0)
+              .attr('r', baseRadius)
             .attr('data-base-radius', baseRadius)
             .attr('data-base-stroke-width', baseStrokeWidth)
             .attr('data-fill-color', nodeFillColor)
             .attr('fill', nodeFillColor)
-            .attr('stroke', '#007AFF')
-            .attr('stroke-width', baseStrokeWidth)
+              .attr('stroke', '#007AFF')
+              .attr('stroke-width', baseStrokeWidth)
             .style('fill', nodeFillColor)
             .style('filter', isSelected ? 'drop-shadow(0 0 6px rgba(0, 122, 255, 0.4))' : 'none');
 
           companyNode.on('mouseover', function(event, d) {
-            const storedBaseRadius = parseFloat(d3.select(this).select('circle').attr('data-base-radius') || '2.2');
+              const storedBaseRadius = parseFloat(d3.select(this).select('circle').attr('data-base-radius') || '2.2');
             const svgNode = svgRef.current;
             const currentScale = svgNode ? d3.zoomTransform(svgNode)?.k || 1 : 1;
-            const currentRadius = Math.max(0.5, storedBaseRadius / currentScale);
-            d3.select(this).select('circle').transition().duration(200).attr('r', currentRadius * 1.5);
-            
+              const currentRadius = Math.max(0.5, storedBaseRadius / currentScale);
+              d3.select(this).select('circle').transition().duration(200).attr('r', currentRadius * 1.5);
+              
             const companyType = (d as CompanyWithLocation).type || 'Unknown';
             const companyData = d as CompanyWithLocation;
-            let tooltipHTML = `
-              <div style="display: flex; flex-direction: column; gap: 8px;">
-                <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+              let tooltipHTML = `
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                  <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
                   <span style="font-weight: bold; font-size: 14px; color: #1D1D1F;">${companyData.name || 'Unknown Company'}</span>
-                  <span style="font-size: 10px; font-weight: bold; color: #86868B; text-transform: uppercase; letter-spacing: 0.05em;">${companyType}</span>
-                </div>
-                <div style="height: 0.5px; background: rgba(0,0,0,0.05);"></div>
-                <div style="display: flex; flex-direction: column; gap: 2px;">
-                  <span style="color: #86868B; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em;">Location</span>
-                  <span style="color: #1D1D1F; font-size: 12px; font-weight: 600;">${companyData.city || 'Unknown'}, ${companyData.countryName || companyData.countryCode || 'Unknown'}</span>
-                </div>
-                ${cityCompanies.length > 1 ? `
-                  <div style="color: #86868B; font-size: 10px; font-style: italic;">
-                    ${cityCompanies.length} companies at this location
+                    <span style="font-size: 10px; font-weight: bold; color: #86868B; text-transform: uppercase; letter-spacing: 0.05em;">${companyType}</span>
                   </div>
-                ` : ''}
-              </div>
-            `;
-            
+                  <div style="height: 0.5px; background: rgba(0,0,0,0.05);"></div>
+                  <div style="display: flex; flex-direction: column; gap: 2px;">
+                    <span style="color: #86868B; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em;">Location</span>
+                  <span style="color: #1D1D1F; font-size: 12px; font-weight: 600;">${companyData.city || 'Unknown'}, ${companyData.countryName || companyData.countryCode || 'Unknown'}</span>
+                  </div>
+                  ${cityCompanies.length > 1 ? `
+                    <div style="color: #86868B; font-size: 10px; font-style: italic;">
+                      ${cityCompanies.length} companies at this location
+                    </div>
+                  ` : ''}
+                </div>
+              `;
+              
             if (tooltipRef.current) {
               tooltipRef.current.html(tooltipHTML)
                 .style('visibility', 'visible')
                 .style('top', (event.pageY - 10) + 'px')
                 .style('left', (event.pageX + 20) + 'px');
             }
-          })
-          .on('mouseout', function() {
-            const storedBaseRadius = parseFloat(d3.select(this).select('circle').attr('data-base-radius') || '2.2');
+            })
+            .on('mouseout', function() {
+              const storedBaseRadius = parseFloat(d3.select(this).select('circle').attr('data-base-radius') || '2.2');
             const svgNode = svgRef.current;
             const currentScale = svgNode ? d3.zoomTransform(svgNode)?.k || 1 : 1;
-            const scaledRadius = Math.max(0.5, storedBaseRadius / currentScale);
-            d3.select(this).select('circle').transition().duration(200).attr('r', scaledRadius);
+              const scaledRadius = Math.max(0.5, storedBaseRadius / currentScale);
+              d3.select(this).select('circle').transition().duration(200).attr('r', scaledRadius);
             if (tooltipRef.current) {
               tooltipRef.current.style('visibility', 'hidden');
             }
+            });
           });
         });
-      });
-    }
+      }
 
     // 绘制路径和粒子（preview 模式限制粒子数量）
-    if (shipments.length > 0) {
+      if (shipments.length > 0) {
       // 按公司对聚合交易（相同出口商和进口商的交易合并）
       const routeGroups = new Map<string, {
         exporterCompanyId?: string;
@@ -368,7 +368,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
 
       // 按交易数量计算路径粗细
       const countExtent = d3.extent(Array.from(routeGroups.values()), d => d.count) as [number, number];
-      const strokeScale = d3.scaleSqrt()
+        const strokeScale = d3.scaleSqrt()
         .domain(countExtent[0] !== undefined ? countExtent : [1, 10])
         .range([1.2, 6]); // 根据交易数量，范围 1.2-6
 
@@ -402,40 +402,40 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
 
         if (!origin || !dest) return;
 
-        let sourcePos = projection([origin.lng, origin.lat])!;
-        let targetPos = projection([dest.lng, dest.lat])!;
-        
-        if (originCompany && companyNodePositions.has(originCompany.id)) {
-          sourcePos = companyNodePositions.get(originCompany.id)!;
-        }
-        
-        if (destCompany && companyNodePositions.has(destCompany.id)) {
-          targetPos = companyNodePositions.get(destCompany.id)!;
-        }
-        
-        const midX = (sourcePos[0] + targetPos[0]) / 2;
-        const midY = (sourcePos[1] + targetPos[1]) / 2 - 50; 
-        const lineData = `M${sourcePos[0]},${sourcePos[1]} Q${midX},${midY} ${targetPos[0]},${targetPos[1]}`;
-        
+          let sourcePos = projection([origin.lng, origin.lat])!;
+          let targetPos = projection([dest.lng, dest.lat])!;
+          
+          if (originCompany && companyNodePositions.has(originCompany.id)) {
+            sourcePos = companyNodePositions.get(originCompany.id)!;
+          }
+          
+          if (destCompany && companyNodePositions.has(destCompany.id)) {
+            targetPos = companyNodePositions.get(destCompany.id)!;
+          }
+          
+          const midX = (sourcePos[0] + targetPos[0]) / 2;
+          const midY = (sourcePos[1] + targetPos[1]) / 2 - 50; 
+          const lineData = `M${sourcePos[0]},${sourcePos[1]} Q${midX},${midY} ${targetPos[0]},${targetPos[1]}`;
+          
         const color = routeGroup.mainColor;
         const thickness = strokeScale(routeGroup.count); // 根据交易数量计算粗细
 
         const arc = gFlows.append('path')
-          .attr('d', lineData)
-          .attr('fill', 'none')
-          .attr('stroke', color)
-          .attr('stroke-width', thickness)
+            .attr('d', lineData)
+            .attr('fill', 'none')
+            .attr('stroke', color)
+            .attr('stroke-width', thickness)
           .attr('data-base-stroke-width', thickness)
-          .attr('stroke-linecap', 'round')
-          .attr('opacity', 0.5)
+            .attr('stroke-linecap', 'round')
+            .attr('opacity', 0.5)
           .attr('class', 'shipment-path');
 
-        arc.on('mouseover', function(event) {
+          arc.on('mouseover', function(event) {
           const svgNode = svgRef.current;
           const currentScale = svgNode ? d3.zoomTransform(svgNode)?.k || 1 : 1;
-          const baseStrokeWidth = parseFloat(d3.select(this).attr('data-base-stroke-width') || thickness.toString());
-          const scaledThickness = Math.max(0.2, baseStrokeWidth / currentScale);
-          d3.select(this).attr('opacity', 0.9).attr('stroke-width', scaledThickness + 1.5 / currentScale);
+            const baseStrokeWidth = parseFloat(d3.select(this).attr('data-base-stroke-width') || thickness.toString());
+            const scaledThickness = Math.max(0.2, baseStrokeWidth / currentScale);
+            d3.select(this).attr('opacity', 0.9).attr('stroke-width', scaledThickness + 1.5 / currentScale);
           
           if (tooltipRef.current) {
             // 获取所有物料（去重）
@@ -444,11 +444,21 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
               ? `${uniqueMaterials.slice(0, 3).join(', ')}, ...`
               : uniqueMaterials.join(', ');
             
+            // 获取品类显示名称
+            const category = categories.find(c => c.displayName === routeGroup.mainCategory);
+            const categoryDisplayName = category?.displayName || routeGroup.mainCategory;
+            
             tooltipRef.current.html(`
               <div class="space-y-3">
-                <div class="flex items-center justify-between gap-4">
-                  <span class="font-bold text-[14px]">${materialsText}</span>
-                  <div class="w-2.5 h-2.5 rounded-full" style="background-color: ${color}"></div>
+                <div class="flex items-center justify-between gap-4 pb-2 border-b border-black/5">
+                  <div class="flex items-center gap-2">
+                    <div class="w-3 h-3 rounded-full" style="background-color: ${color}"></div>
+                    <span class="font-bold text-[16px] text-[#1D1D1F]">${categoryDisplayName}</span>
+                  </div>
+                </div>
+                <div class="flex flex-col gap-1">
+                  <span class="text-[#86868B] text-[10px] font-bold uppercase">物料名称</span>
+                  <span class="text-[#1D1D1F] font-semibold text-[13px]">${materialsText}</span>
                 </div>
                 <div class="flex flex-col gap-1">
                   <span class="text-[#86868B] text-[10px] font-bold uppercase">交易向</span>
@@ -468,18 +478,18 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
             .style('top', (event.pageY - 10) + 'px')
             .style('left', (event.pageX + 20) + 'px');
           }
-        })
-        .on('mousemove', (event) => {
+          })
+          .on('mousemove', (event) => {
           if (tooltipRef.current) {
             tooltipRef.current.style('top', (event.pageY - 10) + 'px').style('left', (event.pageX + 20) + 'px');
           }
-        })
-        .on('mouseout', function() {
+          })
+          .on('mouseout', function() {
           const svgNode = svgRef.current;
           const currentScale = svgNode ? d3.zoomTransform(svgNode)?.k || 1 : 1;
-          const baseStrokeWidth = parseFloat(d3.select(this).attr('data-base-stroke-width') || thickness.toString());
-          const scaledThickness = Math.max(0.2, baseStrokeWidth / currentScale);
-          d3.select(this).attr('opacity', 0.5).attr('stroke-width', scaledThickness);
+            const baseStrokeWidth = parseFloat(d3.select(this).attr('data-base-stroke-width') || thickness.toString());
+            const scaledThickness = Math.max(0.2, baseStrokeWidth / currentScale);
+            d3.select(this).attr('opacity', 0.5).attr('stroke-width', scaledThickness);
           if (tooltipRef.current) {
             tooltipRef.current.style('visibility', 'hidden');
           }
@@ -492,30 +502,30 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
           const particleCountForRoute = Math.min(routeGroup.count, 5);
           
           for (let p = 0; p < particleCountForRoute; p++) {
-            const particleBaseRadius = Math.max(1.8, thickness / 1.8);
-            const particleBaseStrokeWidth = 0.5;
+          const particleBaseRadius = Math.max(1.8, thickness / 1.8);
+          const particleBaseStrokeWidth = 0.5;
             const particle = gFlows.append('circle')
-              .attr('r', particleBaseRadius)
+            .attr('r', particleBaseRadius)
               .attr('data-base-radius', particleBaseRadius)
               .attr('data-base-stroke-width', particleBaseStrokeWidth)
-              .attr('fill', '#FFFFFF')
-              .attr('stroke', color)
-              .attr('stroke-width', particleBaseStrokeWidth)
+            .attr('fill', '#FFFFFF')
+            .attr('stroke', color)
+            .attr('stroke-width', particleBaseStrokeWidth)
               .attr('class', 'shipment-particle')
-              .style('filter', 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))');
+            .style('filter', 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))');
 
-            const animate = () => {
+          const animate = () => {
               const anim = particle.transition()
                 .duration(2500 + Math.random() * 2000 + p * 200) // 错开粒子动画时间
-                .ease(d3.easeLinear)
-                .attrTween('transform', () => {
-                  const node = arc.node() as SVGPathElement;
-                  const l = node.getTotalLength();
-                  return (t) => {
-                    const p = node.getPointAtLength(t * l);
-                    return `translate(${p.x},${p.y})`;
-                  };
-                })
+              .ease(d3.easeLinear)
+              .attrTween('transform', () => {
+                const node = arc.node() as SVGPathElement;
+                const l = node.getTotalLength();
+                return (t) => {
+                  const p = node.getPointAtLength(t * l);
+                  return `translate(${p.x},${p.y})`;
+                };
+              })
                 .on('end', () => {
                   particleAnimationsRef.current.delete(anim);
                   if (!isPreview) {
@@ -524,12 +534,12 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
                 });
               
               particleAnimationsRef.current.add(anim);
-            };
-            animate();
-          }
+          };
+          animate();
+        }
         }
       });
-    }
+      }
   }, [shipments, selectedCountries, activeCompanies, companies, countries, categoryColors, categories, isPreview]);
 
   return (
