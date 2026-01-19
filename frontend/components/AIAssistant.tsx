@@ -57,16 +57,9 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onSendMessage }) => {
     setInputValue('');
     setIsLoading(true);
 
-    // 创建助手消息占位符
+    // 创建助手消息占位符（不立即添加到消息列表，等有内容时再添加）
     const assistantMessageId = (Date.now() + 1).toString();
-    const assistantMessage: Message = {
-      id: assistantMessageId,
-      role: 'assistant',
-      content: '',
-      timestamp: new Date()
-    };
-
-    setMessages(prev => [...prev, assistantMessage]);
+    let assistantMessageAdded = false;
 
     try {
       // 构建对话历史（排除初始欢迎消息和当前用户消息）
@@ -87,13 +80,25 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onSendMessage }) => {
           // onChunk: 每次收到新的内容块时调用
           (chunk: string) => {
             accumulatedContent += chunk;
-            setMessages(prev => 
-              prev.map(msg => 
-                msg.id === assistantMessageId 
-                  ? { ...msg, content: accumulatedContent }
-                  : msg
-              )
-            );
+            // 第一次收到内容时，添加助手消息到列表
+            if (!assistantMessageAdded) {
+              assistantMessageAdded = true;
+              setMessages(prev => [...prev, {
+                id: assistantMessageId,
+                role: 'assistant',
+                content: accumulatedContent,
+                timestamp: new Date()
+              }]);
+            } else {
+              // 更新已有消息的内容
+              setMessages(prev => 
+                prev.map(msg => 
+                  msg.id === assistantMessageId 
+                    ? { ...msg, content: accumulatedContent }
+                    : msg
+                )
+              );
+            }
             // 自动滚动到底部
             setTimeout(() => {
               if (messagesEndRef.current) {
@@ -112,36 +117,44 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onSendMessage }) => {
           },
           // onError: 发生错误时调用
           (error: string) => {
-            setMessages(prev => 
-              prev.map(msg => 
-                msg.id === assistantMessageId 
-                  ? { ...msg, content: `抱歉，发生了错误：${error}` }
-                  : msg
-              )
-            );
+            // 如果还没有添加消息，现在添加错误消息
+            if (!assistantMessageAdded) {
+              setMessages(prev => [...prev, {
+                id: assistantMessageId,
+                role: 'assistant',
+                content: `抱歉，发生了错误：${error}`,
+                timestamp: new Date()
+              }]);
+            } else {
+              setMessages(prev => 
+                prev.map(msg => 
+                  msg.id === assistantMessageId 
+                    ? { ...msg, content: `抱歉，发生了错误：${error}` }
+                    : msg
+                )
+              );
+            }
             setIsLoading(false);
           }
         );
       } else {
         // 如果没有提供 onSendMessage，显示错误
-        setMessages(prev => 
-          prev.map(msg => 
-            msg.id === assistantMessageId 
-              ? { ...msg, content: '抱歉，AI 助手功能未正确配置。' }
-              : msg
-          )
-        );
+        setMessages(prev => [...prev, {
+          id: assistantMessageId,
+          role: 'assistant',
+          content: '抱歉，AI 助手功能未正确配置。',
+          timestamp: new Date()
+        }]);
         setIsLoading(false);
       }
     } catch (error) {
       console.error('Error in handleSend:', error);
-      setMessages(prev => 
-        prev.map(msg => 
-          msg.id === assistantMessageId 
-            ? { ...msg, content: `抱歉，发生了错误：${error instanceof Error ? error.message : '未知错误'}` }
-            : msg
-        )
-      );
+      setMessages(prev => [...prev, {
+        id: assistantMessageId,
+        role: 'assistant',
+        content: `抱歉，发生了错误：${error instanceof Error ? error.message : '未知错误'}`,
+        timestamp: new Date()
+      }]);
       setIsLoading(false);
     }
   };

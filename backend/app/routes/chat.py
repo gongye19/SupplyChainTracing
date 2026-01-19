@@ -69,8 +69,9 @@ async def chat(request: ChatRequest):
             detail=str(e)
         )
     
-    async def generate():
+    def generate():
         try:
+            print(f"Chat request received. Model: {MODEL_NAME}, Message: {request.message[:50]}...")
             # 构建消息历史
             messages = []
             
@@ -94,6 +95,8 @@ async def chat(request: ChatRequest):
                 "content": request.message
             })
             
+            print(f"Calling OpenAI API with {len(messages)} messages")
+            
             # 调用 OpenAI API（流式）
             try:
                 stream = client.chat.completions.create(
@@ -102,6 +105,7 @@ async def chat(request: ChatRequest):
                     temperature=0.7,
                     stream=True
                 )
+                print("OpenAI API stream created successfully")
             except Exception as e:
                 # OpenAI API 调用失败
                 import traceback
@@ -127,8 +131,8 @@ async def chat(request: ChatRequest):
                             # 使用 SSE 格式返回
                             data = json.dumps({"content": content}, ensure_ascii=False)
                             yield f"data: {data}\n\n"
-                            if chunk_count % 10 == 0:  # 每10个chunk打印一次日志
-                                print(f"Sent {chunk_count} chunks, last content: {content[:50]}")
+                            if chunk_count <= 3 or chunk_count % 10 == 0:  # 前3个和每10个chunk打印一次日志
+                                print(f"Sent chunk {chunk_count}, content: {content[:50]}")
                 
                 print(f"Stream completed. Total chunks: {chunk_count}, Has content: {has_content}")
             except Exception as e:
