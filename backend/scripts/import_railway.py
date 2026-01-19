@@ -1,7 +1,24 @@
 #!/usr/bin/env python3
 """
 Railway 数据库数据导入脚本
-用于将 CSV 数据导入到 Railway 的 PostgreSQL 数据库
+用于从本地 CSV 文件导入数据到 Railway 部署的 PostgreSQL 数据库
+
+使用方法:
+1. 通过环境变量设置数据库连接:
+   export DATABASE_URL='postgresql://用户名:密码@主机:端口/数据库名'
+   python backend/scripts/import_railway.py path/to/data.csv
+
+2. 通过命令行参数指定:
+   python backend/scripts/import_railway.py 'postgresql://...' path/to/data.csv
+
+3. 交互式输入:
+   python backend/scripts/import_railway.py
+
+功能:
+- 自动初始化数据库表结构（如果不存在）
+- 自动更新品类显示名称为中文
+- 导入 CSV 数据到数据库
+- 支持中文和英文品类名称查找
 """
 import csv
 import sys
