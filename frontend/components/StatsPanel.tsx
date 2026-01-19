@@ -3,6 +3,7 @@ import React, { useMemo } from 'react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { Transaction } from '../types';
 import { TrendingUp, Package, DollarSign, Activity, ArrowUpRight } from 'lucide-react';
+import { translateMaterial } from '../utils/materialTranslations';
 
 interface StatsPanelProps {
   transactions: Transaction[];
@@ -244,7 +245,7 @@ const StatsPanel: React.FC<StatsPanelProps> = ({ transactions }) => {
                     <td className="py-6 px-2 font-bold text-[#007AFF] text-[15px]">
                       {s.exporterCountryCode.toUpperCase()} &rarr; {s.importerCountryCode.toUpperCase()}
                     </td>
-                  <td className="py-6 px-2 text-[#1D1D1F] font-semibold text-[14px]">{s.material}</td>
+                  <td className="py-6 px-2 text-[#1D1D1F] font-semibold text-[14px]">{translateMaterial(s.material)}</td>
                   <td className="py-6 px-2">
                       <span className={`px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                         s.status === 'in-transit' 

@@ -2,6 +2,7 @@
 import React, { useEffect, useRef, useMemo } from 'react';
 import * as d3 from 'd3';
 import { Shipment, CountryLocation, Category, Transaction, CompanyWithLocation } from '../types';
+import { translateMaterials } from '../utils/materialTranslations';
 
 interface SupplyMapProps {
   shipments: Shipment[];
@@ -444,9 +445,11 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
           if (tooltipRef.current) {
             // 获取所有物料（去重）
             const uniqueMaterials = Array.from(new Set(routeGroup.shipments.map(s => s.material)));
-            const materialsText = uniqueMaterials.length > 3 
-              ? `${uniqueMaterials.slice(0, 3).join(', ')}, ...`
-              : uniqueMaterials.join(', ');
+            // 翻译物料名称
+            const translatedMaterials = translateMaterials(uniqueMaterials);
+            const materialsText = translatedMaterials.length > 3 
+              ? `${translatedMaterials.slice(0, 3).join('、')}，...`
+              : translatedMaterials.join('、');
             
             // 获取品类显示名称
             const category = categories.find(c => c.displayName === routeGroup.mainCategory);
