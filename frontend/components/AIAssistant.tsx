@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Send, Bot } from 'lucide-react';
+import { MessageCircle, X, Send, Bot, Trash2 } from 'lucide-react';
 
 interface Message {
   id: string;
@@ -166,6 +166,20 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onSendMessage }) => {
     }
   };
 
+  // 清空聊天记录
+  const handleClearChat = () => {
+    if (window.confirm('确定要清空所有聊天记录吗？')) {
+      setMessages([
+        {
+          id: '1',
+          role: 'assistant',
+          content: '你好！我是供应链智能助手，可以帮助你分析供应链数据。有什么问题可以问我！',
+          timestamp: new Date()
+        }
+      ]);
+    }
+  };
+
   return (
     <>
       {/* 浮动按钮 */}
@@ -201,12 +215,22 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onSendMessage }) => {
                 <p className="text-white/80 text-[11px]">供应链智能分析</p>
               </div>
             </div>
-            <button
-              onClick={() => setIsOpen(false)}
-              className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all"
-            >
-              <X className="w-4 h-4 text-white" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleClearChat}
+                className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all"
+                title="清空聊天记录"
+              >
+                <Trash2 className="w-4 h-4 text-white" />
+              </button>
+              <button
+                onClick={() => setIsOpen(false)}
+                className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all"
+                title="关闭"
+              >
+                <X className="w-4 h-4 text-white" />
+              </button>
+            </div>
           </div>
 
           {/* 消息列表 */}
