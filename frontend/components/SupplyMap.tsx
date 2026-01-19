@@ -285,8 +285,9 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
             const locationLabel = t('map.location');
             const unknownCompany = t('map.unknownCompany');
             const unknown = t('map.unknown');
-            const companiesAtLocation = t('map.companiesAtLocation');
-            const companiesAtLocationSuffix = t('map.companiesAtLocationSuffix');
+            const companiesAtLocationText = language === 'zh' 
+              ? `此位置有 ${cityCompanies.length} 家公司`
+              : `${cityCompanies.length} ${t('map.companiesAtLocation')}`;
               let tooltipHTML = `
                 <div style="display: flex; flex-direction: column; gap: 8px;">
                   <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
@@ -300,7 +301,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
                   </div>
                   ${cityCompanies.length > 1 ? `
                     <div style="color: #86868B; font-size: 10px; font-style: italic;">
-                      ${companiesAtLocation} ${cityCompanies.length} ${companiesAtLocationSuffix}
+                      ${companiesAtLocationText}
                     </div>
                   ` : ''}
                 </div>
