@@ -438,38 +438,29 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
           d3.select(this).attr('opacity', 0.9).attr('stroke-width', scaledThickness + 1.5 / currentScale);
           
           if (tooltipRef.current) {
-            const materials = routeGroup.shipments.map(s => s.material).slice(0, 3);
-            const materialsText = routeGroup.count > 3 
-              ? `${materials.join(', ')}, ... (${routeGroup.count}笔交易)`
-              : materials.join(', ');
+            // 获取所有物料（去重）
+            const uniqueMaterials = Array.from(new Set(routeGroup.shipments.map(s => s.material)));
+            const materialsText = uniqueMaterials.length > 3 
+              ? `${uniqueMaterials.slice(0, 3).join(', ')}, ...`
+              : uniqueMaterials.join(', ');
             
             tooltipRef.current.html(`
-              <div class="space-y-2">
+              <div class="space-y-3">
                 <div class="flex items-center justify-between gap-4">
-                  <span class="font-bold text-[14px]">${routeGroup.count} 笔交易</span>
+                  <span class="font-bold text-[14px]">${materialsText}</span>
                   <div class="w-2.5 h-2.5 rounded-full" style="background-color: ${color}"></div>
                 </div>
-                <div class="text-[11px] font-semibold text-[#86868B] tracking-wide uppercase">
-                  ${routeGroup.mainCategory}
+                <div class="flex flex-col gap-1">
+                  <span class="text-[#86868B] text-[10px] font-bold uppercase">交易向</span>
+                  <span class="text-[#007AFF] font-semibold text-[13px]">${origin.name} &rarr; ${dest.name}</span>
                 </div>
-                <div class="h-[0.5px] bg-black/5"></div>
-                <div class="flex flex-col gap-0.5">
-                  <span class="text-[#86868B] text-[10px] font-bold uppercase">Logistics Path</span>
-                  <span class="text-[#007AFF] font-semibold">${origin.name} &rarr; ${dest.name}</span>
+                <div class="flex justify-between items-center">
+                  <span class="text-[#86868B] text-[10px] font-bold uppercase">交易数量</span>
+                  <span class="text-[#1D1D1F] font-bold">${routeGroup.count}</span>
                 </div>
-                <div class="flex flex-col gap-1 pt-1">
-                  <div class="flex justify-between items-center">
-                    <span class="text-[#86868B] text-[10px] font-bold uppercase">交易数量</span>
-                    <span class="text-[#1D1D1F] font-bold">${routeGroup.count} 笔</span>
-                  </div>
-                  <div class="flex justify-between items-center">
-                    <span class="text-[#86868B] text-[10px] font-bold uppercase">总价值</span>
-                    <span class="text-[#1D1D1F] font-bold">$${routeGroup.totalValue.toFixed(1)}M</span>
-                  </div>
-                  ${routeGroup.count <= 3 ? `
-                    <div class="text-[#86868B] text-[10px] font-bold uppercase mt-1">物料</div>
-                    <div class="text-[#1D1D1F] text-[11px]">${materialsText}</div>
-                  ` : ''}
+                <div class="flex justify-between items-center">
+                  <span class="text-[#86868B] text-[10px] font-bold uppercase">总价值</span>
+                  <span class="text-[#1D1D1F] font-bold">$${routeGroup.totalValue.toFixed(1)}M</span>
                 </div>
               </div>
             `)
