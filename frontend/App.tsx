@@ -197,6 +197,7 @@ const App: React.FC = () => {
       importerCompanyName: t.importerCompanyName,
       material: t.material,
       category: t.categoryName,
+      categoryColor: t.categoryColor, // 添加品类颜色，直接从交易数据获取
       quantity: t.quantity,
       value: t.totalValue / 1000000, // 转换为百万美元
       status: t.status,

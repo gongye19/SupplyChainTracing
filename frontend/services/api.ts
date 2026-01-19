@@ -29,11 +29,32 @@ async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> 
 // 品类API
 export const categoriesAPI = {
   getAll: async (activeOnly: boolean = true): Promise<Category[]> => {
-    const data = await fetchAPI<Category[]>(`/api/categories?active_only=${activeOnly}`);
-    return data;
+    const data = await fetchAPI<any[]>(`/api/categories?active_only=${activeOnly}`);
+    // 转换字段名从下划线格式到驼峰格式
+    return data.map((cat: any) => ({
+      id: cat.id,
+      name: cat.name,
+      displayName: cat.display_name || cat.displayName || cat.name,
+      color: cat.color,
+      icon: cat.icon,
+      description: cat.description,
+      sortOrder: cat.sort_order || cat.sortOrder || 0,
+      isActive: cat.is_active !== undefined ? cat.is_active : (cat.isActive !== undefined ? cat.isActive : true)
+    }));
   },
   getById: async (id: string): Promise<Category> => {
-    return fetchAPI<Category>(`/api/categories/${id}`);
+    const data = await fetchAPI<any>(`/api/categories/${id}`);
+    // 转换字段名从下划线格式到驼峰格式
+    return {
+      id: data.id,
+      name: data.name,
+      displayName: data.display_name || data.displayName || data.name,
+      color: data.color,
+      icon: data.icon,
+      description: data.description,
+      sortOrder: data.sort_order || data.sortOrder || 0,
+      isActive: data.is_active !== undefined ? data.is_active : (data.isActive !== undefined ? data.isActive : true)
+    };
   },
 };
 

@@ -83,6 +83,7 @@ export interface Filters {
 
 // 向后兼容的 Shipment 接口（用于地图组件）
 export interface Shipment {
+  categoryColor?: string; // 品类颜色，直接从交易数据获取
   id: string;
   originId: string;
   destinationId: string;

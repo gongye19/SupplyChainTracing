@@ -339,8 +339,9 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
         const routeKey = `${shipment.exporterCompanyId || shipment.originId}-${shipment.importerCompanyId || shipment.destinationId}`;
         
         if (!routeGroups.has(routeKey)) {
-          const category = categories.find(c => c.displayName === shipment.category);
-          const color = category?.color || categoryColors[shipment.category] || '#8E8E93';
+          // 优先使用交易数据中的品类颜色，然后尝试从品类列表匹配，最后使用默认颜色
+          const category = categories.find(c => c.displayName === shipment.category || c.name === shipment.category || c.id === shipment.category);
+          const color = (shipment as any).categoryColor || category?.color || categoryColors[shipment.category] || '#8E8E93';
           
           routeGroups.set(routeKey, {
             exporterCompanyId: shipment.exporterCompanyId,
@@ -366,8 +367,10 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
           const mostFrequentCategory = Array.from(categoryCounts.entries())
             .sort((a, b) => b[1] - a[1])[0][0];
           group.mainCategory = mostFrequentCategory;
-          const category = categories.find(c => c.displayName === mostFrequentCategory);
-          group.mainColor = category?.color || categoryColors[mostFrequentCategory] || '#8E8E93';
+          // 找到该品类对应的 shipment，使用其 categoryColor
+          const categoryShipment = group.shipments.find(s => s.category === mostFrequentCategory);
+          const category = categories.find(c => c.displayName === mostFrequentCategory || c.name === mostFrequentCategory || c.id === mostFrequentCategory);
+          group.mainColor = (categoryShipment as any)?.categoryColor || category?.color || categoryColors[mostFrequentCategory] || '#8E8E93';
         }
       });
 
