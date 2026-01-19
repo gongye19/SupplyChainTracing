@@ -228,7 +228,7 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, ca
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-[#007AFF]">
           <Filter className="w-4 h-4" />
-          <span className="text-[12px] font-bold uppercase tracking-widest text-[#1D1D1F]">筛选控制</span>
+          <span className="text-[12px] font-bold uppercase tracking-widest text-[#1D1D1F]">{t('filters.filterControl')}</span>
         </div>
         <button 
           onClick={() => setFilters({ 
@@ -240,27 +240,27 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, ca
           })}
           className="text-[12px] text-[#007AFF] hover:underline font-semibold"
         >
-          重置
+          {t('filters.reset')}
         </button>
       </div>
 
       {/* Date Range - Dual Slider */}
       <section className="space-y-5">
         <label className="text-[11px] font-bold text-[#86868B] uppercase tracking-widest flex items-center gap-2.5">
-          <Calendar className="w-4 h-4" /> 时间范围
+          <Calendar className="w-4 h-4" /> {t('filters.dateRange')}
         </label>
         
         <div className="space-y-2">
           {/* Date Display */}
           <div className="flex items-center justify-between px-1">
             <div className="flex flex-col">
-              <span className="text-[9px] text-[#86868B] uppercase font-bold tracking-wider">起始</span>
+              <span className="text-[9px] text-[#86868B] uppercase font-bold tracking-wider">{t('filters.start')}</span>
               <span className="text-[12px] text-[#1D1D1F] font-semibold mt-0.5">
                 {formatDateDisplay(filters.startDate)}
               </span>
             </div>
             <div className="flex flex-col items-end">
-              <span className="text-[9px] text-[#86868B] uppercase font-bold tracking-wider">结束</span>
+              <span className="text-[9px] text-[#86868B] uppercase font-bold tracking-wider">{t('filters.end')}</span>
               <span className="text-[12px] text-[#1D1D1F] font-semibold mt-0.5">
                 {formatDateDisplay(filters.endDate)}
               </span>
@@ -289,7 +289,7 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, ca
               {/* left thumb */}
               <div
                 role="slider"
-                aria-label="起始日期"
+                aria-label={t('filters.startDate')}
                 aria-valuemin={0}
                 aria-valuemax={totalMonths}
                 aria-valuenow={left}
@@ -306,7 +306,7 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, ca
               {/* right thumb */}
               <div
                 role="slider"
-                aria-label="结束日期"
+                aria-label={t('filters.endDate')}
                 aria-valuemin={0}
                 aria-valuemax={totalMonths}
                 aria-valuenow={right}

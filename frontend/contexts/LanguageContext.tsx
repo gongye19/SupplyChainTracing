@@ -21,7 +21,13 @@ const translations: Record<Language, Record<string, string>> = {
     'app.realTimeMetrics': 'Real-time performance metrics and material distribution analysis.',
     
     // Sidebar Filters
+    'filters.filterControl': 'Filter Control',
+    'filters.reset': 'Reset',
     'filters.dateRange': 'Date Range',
+    'filters.start': 'Start',
+    'filters.end': 'End',
+    'filters.startDate': 'Start Date',
+    'filters.endDate': 'End Date',
     'filters.countries': 'Countries',
     'filters.categories': 'Material Categories',
     'filters.companies': 'Companies',
@@ -99,7 +105,13 @@ const translations: Record<Language, Record<string, string>> = {
     'app.realTimeMetrics': '实时性能指标和物料分布分析。',
     
     // Sidebar Filters
+    'filters.filterControl': '筛选控制',
+    'filters.reset': '重置',
     'filters.dateRange': '日期范围',
+    'filters.start': '起始',
+    'filters.end': '结束',
+    'filters.startDate': '起始日期',
+    'filters.endDate': '结束日期',
     'filters.countries': '国家',
     'filters.categories': '物料品类',
     'filters.companies': '公司',
