@@ -1,22 +1,25 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Filters, Category, CountryLocation } from '../types';
-import { Calendar, Building2, Package, Filter, ChevronDown, Check } from 'lucide-react';
+import { Filters, Category, CountryLocation, CompanyWithLocation } from '../types';
+import { Calendar, Building2, Package, Filter, ChevronDown, Check, Building } from 'lucide-react';
 
 interface SidebarFiltersProps {
   filters: Filters;
   setFilters: React.Dispatch<React.SetStateAction<Filters>>;
   categories: Category[];
   countries: CountryLocation[];
+  companies: CompanyWithLocation[];
   onDragChange?: (isDragging: boolean) => void;
 }
 
-const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, categories, countries, onDragChange }) => {
+const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, categories, countries, companies, onDragChange }) => {
   const [countriesOpen, setCountriesOpen] = useState(false);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
+  const [companiesOpen, setCompaniesOpen] = useState(false);
   const [activeThumb, setActiveThumb] = useState<'start' | 'end' | null>(null);
   const countriesRef = useRef<HTMLDivElement>(null);
   const categoriesRef = useRef<HTMLDivElement>(null);
+  const companiesRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   
   // rAF throttle for smooth dragging
@@ -32,16 +35,19 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, ca
       if (categoriesRef.current && !categoriesRef.current.contains(event.target as Node)) {
         setCategoriesOpen(false);
       }
+      if (companiesRef.current && !companiesRef.current.contains(event.target as Node)) {
+        setCompaniesOpen(false);
+      }
     };
 
-    if (countriesOpen || categoriesOpen) {
+    if (countriesOpen || categoriesOpen || companiesOpen) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [countriesOpen, categoriesOpen]);
+  }, [countriesOpen, categoriesOpen, companiesOpen]);
 
   // 全局鼠标事件，确保拖动状态正确重置
   useEffect(() => {
@@ -204,6 +210,15 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, ca
         : [...prev.selectedCategories, categoryId]
     }));
     // 点击后不关闭下拉框，让用户可以多选
+  };
+
+  const toggleCompany = (companyId: string) => {
+    setFilters(prev => ({
+      ...prev,
+      selectedCompanies: prev.selectedCompanies.includes(companyId)
+        ? prev.selectedCompanies.filter(c => c !== companyId)
+        : [...prev.selectedCompanies, companyId]
+    }));
   };
 
   return (
@@ -392,6 +407,50 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, ca
                     {cat.displayName || cat.name || cat.id}
                   </span>
                   {filters.selectedCategories.includes(cat.id) && <Check className="w-3.5 h-3.5 flex-shrink-0 ml-2" />}
+                </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Companies Dropdown */}
+      <section className="space-y-2.5">
+        <label className="text-[11px] font-bold text-[#86868B] uppercase tracking-widest flex items-center gap-2.5">
+          <Building className="w-4 h-4" /> Companies
+        </label>
+        <div className="relative" ref={companiesRef}>
+          <button 
+            onClick={() => setCompaniesOpen(!companiesOpen)}
+            className="w-full bg-[#F5F5F7] border border-black/5 rounded-[12px] px-3 py-2.5 flex items-center justify-between text-[12px] text-[#1D1D1F] font-semibold hover:bg-[#EBEBEB] transition-all shadow-sm"
+          >
+            <span className="truncate">
+              {filters.selectedCompanies.length === 0 
+                ? 'All Companies' 
+                : `${filters.selectedCompanies.length} Selected`}
+            </span>
+            <ChevronDown className={`w-3.5 h-3.5 text-[#86868B] transition-transform ${companiesOpen ? 'rotate-180' : ''}`} />
+          </button>
+          
+          {companiesOpen && (
+            <div className="absolute top-full left-0 right-0 mt-2 bg-white/90 backdrop-blur-xl border border-black/5 rounded-[16px] shadow-2xl z-50 max-h-72 overflow-y-auto custom-scrollbar p-1.5 animate-in fade-in zoom-in-95 duration-200">
+              {companies.length === 0 ? (
+                <div className="px-3 py-2 text-[12px] text-[#86868B]">加载中...</div>
+              ) : (
+                companies.map(company => (
+                <div 
+                  key={company.id}
+                  onClick={() => toggleCompany(company.id)}
+                  className={`px-3 py-2 text-[12px] flex items-center justify-between cursor-pointer rounded-[8px] transition-colors mb-0.5 last:mb-0 ${filters.selectedCompanies.includes(company.id) ? 'bg-[#007AFF] text-white font-bold' : 'text-[#1D1D1F] hover:bg-black/5'}`}
+                >
+                  <div className="flex flex-col flex-1 min-w-0">
+                    <span className="truncate">{company.name}</span>
+                    <span className={`text-[9px] uppercase font-bold ${filters.selectedCompanies.includes(company.id) ? 'text-white/80' : 'text-[#86868B]'}`}>
+                      {company.city}, {company.countryCode}
+                    </span>
+                  </div>
+                  {filters.selectedCompanies.includes(company.id) && <Check className="w-3.5 h-3.5 flex-shrink-0 ml-2" />}
                 </div>
                 ))
               )}

@@ -271,6 +271,7 @@ const App: React.FC = () => {
              setFilters={setFilters}
              categories={categories}
              countries={countries}
+             companies={companies}
              onDragChange={setDragging}
            />
            

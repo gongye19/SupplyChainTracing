@@ -317,37 +317,87 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
 
     // 绘制路径和粒子（preview 模式限制粒子数量）
     if (shipments.length > 0) {
-      const sortedShipments = [...shipments].sort((a, b) => 
-        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-      );
+      // 按公司对聚合交易（相同出口商和进口商的交易合并）
+      const routeGroups = new Map<string, {
+        exporterCompanyId?: string;
+        importerCompanyId?: string;
+        originId: string;
+        destinationId: string;
+        shipments: typeof shipments;
+        count: number;
+        totalValue: number;
+        mainCategory: string;
+        mainColor: string;
+      }>();
 
-      const valueExtent = d3.extent(shipments, d => d.value) as [number, number];
+      shipments.forEach(shipment => {
+        const routeKey = `${shipment.exporterCompanyId || shipment.originId}-${shipment.importerCompanyId || shipment.destinationId}`;
+        
+        if (!routeGroups.has(routeKey)) {
+          const category = categories.find(c => c.displayName === shipment.category);
+          const color = category?.color || categoryColors[shipment.category] || '#8E8E93';
+          
+          routeGroups.set(routeKey, {
+            exporterCompanyId: shipment.exporterCompanyId,
+            importerCompanyId: shipment.importerCompanyId,
+            originId: shipment.originId,
+            destinationId: shipment.destinationId,
+            shipments: [shipment],
+            count: 1,
+            totalValue: shipment.value,
+            mainCategory: shipment.category,
+            mainColor: color
+          });
+        } else {
+          const group = routeGroups.get(routeKey)!;
+          group.shipments.push(shipment);
+          group.count += 1;
+          group.totalValue += shipment.value;
+          // 更新主要品类（选择出现最多的品类）
+          const categoryCounts = new Map<string, number>();
+          group.shipments.forEach(s => {
+            categoryCounts.set(s.category, (categoryCounts.get(s.category) || 0) + 1);
+          });
+          const mostFrequentCategory = Array.from(categoryCounts.entries())
+            .sort((a, b) => b[1] - a[1])[0][0];
+          group.mainCategory = mostFrequentCategory;
+          const category = categories.find(c => c.displayName === mostFrequentCategory);
+          group.mainColor = category?.color || categoryColors[mostFrequentCategory] || '#8E8E93';
+        }
+      });
+
+      // 按交易数量计算路径粗细
+      const countExtent = d3.extent(Array.from(routeGroups.values()), d => d.count) as [number, number];
       const strokeScale = d3.scaleSqrt()
-        .domain(valueExtent[0] !== undefined ? valueExtent : [0, 1000])
-        .range([1.2, 5]);
+        .domain(countExtent[0] !== undefined ? countExtent : [1, 10])
+        .range([1.2, 6]); // 根据交易数量，范围 1.2-6
 
       // preview 模式：只显示前 100 条路径，不画粒子
       // final 模式：显示所有路径，画粒子（但限制粒子数量）
-      const maxPaths = isPreview ? 100 : sortedShipments.length;
-      const maxParticles = isPreview ? 0 : Math.min(50, sortedShipments.length); // 最多 50 个粒子
+      const routeGroupsArray = Array.from(routeGroups.values())
+        .sort((a, b) => b.count - a.count); // 按交易数量降序
+      const maxPaths = isPreview ? 100 : routeGroupsArray.length;
+      const maxParticles = isPreview ? 0 : Math.min(50, shipments.length); // 最多 50 个粒子
 
-      sortedShipments.slice(0, maxPaths).forEach((shipment, index) => {
-        const originCompany = shipment.exporterCompanyId 
-          ? companies.find(c => c.id === shipment.exporterCompanyId)
+      routeGroupsArray.slice(0, maxPaths).forEach((routeGroup, routeIndex) => {
+        // 使用第一个 shipment 来确定位置
+        const firstShipment = routeGroup.shipments[0];
+        const originCompany = routeGroup.exporterCompanyId 
+          ? companies.find(c => c.id === routeGroup.exporterCompanyId)
           : null;
-        const destCompany = shipment.importerCompanyId
-          ? companies.find(c => c.id === shipment.importerCompanyId)
+        const destCompany = routeGroup.importerCompanyId
+          ? companies.find(c => c.id === routeGroup.importerCompanyId)
           : null;
 
         const origin = originCompany 
           ? { lng: originCompany.longitude, lat: originCompany.latitude, name: originCompany.name, country: originCompany.countryName }
-          : countries.find(c => c.countryCode === shipment.originId) 
-            ? { lng: countries.find(c => c.countryCode === shipment.originId)!.capitalLng, lat: countries.find(c => c.countryCode === shipment.originId)!.capitalLat, name: countries.find(c => c.countryCode === shipment.originId)!.countryName, country: countries.find(c => c.countryCode === shipment.originId)!.countryName }
+          : countries.find(c => c.countryCode === routeGroup.originId) 
+            ? { lng: countries.find(c => c.countryCode === routeGroup.originId)!.capitalLng, lat: countries.find(c => c.countryCode === routeGroup.originId)!.capitalLat, name: countries.find(c => c.countryCode === routeGroup.originId)!.countryName, country: countries.find(c => c.countryCode === routeGroup.originId)!.countryName }
             : null;
         const dest = destCompany
           ? { lng: destCompany.longitude, lat: destCompany.latitude, name: destCompany.name, country: destCompany.countryName }
-          : countries.find(c => c.countryCode === shipment.destinationId)
-            ? { lng: countries.find(c => c.countryCode === shipment.destinationId)!.capitalLng, lat: countries.find(c => c.countryCode === shipment.destinationId)!.capitalLat, name: countries.find(c => c.countryCode === shipment.destinationId)!.countryName, country: countries.find(c => c.countryCode === shipment.destinationId)!.countryName }
+          : countries.find(c => c.countryCode === routeGroup.destinationId)
+            ? { lng: countries.find(c => c.countryCode === routeGroup.destinationId)!.capitalLng, lat: countries.find(c => c.countryCode === routeGroup.destinationId)!.capitalLat, name: countries.find(c => c.countryCode === routeGroup.destinationId)!.countryName, country: countries.find(c => c.countryCode === routeGroup.destinationId)!.countryName }
             : null;
 
         if (!origin || !dest) return;
@@ -367,9 +417,8 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
         const midY = (sourcePos[1] + targetPos[1]) / 2 - 50; 
         const lineData = `M${sourcePos[0]},${sourcePos[1]} Q${midX},${midY} ${targetPos[0]},${targetPos[1]}`;
         
-        const category = categories.find(c => c.displayName === shipment.category);
-        const color = category?.color || categoryColors[shipment.category] || '#8E8E93';
-        const thickness = strokeScale(shipment.value);
+        const color = routeGroup.mainColor;
+        const thickness = strokeScale(routeGroup.count); // 根据交易数量计算粗细
 
         const arc = gFlows.append('path')
           .attr('d', lineData)
@@ -389,23 +438,38 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
           d3.select(this).attr('opacity', 0.9).attr('stroke-width', scaledThickness + 1.5 / currentScale);
           
           if (tooltipRef.current) {
+            const materials = routeGroup.shipments.map(s => s.material).slice(0, 3);
+            const materialsText = routeGroup.count > 3 
+              ? `${materials.join(', ')}, ... (${routeGroup.count}笔交易)`
+              : materials.join(', ');
+            
             tooltipRef.current.html(`
               <div class="space-y-2">
                 <div class="flex items-center justify-between gap-4">
-                  <span class="font-bold text-[14px]">${shipment.material}</span>
+                  <span class="font-bold text-[14px]">${routeGroup.count} 笔交易</span>
                   <div class="w-2.5 h-2.5 rounded-full" style="background-color: ${color}"></div>
                 </div>
                 <div class="text-[11px] font-semibold text-[#86868B] tracking-wide uppercase">
-                  ${shipment.category}
+                  ${routeGroup.mainCategory}
                 </div>
                 <div class="h-[0.5px] bg-black/5"></div>
                 <div class="flex flex-col gap-0.5">
                   <span class="text-[#86868B] text-[10px] font-bold uppercase">Logistics Path</span>
                   <span class="text-[#007AFF] font-semibold">${origin.name} &rarr; ${dest.name}</span>
                 </div>
-                <div class="flex justify-between items-center pt-1">
-                   <span class="text-[#86868B] text-[10px] font-bold uppercase">Value Flow</span>
-                   <span class="text-[#1D1D1F] font-bold">$${shipment.value}M</span>
+                <div class="flex flex-col gap-1 pt-1">
+                  <div class="flex justify-between items-center">
+                    <span class="text-[#86868B] text-[10px] font-bold uppercase">交易数量</span>
+                    <span class="text-[#1D1D1F] font-bold">${routeGroup.count} 笔</span>
+                  </div>
+                  <div class="flex justify-between items-center">
+                    <span class="text-[#86868B] text-[10px] font-bold uppercase">总价值</span>
+                    <span class="text-[#1D1D1F] font-bold">$${routeGroup.totalValue.toFixed(1)}M</span>
+                  </div>
+                  ${routeGroup.count <= 3 ? `
+                    <div class="text-[#86868B] text-[10px] font-bold uppercase mt-1">物料</div>
+                    <div class="text-[#1D1D1F] text-[11px]">${materialsText}</div>
+                  ` : ''}
                 </div>
               </div>
             `)
@@ -431,41 +495,47 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
         });
 
         // 只在 final 模式且未超过粒子限制时画粒子
-        if (!isPreview && index < maxParticles) {
-          const particleBaseRadius = Math.max(1.8, thickness / 1.8);
-          const particleBaseStrokeWidth = 0.5;
-          const particle = gFlows.append('circle')
-            .attr('r', particleBaseRadius)
-            .attr('data-base-radius', particleBaseRadius)
-            .attr('data-base-stroke-width', particleBaseStrokeWidth)
-            .attr('fill', '#FFFFFF')
-            .attr('stroke', color)
-            .attr('stroke-width', particleBaseStrokeWidth)
-            .attr('class', 'shipment-particle')
-            .style('filter', 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))');
+        // 粒子数量根据交易数量，但限制总数
+        if (!isPreview && routeIndex < maxParticles) {
+          // 每个路径组的粒子数量 = min(交易数量, 5)
+          const particleCountForRoute = Math.min(routeGroup.count, 5);
+          
+          for (let p = 0; p < particleCountForRoute; p++) {
+            const particleBaseRadius = Math.max(1.8, thickness / 1.8);
+            const particleBaseStrokeWidth = 0.5;
+            const particle = gFlows.append('circle')
+              .attr('r', particleBaseRadius)
+              .attr('data-base-radius', particleBaseRadius)
+              .attr('data-base-stroke-width', particleBaseStrokeWidth)
+              .attr('fill', '#FFFFFF')
+              .attr('stroke', color)
+              .attr('stroke-width', particleBaseStrokeWidth)
+              .attr('class', 'shipment-particle')
+              .style('filter', 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))');
 
-          const animate = () => {
-            const anim = particle.transition()
-              .duration(2500 + Math.random() * 2000)
-              .ease(d3.easeLinear)
-              .attrTween('transform', () => {
-                const node = arc.node() as SVGPathElement;
-                const l = node.getTotalLength();
-                return (t) => {
-                  const p = node.getPointAtLength(t * l);
-                  return `translate(${p.x},${p.y})`;
-                };
-              })
-              .on('end', () => {
-                particleAnimationsRef.current.delete(anim);
-                if (!isPreview) {
-                  animate();
-                }
-              });
-            
-            particleAnimationsRef.current.add(anim);
-          };
-          animate();
+            const animate = () => {
+              const anim = particle.transition()
+                .duration(2500 + Math.random() * 2000 + p * 200) // 错开粒子动画时间
+                .ease(d3.easeLinear)
+                .attrTween('transform', () => {
+                  const node = arc.node() as SVGPathElement;
+                  const l = node.getTotalLength();
+                  return (t) => {
+                    const p = node.getPointAtLength(t * l);
+                    return `translate(${p.x},${p.y})`;
+                  };
+                })
+                .on('end', () => {
+                  particleAnimationsRef.current.delete(anim);
+                  if (!isPreview) {
+                    animate();
+                  }
+                });
+              
+              particleAnimationsRef.current.add(anim);
+            };
+            animate();
+          }
         }
       });
     }
