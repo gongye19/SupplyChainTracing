@@ -114,8 +114,11 @@ async def chat(request: ChatRequest):
             
             # 流式返回数据
             has_content = False
+            chunk_count = 0
             try:
+                print(f"Starting to stream response for model: {MODEL_NAME}")
                 for chunk in stream:
+                    chunk_count += 1
                     if chunk.choices and len(chunk.choices) > 0:
                         delta = chunk.choices[0].delta
                         if delta and delta.content is not None:
@@ -124,6 +127,10 @@ async def chat(request: ChatRequest):
                             # 使用 SSE 格式返回
                             data = json.dumps({"content": content}, ensure_ascii=False)
                             yield f"data: {data}\n\n"
+                            if chunk_count % 10 == 0:  # 每10个chunk打印一次日志
+                                print(f"Sent {chunk_count} chunks, last content: {content[:50]}")
+                
+                print(f"Stream completed. Total chunks: {chunk_count}, Has content: {has_content}")
             except Exception as e:
                 # 流式读取过程中出错
                 import traceback
@@ -135,6 +142,7 @@ async def chat(request: ChatRequest):
                 return
             
             # 发送结束标记
+            print("Sending done marker")
             yield f"data: {json.dumps({'done': True}, ensure_ascii=False)}\n\n"
             
         except Exception as e:

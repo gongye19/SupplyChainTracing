@@ -306,6 +306,8 @@ export const chatAPI = {
     const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
     const url = `${API_BASE_URL}/api/chat`;
     
+    console.log('Sending chat request to:', url);
+    
     try {
       const response = await fetch(url, {
         method: 'POST',
@@ -334,11 +336,14 @@ export const chatAPI = {
       let buffer = '';
       let hasReceivedContent = false;
       
+      console.log('Starting to read stream...');
+      
       try {
         while (true) {
           const { done, value } = await reader.read();
           
           if (done) {
+            console.log('Stream done, buffer:', buffer.substring(0, 100));
             // 处理剩余的 buffer
             if (buffer.trim()) {
               const lines = buffer.split('\n');
@@ -346,6 +351,7 @@ export const chatAPI = {
                 if (line.trim() && line.startsWith('data: ')) {
                   try {
                     const data = JSON.parse(line.slice(6));
+                    console.log('Parsed final data:', data);
                     
                     if (data.error) {
                       console.error('Server error:', data.error);
@@ -354,6 +360,7 @@ export const chatAPI = {
                     }
                     
                     if (data.done) {
+                      console.log('Received done marker');
                       if (!hasReceivedContent) {
                         console.warn('Stream completed without content');
                       }
@@ -363,6 +370,7 @@ export const chatAPI = {
                     
                     if (data.content) {
                       hasReceivedContent = true;
+                      console.log('Received content chunk:', data.content.substring(0, 50));
                       onChunk(data.content);
                     }
                   } catch (e) {
@@ -374,7 +382,8 @@ export const chatAPI = {
             break;
           }
           
-          buffer += decoder.decode(value, { stream: true });
+          const chunk = decoder.decode(value, { stream: true });
+          buffer += chunk;
           const lines = buffer.split('\n');
           buffer = lines.pop() || ''; // 保留最后一个不完整的行
           
@@ -390,6 +399,7 @@ export const chatAPI = {
                 }
                 
                 if (data.done) {
+                  console.log('Received done marker');
                   if (!hasReceivedContent) {
                     console.warn('Stream completed without content');
                   }
@@ -409,6 +419,7 @@ export const chatAPI = {
         }
         
         // 如果流结束但没有收到 done 标记，也调用 onComplete
+        console.log('Stream ended, hasReceivedContent:', hasReceivedContent);
         if (!hasReceivedContent) {
           console.warn('Stream ended without content or done marker');
         }
@@ -418,6 +429,7 @@ export const chatAPI = {
         onError(error instanceof Error ? error.message : 'Unknown error while reading stream');
       }
     } catch (error) {
+      console.error('Error in sendMessage:', error);
       onError(error instanceof Error ? error.message : 'Unknown error');
     }
   },

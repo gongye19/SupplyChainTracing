@@ -204,15 +204,17 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onSendMessage }) => {
                 className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`max-w-[80%] rounded-[18px] px-4 py-3 ${
+                  className={`max-w-[80%] rounded-[18px] px-4 py-3 flex flex-col ${
                     message.role === 'user'
                       ? 'bg-[#007AFF] text-white'
                       : 'bg-white text-[#1D1D1F] border border-black/5'
                   }`}
                 >
-                  <p className="text-[14px] leading-relaxed whitespace-pre-wrap">
-                    {message.content}
-                  </p>
+                  {message.content && (
+                    <p className="text-[14px] leading-relaxed whitespace-pre-wrap">
+                      {message.content}
+                    </p>
+                  )}
                   <p className={`text-[10px] mt-1.5 ${
                     message.role === 'user' ? 'text-white/60' : 'text-[#86868B]'
                   }`}>
