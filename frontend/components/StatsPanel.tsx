@@ -4,6 +4,7 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, 
 import { Transaction } from '../types';
 import { TrendingUp, Package, DollarSign, Activity, ArrowUpRight } from 'lucide-react';
 import { translateMaterial } from '../utils/materialTranslations';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface StatsPanelProps {
   transactions: Transaction[];
@@ -13,6 +14,7 @@ interface StatsPanelProps {
 const COLORS = ['#5856D6', '#007AFF', '#34C759', '#FF9500', '#FF2D55'];
 
 const StatsPanel: React.FC<StatsPanelProps> = ({ transactions }) => {
+  const { t } = useLanguage();
   // 1. Network Value: 当前筛选范围内交易总价值
   const totalValue = useMemo(() => {
     return transactions.reduce((sum, t) => sum + t.totalValue, 0) / 1000000; // 转换为百万美元
@@ -89,8 +91,8 @@ const StatsPanel: React.FC<StatsPanelProps> = ({ transactions }) => {
       {/* High Level KPIs - 只显示2个 */}
       <div className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-6">
         {[
-          { label: '网络价值', value: `$${totalValue.toFixed(1)}M`, color: '#007AFF', icon: <DollarSign className="w-5 h-5" /> },
-          { label: '交易总数', value: totalTransactions, color: '#34C759', icon: <Activity className="w-5 h-5" /> },
+          { label: t('stats.networkValue'), value: `$${totalValue.toFixed(1)}M`, color: '#007AFF', icon: <DollarSign className="w-5 h-5" /> },
+          { label: t('stats.totalTransactions'), value: totalTransactions, color: '#34C759', icon: <Activity className="w-5 h-5" /> },
         ].map((kpi, i) => (
           <div key={i} className="bg-white border border-black/5 p-8 rounded-[28px] shadow-sm hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between mb-4">
@@ -107,10 +109,10 @@ const StatsPanel: React.FC<StatsPanelProps> = ({ transactions }) => {
       <div className="lg:col-span-2 bg-white border border-black/5 p-8 rounded-[28px] shadow-sm">
         <div className="flex items-center justify-between mb-10">
           <h3 className="text-[18px] font-bold text-[#1D1D1F] flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-[#007AFF]" /> 交易趋势
+            <TrendingUp className="w-5 h-5 text-[#007AFF]" /> {t('stats.transactionTrends')}
           </h3>
           <div className="px-3 py-1 bg-[#F5F5F7] rounded-full text-[11px] font-bold text-[#86868B] uppercase">
-            {flowMomentumData.length > 0 ? `${flowMomentumData.length} 个周期` : '无数据'}
+            {flowMomentumData.length > 0 ? `${flowMomentumData.length} ${t('stats.periods')}` : t('stats.noData')}
           </div>
         </div>
         <div className="h-[320px]">
@@ -166,7 +168,7 @@ const StatsPanel: React.FC<StatsPanelProps> = ({ transactions }) => {
           </ResponsiveContainer>
           ) : (
             <div className="h-full flex items-center justify-center text-[#86868B] text-sm">
-              暂无交易数据
+              {t('stats.noData')}
             </div>
           )}
         </div>
@@ -175,7 +177,7 @@ const StatsPanel: React.FC<StatsPanelProps> = ({ transactions }) => {
       {/* Material Mix Pie Chart */}
       <div className="bg-white border border-black/5 p-8 rounded-[28px] shadow-sm">
         <h3 className="text-[18px] font-bold text-[#1D1D1F] mb-10 flex items-center gap-2">
-          <Package className="w-5 h-5 text-[#34C759]" /> 物料分布
+          <Package className="w-5 h-5 text-[#34C759]" /> {t('stats.materialMix')}
         </h3>
         <div className="h-[320px] flex items-center justify-center">
           {materialData.length > 0 ? (
@@ -215,7 +217,7 @@ const StatsPanel: React.FC<StatsPanelProps> = ({ transactions }) => {
             </PieChart>
           </ResponsiveContainer>
           ) : (
-            <div className="text-[#86868B] text-sm">暂无品类数据</div>
+            <div className="text-[#86868B] text-sm">{t('stats.noData')}</div>
           )}
         </div>
       </div>
@@ -223,19 +225,19 @@ const StatsPanel: React.FC<StatsPanelProps> = ({ transactions }) => {
       {/* Strategic Corridor Priority - 显示所有交易 */}
       <div className="lg:col-span-3 bg-white border border-black/5 p-8 rounded-[28px] shadow-sm overflow-hidden">
         <div className="flex items-center justify-between mb-8">
-          <h3 className="text-[18px] font-bold text-[#1D1D1F]">所有交易</h3>
+          <h3 className="text-[18px] font-bold text-[#1D1D1F]">{t('stats.allTransactions')}</h3>
           <span className="text-[13px] text-[#86868B] font-medium">
-            {allRoutes.length} {allRoutes.length === 1 ? '笔交易' : '笔交易'}
+            {allRoutes.length} {t('stats.transactions')}
           </span>
         </div>
         <div className="overflow-x-auto max-h-[600px] overflow-y-auto custom-scrollbar">
           <table className="w-full text-left">
             <thead className="sticky top-0 bg-white z-10">
               <tr className="text-[#86868B] text-[11px] font-bold uppercase tracking-widest border-b border-black/5">
-                <th className="pb-4 px-2">物流路线</th>
-                <th className="pb-4 px-2">物料规格</th>
-                <th className="pb-4 px-2">供应状态</th>
-                <th className="pb-4 px-2 text-right">交易额</th>
+                <th className="pb-4 px-2">{t('stats.logisticsRoute')}</th>
+                <th className="pb-4 px-2">{t('stats.materialSpec')}</th>
+                <th className="pb-4 px-2">{t('stats.supplyStatus')}</th>
+                <th className="pb-4 px-2 text-right">{t('stats.transactionAmount')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-black/[0.03]">
@@ -254,7 +256,7 @@ const StatsPanel: React.FC<StatsPanelProps> = ({ transactions }) => {
                             ? 'bg-[#FF9500]15 text-[#FF9500]' 
                             : 'bg-[#34C759]15 text-[#34C759]'
                       }`}>
-                      {s.status === 'completed' ? '已完成' : s.status === 'in-transit' ? '运输中' : s.status === 'pending' ? '待处理' : s.status === 'cancelled' ? '已取消' : s.status}
+                      {s.status === 'completed' ? t('stats.status.completed') : s.status === 'in-transit' ? t('stats.status.inTransit') : s.status === 'pending' ? t('stats.status.pending') : s.status === 'cancelled' ? t('stats.status.cancelled') : s.status}
                     </span>
                     </td>
                     <td className="py-6 px-2 text-right font-black text-[#1D1D1F] text-[16px] tracking-tight">
@@ -265,7 +267,7 @@ const StatsPanel: React.FC<StatsPanelProps> = ({ transactions }) => {
               ) : (
                 <tr>
                   <td colSpan={4} className="py-12 text-center text-[#86868B] text-sm">
-                    未找到交易记录
+                    {t('stats.noTransactionsFound')}
                   </td>
                 </tr>
               )}

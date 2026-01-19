@@ -33,7 +33,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
   categories,
   isPreview = false 
 }) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const svgRef = useRef<SVGSVGElement>(null);
   const projectionRef = useRef<d3.GeoProjection | null>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
@@ -279,23 +279,28 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
             const companyType = (d as CompanyWithLocation).type || '未知';
             const companyData = d as CompanyWithLocation;
             // 翻译公司类型
-            const companyTypeText = companyType === 'importer' ? '进口商' : 
-                                   companyType === 'exporter' ? '出口商' : 
-                                   companyType === 'both' ? '进出口商' : companyType;
+            const companyTypeText = companyType === 'importer' ? t('map.companyType.importer') : 
+                                   companyType === 'exporter' ? t('map.companyType.exporter') : 
+                                   companyType === 'both' ? t('map.companyType.both') : companyType;
+            const locationLabel = t('map.location');
+            const unknownCompany = t('map.unknownCompany');
+            const unknown = t('map.unknown');
+            const companiesAtLocation = t('map.companiesAtLocation');
+            const companiesAtLocationSuffix = t('map.companiesAtLocationSuffix');
               let tooltipHTML = `
                 <div style="display: flex; flex-direction: column; gap: 8px;">
                   <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
-                  <span style="font-weight: bold; font-size: 14px; color: #1D1D1F;">${companyData.name || '未知公司'}</span>
+                  <span style="font-weight: bold; font-size: 14px; color: #1D1D1F;">${companyData.name || unknownCompany}</span>
                     <span style="font-size: 10px; font-weight: bold; color: #86868B; text-transform: uppercase; letter-spacing: 0.05em;">${companyTypeText}</span>
                   </div>
                   <div style="height: 0.5px; background: rgba(0,0,0,0.05);"></div>
                   <div style="display: flex; flex-direction: column; gap: 2px;">
-                    <span style="color: #86868B; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em;">位置</span>
-                  <span style="color: #1D1D1F; font-size: 12px; font-weight: 600;">${companyData.city || '未知'}, ${companyData.countryName || companyData.countryCode || '未知'}</span>
+                    <span style="color: #86868B; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em;">${locationLabel}</span>
+                  <span style="color: #1D1D1F; font-size: 12px; font-weight: 600;">${companyData.city || unknown}, ${companyData.countryName || companyData.countryCode || unknown}</span>
                   </div>
                   ${cityCompanies.length > 1 ? `
                     <div style="color: #86868B; font-size: 10px; font-style: italic;">
-                      此位置有 ${cityCompanies.length} 家公司
+                      ${companiesAtLocation} ${cityCompanies.length} ${companiesAtLocationSuffix}
                     </div>
                   ` : ''}
                 </div>

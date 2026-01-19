@@ -228,28 +228,13 @@ const App: React.FC = () => {
         </div>
         
         {/* Language Switcher */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setLanguage('en')}
-            className={`px-3 py-1.5 rounded-[8px] text-[13px] font-medium transition-all ${
-              language === 'en' 
-                ? 'bg-[#007AFF] text-white' 
-                : 'bg-[#F5F5F7] text-[#86868B] hover:bg-black/5'
-            }`}
-          >
-            EN
-          </button>
-          <button
-            onClick={() => setLanguage('zh')}
-            className={`px-3 py-1.5 rounded-[8px] text-[13px] font-medium transition-all ${
-              language === 'zh' 
-                ? 'bg-[#007AFF] text-white' 
-                : 'bg-[#F5F5F7] text-[#86868B] hover:bg-black/5'
-            }`}
-          >
-            中文
-          </button>
-        </div>
+        <button
+          onClick={() => setLanguage(language === 'en' ? 'zh' : 'en')}
+          className="px-3 py-1.5 rounded-[8px] text-[13px] font-medium transition-all bg-[#F5F5F7] text-[#86868B] hover:bg-black/5"
+          title={language === 'en' ? 'Switch to Chinese' : '切换到英文'}
+        >
+          {language === 'en' ? '中文' : 'EN'}
+        </button>
       </header>
 
       <main className="flex-1 flex overflow-hidden">
@@ -294,21 +279,21 @@ const App: React.FC = () => {
                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5 text-[#86868B]">
                     <TrendingUp className="w-4 h-4 text-[#007AFF]" />
-                    <span className="text-[10px] uppercase font-bold tracking-wider">交易流</span>
+                    <span className="text-[10px] uppercase font-bold tracking-wider">{t('stats.transactionFlow')}</span>
                   </div>
                   <span className="text-sm font-bold">{stats.transactions}</span>
                </div>
                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5 text-[#86868B]">
                     <Users className="w-4 h-4 text-[#34C759]" />
-                    <span className="text-[10px] uppercase font-bold tracking-wider">节点</span>
+                    <span className="text-[10px] uppercase font-bold tracking-wider">{t('stats.nodes')}</span>
                   </div>
                   <span className="text-sm font-bold">{stats.suppliers}</span>
                </div>
                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5 text-[#86868B]">
                     <Package className="w-4 h-4 text-[#FF2D55]" />
-                    <span className="text-[10px] uppercase font-bold tracking-wider">品类</span>
+                    <span className="text-[10px] uppercase font-bold tracking-wider">{t('stats.categories')}</span>
                   </div>
                   <span className="text-sm font-bold">{stats.categories}</span>
                </div>

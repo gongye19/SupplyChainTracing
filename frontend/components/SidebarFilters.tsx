@@ -337,7 +337,7 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, ca
             <span className="truncate">
               {filters.selectedCountries.length === 0 
                 ? t('filters.selectAll') 
-                : `${filters.selectedCountries.length} ${language === 'zh' ? 'selected' : 'selected'}`}
+                : `${filters.selectedCountries.length} ${t('filters.selected')}`}
             </span>
             <ChevronDown className={`w-3.5 h-3.5 text-[#86868B] transition-transform ${countriesOpen ? 'rotate-180' : ''}`} />
           </button>
@@ -378,8 +378,8 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, ca
           >
             <span className="truncate">
               {filters.selectedCategories.length === 0 
-                ? '所有物料流' 
-                : `已选 ${filters.selectedCategories.length} 个`}
+                ? t('filters.allMaterialFlows') 
+                : `${t('filters.selected')} ${filters.selectedCategories.length}`}
             </span>
             <ChevronDown className={`w-3.5 h-3.5 text-[#86868B] transition-transform ${categoriesOpen ? 'rotate-180' : ''}`} />
           </button>
@@ -420,7 +420,7 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, ca
       {/* Companies Dropdown */}
       <section className="space-y-2.5">
         <label className="text-[11px] font-bold text-[#86868B] uppercase tracking-widest flex items-center gap-2.5">
-          <Building className="w-4 h-4" /> 公司
+          <Building className="w-4 h-4" /> {t('filters.companies')}
         </label>
         <div className="relative" ref={companiesRef}>
           <button 
@@ -430,7 +430,7 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, ca
             <span className="truncate">
               {filters.selectedCompanies.length === 0 
                 ? t('filters.selectAll') 
-                : `${filters.selectedCompanies.length} ${language === 'zh' ? 'selected' : 'selected'}`}
+                : `${filters.selectedCompanies.length} ${t('filters.selected')}`}
             </span>
             <ChevronDown className={`w-3.5 h-3.5 text-[#86868B] transition-transform ${companiesOpen ? 'rotate-180' : ''}`} />
           </button>
