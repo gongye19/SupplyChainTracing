@@ -6,7 +6,7 @@ import SidebarFilters from './components/SidebarFilters';
 import AIAssistant from './components/AIAssistant';
 import { Transaction, Filters, Category, CountryLocation, Location, CompanyWithLocation } from './types';
 import { transactionsAPI, categoriesAPI, locationsAPI, companiesAPI, chatAPI, ChatMessage } from './services/api';
-import { Globe, BarChart3, Bell, Map as MapIcon, Package, TrendingUp, Users, Settings, ChevronRight } from 'lucide-react';
+import { Globe, BarChart3, Map as MapIcon, Package, TrendingUp, Users, ChevronRight } from 'lucide-react';
 
 const App: React.FC = () => {
   const [activeView, setActiveView] = useState<'map' | 'stats'>('map');
@@ -224,18 +224,6 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          <button className="p-2.5 text-black/60 hover:bg-black/5 rounded-full transition-all relative">
-            <Bell className="w-4.5 h-4.5" />
-            <span className="absolute top-2.5 right-2.5 w-1.5 h-1.5 bg-[#FF3B30] rounded-full border border-white"></span>
-          </button>
-          <button className="p-2.5 text-black/60 hover:bg-black/5 rounded-full transition-all">
-            <Settings className="w-4.5 h-4.5" />
-          </button>
-          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#007AFF] to-[#5856D6] flex items-center justify-center text-white font-bold text-[11px] ml-2 shadow-sm">
-            AD
-          </div>
-        </div>
       </header>
 
       <main className="flex-1 flex overflow-hidden">
