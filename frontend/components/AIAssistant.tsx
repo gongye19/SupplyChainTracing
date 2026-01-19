@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MessageCircle, X, Send, Bot, Trash2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface Message {
   id: string;
@@ -21,15 +22,31 @@ interface AIAssistantProps {
 }
 
 const AIAssistant: React.FC<AIAssistantProps> = ({ onSendMessage }) => {
+  const { t, language } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
       role: 'assistant',
-      content: '你好！我是供应链智能助手，可以帮助你分析供应链数据。有什么问题可以问我！',
+      content: t('ai.welcome'),
       timestamp: new Date()
     }
   ]);
+  
+  // 当语言切换时，更新欢迎消息
+  useEffect(() => {
+    setMessages(prev => {
+      if (prev.length === 1 && prev[0].id === '1') {
+        return [{
+          id: '1',
+          role: 'assistant',
+          content: t('ai.welcome'),
+          timestamp: new Date()
+        }];
+      }
+      return prev;
+    });
+  }, [language, t]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -173,7 +190,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onSendMessage }) => {
       {
         id: '1',
         role: 'assistant',
-        content: '你好！我是供应链智能助手，可以帮助你分析供应链数据。有什么问题可以问我！',
+        content: t('ai.welcome'),
         timestamp: new Date()
       }
     ]);
@@ -210,22 +227,22 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onSendMessage }) => {
                 <Bot className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h3 className="text-white font-bold text-[16px]">AI 助手</h3>
-                <p className="text-white/80 text-[11px]">供应链智能分析</p>
+                <h3 className="text-white font-bold text-[16px]">{t('ai.assistant')}</h3>
+                <p className="text-white/80 text-[11px]">{t('ai.supplyChainAnalysis')}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={handleClearChat}
                 className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all"
-                title="清空聊天记录"
+                title={t('ai.clearChat')}
               >
                 <Trash2 className="w-4 h-4 text-white" />
               </button>
               <button
                 onClick={() => setIsOpen(false)}
                 className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all"
-                title="关闭"
+                title={t('ai.close')}
               >
                 <X className="w-4 h-4 text-white" />
               </button>
@@ -316,7 +333,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onSendMessage }) => {
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="输入你的问题..."
+                placeholder={t('ai.placeholder')}
                 className="flex-1 resize-none rounded-[16px] border border-black/10 px-4 py-3 text-[14px] focus:outline-none focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20 transition-all"
                 rows={1}
                 style={{

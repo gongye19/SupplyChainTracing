@@ -112,16 +112,16 @@ def get_city_coordinates(country_code: str, city: str) -> tuple:
     }
     return default_coords.get(country_code, (0.0, 0.0))
 
-def update_categories_chinese(engine):
-    """更新品类显示名称为中文"""
-    print("正在更新品类显示名称为中文...")
+def update_categories_english(engine):
+    """更新品类显示名称为英文"""
+    print("正在更新品类显示名称为英文...")
     try:
         with engine.begin() as conn:
             updates = [
-                ("equipment", "设备"),
-                ("raw_material", "原材料"),
-                ("logic", "逻辑芯片"),
-                ("memory", "存储"),
+                ("equipment", "Equipment"),
+                ("raw_material", "Raw Material"),
+                ("logic", "Logic"),
+                ("memory", "Memory"),
             ]
             
             for category_id, display_name in updates:
@@ -176,6 +176,10 @@ def update_categories_chinese(engine):
         traceback.print_exc()
         return False
 
+def update_categories_chinese(engine):
+    """更新品类显示名称为中文（保留用于兼容）"""
+    return update_categories_english(engine)  # 默认使用英文
+
 def init_database(engine):
     """初始化数据库表结构和种子数据"""
     print("正在初始化数据库表结构...")
@@ -202,8 +206,8 @@ def init_database(engine):
                             print(f"警告: {e}")
         print("✓ 数据库表结构初始化完成")
         
-        # 初始化完成后，更新品类为中文
-        update_categories_chinese(engine)
+        # 初始化完成后，更新品类为英文
+        update_categories_english(engine)
         
         return True
     except Exception as e:
@@ -231,8 +235,8 @@ def import_data(csv_path: str, database_url: str):
                 return
         else:
             print("✓ 数据库表已存在")
-            # 即使表已存在，也更新品类为中文
-            update_categories_chinese(engine)
+            # 即使表已存在，也更新品类为英文
+            update_categories_english(engine)
         
         # 2. 读取CSV文件
         print(f"\n步骤 2: 读取 CSV 文件: {csv_path}")
@@ -484,9 +488,9 @@ if __name__ == "__main__":
     
     # 如果没有提供 CSV 文件，只更新品类
     if not csv_path:
-        print(f"\n未提供 CSV 文件，只更新品类显示名称为中文...")
+        print(f"\n未提供 CSV 文件，只更新品类显示名称为英文...")
         engine = create_engine(database_url, pool_pre_ping=True)
-        update_categories_chinese(engine)
+        update_categories_english(engine)
         print("\n✓ 品类更新完成!")
     else:
         # 检查 CSV 文件是否存在

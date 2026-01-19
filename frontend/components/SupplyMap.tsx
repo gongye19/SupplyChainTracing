@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useMemo } from 'react';
 import * as d3 from 'd3';
 import { Shipment, CountryLocation, Category, Transaction, CompanyWithLocation } from '../types';
 import { translateMaterials } from '../utils/materialTranslations';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface SupplyMapProps {
   shipments: Shipment[];
@@ -32,6 +33,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
   categories,
   isPreview = false 
 }) => {
+  const { t } = useLanguage();
   const svgRef = useRef<SVGSVGElement>(null);
   const projectionRef = useRef<d3.GeoProjection | null>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
@@ -387,6 +389,12 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
       const maxPaths = isPreview ? 100 : routeGroupsArray.length;
       const maxParticles = isPreview ? 0 : Math.min(50, shipments.length); // 最多 50 个粒子
 
+      // 获取翻译文本（在循环外部）
+      const materialNameLabel = t('map.materialName');
+      const directionLabel = t('map.direction');
+      const transactionCountLabel = t('map.transactionCount');
+      const totalValueLabel = t('map.totalValue');
+      
       routeGroupsArray.slice(0, maxPaths).forEach((routeGroup, routeIndex) => {
         // 使用第一个 shipment 来确定位置
         const firstShipment = routeGroup.shipments[0];
@@ -467,19 +475,19 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
                   </div>
                 </div>
                 <div class="flex flex-col gap-1">
-                  <span class="text-[#86868B] text-[10px] font-bold uppercase">物料名称</span>
+                  <span class="text-[#86868B] text-[10px] font-bold uppercase">${materialNameLabel}</span>
                   <span class="text-[#1D1D1F] font-semibold text-[13px]">${materialsText}</span>
                 </div>
                 <div class="flex flex-col gap-1">
-                  <span class="text-[#86868B] text-[10px] font-bold uppercase">交易向</span>
+                  <span class="text-[#86868B] text-[10px] font-bold uppercase">${directionLabel}</span>
                   <span class="text-[#007AFF] font-semibold text-[13px]">${origin.name} &rarr; ${dest.name}</span>
                 </div>
                 <div class="flex justify-between items-center">
-                  <span class="text-[#86868B] text-[10px] font-bold uppercase">交易数量</span>
+                  <span class="text-[#86868B] text-[10px] font-bold uppercase">${transactionCountLabel}</span>
                   <span class="text-[#1D1D1F] font-bold">${routeGroup.count}</span>
                 </div>
                 <div class="flex justify-between items-center">
-                  <span class="text-[#86868B] text-[10px] font-bold uppercase">总价值</span>
+                  <span class="text-[#86868B] text-[10px] font-bold uppercase">${totalValueLabel}</span>
                   <span class="text-[#1D1D1F] font-bold">$${routeGroup.totalValue.toFixed(1)}M</span>
                 </div>
               </div>
@@ -558,7 +566,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
       <div className="absolute top-6 left-6 z-20">
         <div className="bg-white/95 backdrop-blur-xl p-4 rounded-[18px] border border-black/[0.05] shadow-lg min-w-[160px] pointer-events-auto">
           <div className="mb-3 pb-2.5 border-b border-black/10">
-            <span className="text-[10px] text-[#86868B] font-bold uppercase tracking-widest">物料品类</span>
+            <span className="text-[10px] text-[#86868B] font-bold uppercase tracking-widest">{t('map.materialCategories')}</span>
           </div>
           <div className="flex flex-col gap-3">
             {categories.map((cat) => (

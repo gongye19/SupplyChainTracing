@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Filters, Category, CountryLocation, CompanyWithLocation } from '../types';
 import { Calendar, Building2, Package, Filter, ChevronDown, Check, Building } from 'lucide-react';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface SidebarFiltersProps {
   filters: Filters;
@@ -13,6 +14,7 @@ interface SidebarFiltersProps {
 }
 
 const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, categories, countries, companies, onDragChange }) => {
+  const { t, language } = useLanguage();
   const [countriesOpen, setCountriesOpen] = useState(false);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
   const [companiesOpen, setCompaniesOpen] = useState(false);
@@ -325,7 +327,7 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, ca
       {/* Countries Dropdown */}
       <section className="space-y-2.5">
         <label className="text-[11px] font-bold text-[#86868B] uppercase tracking-widest flex items-center gap-2.5">
-          <Building2 className="w-4 h-4" /> 国家
+          <Building2 className="w-4 h-4" /> {t('filters.countries')}
         </label>
         <div className="relative" ref={countriesRef}>
           <button 
@@ -334,8 +336,8 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, ca
           >
             <span className="truncate">
               {filters.selectedCountries.length === 0 
-                ? '所有国家' 
-                : `已选 ${filters.selectedCountries.length} 个`}
+                ? t('filters.selectAll') 
+                : `${filters.selectedCountries.length} ${language === 'zh' ? 'selected' : 'selected'}`}
             </span>
             <ChevronDown className={`w-3.5 h-3.5 text-[#86868B] transition-transform ${countriesOpen ? 'rotate-180' : ''}`} />
           </button>
@@ -343,7 +345,7 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, ca
           {countriesOpen && (
             <div className="absolute top-full left-0 right-0 mt-2 bg-white/90 backdrop-blur-xl border border-black/5 rounded-[16px] shadow-2xl z-50 max-h-72 overflow-y-auto custom-scrollbar p-1.5 animate-in fade-in zoom-in-95 duration-200">
               {countries.length === 0 ? (
-                <div className="px-3 py-2 text-[12px] text-[#86868B]">加载中...</div>
+                <div className="px-3 py-2 text-[12px] text-[#86868B]">{t('filters.loading')}</div>
               ) : (
                 countries.map(country => (
                 <div 
@@ -367,7 +369,7 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, ca
       {/* Categories Dropdown */}
       <section className="space-y-2.5">
         <label className="text-[11px] font-bold text-[#86868B] uppercase tracking-widest flex items-center gap-2.5">
-          <Package className="w-4 h-4" /> 物料品类
+          <Package className="w-4 h-4" /> {t('filters.categories')}
         </label>
         <div className="relative" ref={categoriesRef}>
           <button 
@@ -385,7 +387,7 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, ca
           {categoriesOpen && (
             <div className="absolute top-full left-0 right-0 mt-2 bg-white/90 backdrop-blur-xl border border-black/5 rounded-[16px] shadow-2xl z-50 max-h-72 overflow-y-auto custom-scrollbar p-1.5 animate-in fade-in zoom-in-95 duration-200">
               {categories.length === 0 ? (
-                <div className="px-3 py-2 text-[12px] text-[#86868B]">加载中...</div>
+                <div className="px-3 py-2 text-[12px] text-[#86868B]">{t('filters.loading')}</div>
               ) : (
                 categories.map(cat => (
                 <div 
@@ -427,8 +429,8 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, ca
           >
             <span className="truncate">
               {filters.selectedCompanies.length === 0 
-                ? '所有公司' 
-                : `已选 ${filters.selectedCompanies.length} 个`}
+                ? t('filters.selectAll') 
+                : `${filters.selectedCompanies.length} ${language === 'zh' ? 'selected' : 'selected'}`}
             </span>
             <ChevronDown className={`w-3.5 h-3.5 text-[#86868B] transition-transform ${companiesOpen ? 'rotate-180' : ''}`} />
           </button>
@@ -436,7 +438,7 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, ca
           {companiesOpen && (
             <div className="absolute top-full left-0 right-0 mt-2 bg-white/90 backdrop-blur-xl border border-black/5 rounded-[16px] shadow-2xl z-50 max-h-72 overflow-y-auto custom-scrollbar p-1.5 animate-in fade-in zoom-in-95 duration-200">
               {companies.length === 0 ? (
-                <div className="px-3 py-2 text-[12px] text-[#86868B]">加载中...</div>
+                <div className="px-3 py-2 text-[12px] text-[#86868B]">{t('filters.loading')}</div>
               ) : (
                 companies.map(company => (
                 <div 

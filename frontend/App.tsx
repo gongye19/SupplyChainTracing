@@ -7,8 +7,10 @@ import AIAssistant from './components/AIAssistant';
 import { Transaction, Filters, Category, CountryLocation, Location, CompanyWithLocation } from './types';
 import { transactionsAPI, categoriesAPI, locationsAPI, companiesAPI, chatAPI, ChatMessage } from './services/api';
 import { Globe, BarChart3, Map as MapIcon, Package, TrendingUp, Users, ChevronRight } from 'lucide-react';
+import { useLanguage } from './contexts/LanguageContext';
 
 const App: React.FC = () => {
+  const { language, setLanguage, t } = useLanguage();
   const [activeView, setActiveView] = useState<'map' | 'stats'>('map');
   
   const START_DATE = new Date('2023-01-01');
@@ -73,7 +75,7 @@ const App: React.FC = () => {
         setCompanies(companiesData);
       } catch (error) {
         console.error('Failed to load initial data:', error);
-        alert('无法加载数据，请检查后端服务是否正常运行。错误: ' + (error as Error).message);
+        alert(t('app.loadDataError') + (error as Error).message);
       } finally {
         setInitialLoading(false);
       }
@@ -221,10 +223,33 @@ const App: React.FC = () => {
             <div className="w-9 h-9 bg-[#1D1D1F] rounded-[10px] flex items-center justify-center">
                <Globe className="text-white w-5 h-5" />
             </div>
-            <h1 className="text-lg font-bold tracking-tight">全球供应链地图</h1>
+            <h1 className="text-lg font-bold tracking-tight">{t('app.title')}</h1>
           </div>
         </div>
-
+        
+        {/* Language Switcher */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setLanguage('en')}
+            className={`px-3 py-1.5 rounded-[8px] text-[13px] font-medium transition-all ${
+              language === 'en' 
+                ? 'bg-[#007AFF] text-white' 
+                : 'bg-[#F5F5F7] text-[#86868B] hover:bg-black/5'
+            }`}
+          >
+            EN
+          </button>
+          <button
+            onClick={() => setLanguage('zh')}
+            className={`px-3 py-1.5 rounded-[8px] text-[13px] font-medium transition-all ${
+              language === 'zh' 
+                ? 'bg-[#007AFF] text-white' 
+                : 'bg-[#F5F5F7] text-[#86868B] hover:bg-black/5'
+            }`}
+          >
+            中文
+          </button>
+        </div>
       </header>
 
       <main className="flex-1 flex overflow-hidden">
@@ -237,7 +262,7 @@ const App: React.FC = () => {
              >
                <div className="flex items-center gap-3">
                  <MapIcon className="w-4 h-4" />
-                 全球地图
+                 {t('common.map')}
                </div>
                {activeView === 'map' && <ChevronRight className="w-3.5 h-3.5" />}
              </button>
@@ -247,7 +272,7 @@ const App: React.FC = () => {
              >
                <div className="flex items-center gap-3">
                  <BarChart3 className="w-4 h-4" />
-                 智能分析中心
+                 {t('common.stats')}
                </div>
                {activeView === 'stats' && <ChevronRight className="w-3.5 h-3.5" />}
              </button>
@@ -298,7 +323,7 @@ const App: React.FC = () => {
               {/* 只在初始加载时显示 loading，筛选更新时不显示 */}
               {initialLoading ? (
                 <div className="flex items-center justify-center h-full absolute inset-0 bg-white/80 backdrop-blur-sm z-10">
-                  <div className="text-[#86868B]">Loading...</div>
+                  <div className="text-[#86868B]">{t('app.loading')}</div>
                 </div>
               ) : (
                 <>
@@ -323,12 +348,12 @@ const App: React.FC = () => {
           ) : (
             <div className="h-full overflow-y-auto custom-scrollbar pr-4">
               <div className="mb-10">
-                <h2 className="text-[32px] font-bold tracking-tight text-[#1D1D1F]">网络洞察</h2>
-                <p className="text-[#86868B] text-[16px] font-medium mt-1">实时性能指标和物料分布分析。</p>
+                <h2 className="text-[32px] font-bold tracking-tight text-[#1D1D1F]">{t('app.networkInsights')}</h2>
+                <p className="text-[#86868B] text-[16px] font-medium mt-1">{t('app.realTimeMetrics')}</p>
               </div>
               {initialLoading ? (
                 <div className="flex items-center justify-center h-full">
-                  <div className="text-[#86868B]">加载中...</div>
+                  <div className="text-[#86868B]">{t('app.loading')}</div>
                 </div>
               ) : (
                 <StatsPanel transactions={transactions} />
