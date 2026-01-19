@@ -95,28 +95,55 @@ async def chat(request: ChatRequest):
             })
             
             # 调用 OpenAI API（流式）
-            stream = client.chat.completions.create(
-                model=MODEL_NAME,
-                messages=messages,
-                temperature=0.7,
-                stream=True
-            )
+            try:
+                stream = client.chat.completions.create(
+                    model=MODEL_NAME,
+                    messages=messages,
+                    temperature=0.7,
+                    stream=True
+                )
+            except Exception as e:
+                # OpenAI API 调用失败
+                import traceback
+                error_msg = f"OpenAI API error: {str(e)}"
+                print(f"Error calling OpenAI API: {error_msg}")
+                print(traceback.format_exc())
+                error_data = json.dumps({"error": error_msg}, ensure_ascii=False)
+                yield f"data: {error_data}\n\n"
+                return
             
             # 流式返回数据
-            for chunk in stream:
-                if chunk.choices and len(chunk.choices) > 0:
-                    delta = chunk.choices[0].delta
-                    if delta and delta.content is not None:
-                        content = delta.content
-                        # 使用 SSE 格式返回
-                        data = json.dumps({"content": content}, ensure_ascii=False)
-                        yield f"data: {data}\n\n"
+            has_content = False
+            try:
+                for chunk in stream:
+                    if chunk.choices and len(chunk.choices) > 0:
+                        delta = chunk.choices[0].delta
+                        if delta and delta.content is not None:
+                            content = delta.content
+                            has_content = True
+                            # 使用 SSE 格式返回
+                            data = json.dumps({"content": content}, ensure_ascii=False)
+                            yield f"data: {data}\n\n"
+            except Exception as e:
+                # 流式读取过程中出错
+                import traceback
+                error_msg = f"Stream reading error: {str(e)}"
+                print(f"Error reading stream: {error_msg}")
+                print(traceback.format_exc())
+                error_data = json.dumps({"error": error_msg}, ensure_ascii=False)
+                yield f"data: {error_data}\n\n"
+                return
             
             # 发送结束标记
             yield f"data: {json.dumps({'done': True}, ensure_ascii=False)}\n\n"
             
         except Exception as e:
-            error_data = json.dumps({"error": str(e)}, ensure_ascii=False)
+            # 其他未预期的错误
+            import traceback
+            error_msg = f"Unexpected error: {str(e)}"
+            print(f"Unexpected error in generate(): {error_msg}")
+            print(traceback.format_exc())
+            error_data = json.dumps({"error": error_msg}, ensure_ascii=False)
             yield f"data: {error_data}\n\n"
     
     return StreamingResponse(

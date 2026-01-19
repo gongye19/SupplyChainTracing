@@ -316,82 +316,107 @@ export const chatAPI = {
       });
       
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        console.error('Chat API error:', response.status, errorText);
+        onError(`HTTP error! status: ${response.status}`);
+        return;
       }
       
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
       
       if (!reader) {
-        throw new Error('Response body is not readable');
+        console.error('Response body is not readable');
+        onError('Response body is not readable');
+        return;
       }
       
       let buffer = '';
+      let hasReceivedContent = false;
       
-      while (true) {
-        const { done, value } = await reader.read();
-        
-        if (done) {
-          // 处理剩余的 buffer
-          if (buffer.trim()) {
-            const lines = buffer.split('\n');
-            for (const line of lines) {
-              if (line.trim() && line.startsWith('data: ')) {
-                try {
-                  const data = JSON.parse(line.slice(6));
-                  
-                  if (data.error) {
-                    onError(data.error);
-                    return;
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          
+          if (done) {
+            // 处理剩余的 buffer
+            if (buffer.trim()) {
+              const lines = buffer.split('\n');
+              for (const line of lines) {
+                if (line.trim() && line.startsWith('data: ')) {
+                  try {
+                    const data = JSON.parse(line.slice(6));
+                    
+                    if (data.error) {
+                      console.error('Server error:', data.error);
+                      onError(data.error);
+                      return;
+                    }
+                    
+                    if (data.done) {
+                      if (!hasReceivedContent) {
+                        console.warn('Stream completed without content');
+                      }
+                      onComplete();
+                      return;
+                    }
+                    
+                    if (data.content) {
+                      hasReceivedContent = true;
+                      onChunk(data.content);
+                    }
+                  } catch (e) {
+                    console.error('Failed to parse SSE data:', e, line);
                   }
-                  
-                  if (data.done) {
-                    onComplete();
-                    return;
-                  }
-                  
-                  if (data.content) {
-                    onChunk(data.content);
-                  }
-                } catch (e) {
-                  console.error('Failed to parse SSE data:', e);
                 }
               }
             }
+            break;
           }
-          break;
-        }
-        
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || ''; // 保留最后一个不完整的行
-        
-        for (const line of lines) {
-          if (line.trim() && line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              
-              if (data.error) {
-                onError(data.error);
-                return;
+          
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || ''; // 保留最后一个不完整的行
+          
+          for (const line of lines) {
+            if (line.trim() && line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                
+                if (data.error) {
+                  console.error('Server error:', data.error);
+                  onError(data.error);
+                  return;
+                }
+                
+                if (data.done) {
+                  if (!hasReceivedContent) {
+                    console.warn('Stream completed without content');
+                  }
+                  onComplete();
+                  return;
+                }
+                
+                if (data.content) {
+                  hasReceivedContent = true;
+                  onChunk(data.content);
+                }
+              } catch (e) {
+                console.error('Failed to parse SSE data:', e, line);
               }
-              
-              if (data.done) {
-                onComplete();
-                return;
-              }
-              
-              if (data.content) {
-                onChunk(data.content);
-              }
-            } catch (e) {
-              console.error('Failed to parse SSE data:', e);
             }
           }
         }
+        
+        // 如果流结束但没有收到 done 标记，也调用 onComplete
+        if (!hasReceivedContent) {
+          console.warn('Stream ended without content or done marker');
+        }
+        onComplete();
+      } catch (error) {
+        console.error('Error reading stream:', error);
+        onError(error instanceof Error ? error.message : 'Unknown error while reading stream');
       }
-      
-      onComplete();
     } catch (error) {
       onError(error instanceof Error ? error.message : 'Unknown error');
     }

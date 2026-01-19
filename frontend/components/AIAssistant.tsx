@@ -134,10 +134,11 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onSendMessage }) => {
         setIsLoading(false);
       }
     } catch (error) {
+      console.error('Error in handleSend:', error);
       setMessages(prev => 
         prev.map(msg => 
           msg.id === assistantMessageId 
-            ? { ...msg, content: '抱歉，发生了错误。请稍后再试。' }
+            ? { ...msg, content: `抱歉，发生了错误：${error instanceof Error ? error.message : '未知错误'}` }
             : msg
         )
       );
