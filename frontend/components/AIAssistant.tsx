@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Send, Bot, Trash2, AlertTriangle } from 'lucide-react';
+import { MessageCircle, X, Send, Bot, Trash2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 interface Message {
@@ -32,7 +32,6 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onSendMessage }) => {
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [showClearConfirm, setShowClearConfirm] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -170,10 +169,6 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onSendMessage }) => {
 
   // 清空聊天记录
   const handleClearChat = () => {
-    setShowClearConfirm(true);
-  };
-
-  const confirmClearChat = () => {
     setMessages([
       {
         id: '1',
@@ -182,11 +177,6 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onSendMessage }) => {
         timestamp: new Date()
       }
     ]);
-    setShowClearConfirm(false);
-  };
-
-  const cancelClearChat = () => {
-    setShowClearConfirm(false);
   };
 
   return (
@@ -345,55 +335,6 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onSendMessage }) => {
                 className="w-11 h-11 bg-[#007AFF] rounded-full flex items-center justify-center hover:bg-[#0051D5] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Send className="w-5 h-5 text-white" />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 清空聊天记录确认对话框 */}
-      {showClearConfirm && (
-        <div 
-          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[2000] flex items-center justify-center"
-          onClick={cancelClearChat}
-        >
-          <div 
-            className="bg-white rounded-[24px] shadow-2xl border border-black/10 w-[400px] max-w-[90vw] overflow-hidden animate-in fade-in zoom-in-95 duration-200"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* 对话框头部 */}
-            <div className="bg-gradient-to-r from-[#FF3B30] to-[#FF9500] px-6 py-5">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
-                  <AlertTriangle className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-white font-bold text-[18px]">清空聊天记录</h3>
-                  <p className="text-white/90 text-[13px] mt-0.5">此操作不可恢复</p>
-                </div>
-              </div>
-            </div>
-
-            {/* 对话框内容 */}
-            <div className="px-6 py-5">
-              <p className="text-[#1D1D1F] text-[15px] leading-relaxed">
-                确定要清空所有聊天记录吗？此操作将删除所有对话历史，只保留初始欢迎消息。
-              </p>
-            </div>
-
-            {/* 对话框底部按钮 */}
-            <div className="px-6 py-4 bg-[#F5F5F7] flex items-center justify-end gap-3 border-t border-black/5">
-              <button
-                onClick={cancelClearChat}
-                className="px-5 py-2.5 rounded-[12px] text-[#1D1D1F] text-[14px] font-medium hover:bg-black/5 transition-all"
-              >
-                取消
-              </button>
-              <button
-                onClick={confirmClearChat}
-                className="px-5 py-2.5 rounded-[12px] bg-gradient-to-r from-[#FF3B30] to-[#FF9500] text-white text-[14px] font-medium hover:opacity-90 transition-all shadow-sm"
-              >
-                确认清空
               </button>
             </div>
           </div>
