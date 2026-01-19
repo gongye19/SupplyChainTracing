@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Send, Bot, Trash2 } from 'lucide-react';
+import { MessageCircle, X, Send, Bot, Trash2, AlertTriangle } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 
 interface Message {
   id: string;
@@ -31,6 +32,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onSendMessage }) => {
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -168,16 +170,23 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onSendMessage }) => {
 
   // 清空聊天记录
   const handleClearChat = () => {
-    if (window.confirm('确定要清空所有聊天记录吗？')) {
-      setMessages([
-        {
-          id: '1',
-          role: 'assistant',
-          content: '你好！我是供应链智能助手，可以帮助你分析供应链数据。有什么问题可以问我！',
-          timestamp: new Date()
-        }
-      ]);
-    }
+    setShowClearConfirm(true);
+  };
+
+  const confirmClearChat = () => {
+    setMessages([
+      {
+        id: '1',
+        role: 'assistant',
+        content: '你好！我是供应链智能助手，可以帮助你分析供应链数据。有什么问题可以问我！',
+        timestamp: new Date()
+      }
+    ]);
+    setShowClearConfirm(false);
+  };
+
+  const cancelClearChat = () => {
+    setShowClearConfirm(false);
   };
 
   return (
@@ -248,9 +257,42 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onSendMessage }) => {
                   }`}
                 >
                   {message.content && (
-                    <p className="text-[14px] leading-relaxed whitespace-pre-wrap">
-                      {message.content}
-                    </p>
+                    <div className={`text-[14px] leading-relaxed ${message.role === 'assistant' ? 'prose prose-sm max-w-none' : ''}`}>
+                      {message.role === 'assistant' ? (
+                        <ReactMarkdown
+                          components={{
+                            p: ({ children }) => <p className="mb-2 last:mb-0 text-[#1D1D1F]">{children}</p>,
+                            h1: ({ children }) => <h1 className="text-lg font-bold mb-2 mt-3 first:mt-0 text-[#1D1D1F]">{children}</h1>,
+                            h2: ({ children }) => <h2 className="text-base font-bold mb-2 mt-3 first:mt-0 text-[#1D1D1F]">{children}</h2>,
+                            h3: ({ children }) => <h3 className="text-sm font-bold mb-2 mt-3 first:mt-0 text-[#1D1D1F]">{children}</h3>,
+                            ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1 text-[#1D1D1F]">{children}</ul>,
+                            ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-1 text-[#1D1D1F]">{children}</ol>,
+                            li: ({ children }) => <li className="ml-2">{children}</li>,
+                            code: ({ children, className }) => {
+                              const isInline = !className;
+                              return isInline ? (
+                                <code className="bg-[#F5F5F7] px-1.5 py-0.5 rounded text-[13px] font-mono text-[#1D1D1F]">{children}</code>
+                              ) : (
+                                <code className="block bg-[#F5F5F7] p-2 rounded text-[13px] font-mono overflow-x-auto text-[#1D1D1F]">{children}</code>
+                              );
+                            },
+                            pre: ({ children }) => <pre className="bg-[#F5F5F7] p-2 rounded text-[13px] font-mono overflow-x-auto mb-2 text-[#1D1D1F]">{children}</pre>,
+                            blockquote: ({ children }) => <blockquote className="border-l-4 border-[#007AFF]/30 pl-3 italic my-2 text-[#1D1D1F]">{children}</blockquote>,
+                            a: ({ children, href }) => <a href={href} className="text-[#007AFF] underline hover:text-[#0051D5]" target="_blank" rel="noopener noreferrer">{children}</a>,
+                            strong: ({ children }) => <strong className="font-bold text-[#1D1D1F]">{children}</strong>,
+                            em: ({ children }) => <em className="italic text-[#1D1D1F]">{children}</em>,
+                            hr: () => <hr className="my-3 border-black/10" />,
+                            table: ({ children }) => <div className="overflow-x-auto my-2"><table className="min-w-full border-collapse">{children}</table></div>,
+                            th: ({ children }) => <th className="border border-black/10 px-2 py-1 bg-[#F5F5F7] font-bold text-left">{children}</th>,
+                            td: ({ children }) => <td className="border border-black/10 px-2 py-1">{children}</td>,
+                          }}
+                        >
+                          {message.content}
+                        </ReactMarkdown>
+                      ) : (
+                        <p className="whitespace-pre-wrap text-white">{message.content}</p>
+                      )}
+                    </div>
                   )}
                   <p className={`text-[10px] mt-1.5 ${
                     message.role === 'user' ? 'text-white/60' : 'text-[#86868B]'
@@ -303,6 +345,55 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onSendMessage }) => {
                 className="w-11 h-11 bg-[#007AFF] rounded-full flex items-center justify-center hover:bg-[#0051D5] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Send className="w-5 h-5 text-white" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 清空聊天记录确认对话框 */}
+      {showClearConfirm && (
+        <div 
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[2000] flex items-center justify-center"
+          onClick={cancelClearChat}
+        >
+          <div 
+            className="bg-white rounded-[24px] shadow-2xl border border-black/10 w-[400px] max-w-[90vw] overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* 对话框头部 */}
+            <div className="bg-gradient-to-r from-[#FF3B30] to-[#FF9500] px-6 py-5">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
+                  <AlertTriangle className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-white font-bold text-[18px]">清空聊天记录</h3>
+                  <p className="text-white/90 text-[13px] mt-0.5">此操作不可恢复</p>
+                </div>
+              </div>
+            </div>
+
+            {/* 对话框内容 */}
+            <div className="px-6 py-5">
+              <p className="text-[#1D1D1F] text-[15px] leading-relaxed">
+                确定要清空所有聊天记录吗？此操作将删除所有对话历史，只保留初始欢迎消息。
+              </p>
+            </div>
+
+            {/* 对话框底部按钮 */}
+            <div className="px-6 py-4 bg-[#F5F5F7] flex items-center justify-end gap-3 border-t border-black/5">
+              <button
+                onClick={cancelClearChat}
+                className="px-5 py-2.5 rounded-[12px] text-[#1D1D1F] text-[14px] font-medium hover:bg-black/5 transition-all"
+              >
+                取消
+              </button>
+              <button
+                onClick={confirmClearChat}
+                className="px-5 py-2.5 rounded-[12px] bg-gradient-to-r from-[#FF3B30] to-[#FF9500] text-white text-[14px] font-medium hover:opacity-90 transition-all shadow-sm"
+              >
+                确认清空
               </button>
             </div>
           </div>
