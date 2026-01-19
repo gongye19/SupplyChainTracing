@@ -351,8 +351,14 @@ const App: React.FC = () => {
 
       {/* AI 助手 */}
       <AIAssistant 
-        onSendMessage={async (message: string, history: ChatMessage[]) => {
-          return await chatAPI.sendMessage(message, history);
+        onSendMessage={async (
+          message: string,
+          history: ChatMessage[],
+          onChunk: (chunk: string) => void,
+          onComplete: () => void,
+          onError: (error: string) => void
+        ) => {
+          await chatAPI.sendMessage(message, history, onChunk, onComplete, onError);
         }}
       />
     </div>

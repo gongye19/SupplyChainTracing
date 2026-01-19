@@ -9,8 +9,14 @@ interface Message {
 }
 
 interface AIAssistantProps {
-  // 后端 API 接口
-  onSendMessage?: (message: string, history: Array<{ role: 'user' | 'assistant'; content: string }>) => Promise<string>;
+  // 后端 API 接口（流式）
+  onSendMessage?: (
+    message: string,
+    history: Array<{ role: 'user' | 'assistant'; content: string }>,
+    onChunk: (chunk: string) => void,
+    onComplete: () => void,
+    onError: (error: string) => void
+  ) => Promise<void>;
 }
 
 const AIAssistant: React.FC<AIAssistantProps> = ({ onSendMessage }) => {
@@ -35,7 +41,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onSendMessage }) => {
     }
   }, [messages, isOpen]);
 
-  // 发送消息
+  // 发送消息（流式）
   const handleSend = async () => {
     if (!inputValue.trim() || isLoading) return;
 
@@ -47,45 +53,94 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onSendMessage }) => {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const userInput = inputValue;
     setInputValue('');
     setIsLoading(true);
 
+    // 创建助手消息占位符
+    const assistantMessageId = (Date.now() + 1).toString();
+    const assistantMessage: Message = {
+      id: assistantMessageId,
+      role: 'assistant',
+      content: '',
+      timestamp: new Date()
+    };
+
+    setMessages(prev => [...prev, assistantMessage]);
+
     try {
-      // 调用后端 API
-      let assistantResponse = '';
+      // 构建对话历史（排除初始欢迎消息和当前用户消息）
+      const history = messages
+        .filter(msg => msg.id !== '1') // 排除初始欢迎消息
+        .map(msg => ({
+          role: msg.role,
+          content: msg.content
+        }));
+
       if (onSendMessage) {
-        // 构建对话历史（排除初始欢迎消息）
-        const history = messages
-          .filter(msg => msg.id !== '1') // 排除初始欢迎消息
-          .map(msg => ({
-            role: msg.role,
-            content: msg.content
-          }));
+        // 使用流式 API
+        let accumulatedContent = '';
         
-        assistantResponse = await onSendMessage(inputValue, history);
+        await onSendMessage(
+          userInput,
+          history,
+          // onChunk: 每次收到新的内容块时调用
+          (chunk: string) => {
+            accumulatedContent += chunk;
+            setMessages(prev => 
+              prev.map(msg => 
+                msg.id === assistantMessageId 
+                  ? { ...msg, content: accumulatedContent }
+                  : msg
+              )
+            );
+            // 自动滚动到底部
+            setTimeout(() => {
+              if (messagesEndRef.current) {
+                messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+              }
+            }, 0);
+          },
+          // onComplete: 流式输出完成时调用
+          () => {
+            setIsLoading(false);
+            setTimeout(() => {
+              if (messagesEndRef.current) {
+                messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+              }
+            }, 0);
+          },
+          // onError: 发生错误时调用
+          (error: string) => {
+            setMessages(prev => 
+              prev.map(msg => 
+                msg.id === assistantMessageId 
+                  ? { ...msg, content: `抱歉，发生了错误：${error}` }
+                  : msg
+              )
+            );
+            setIsLoading(false);
+          }
+        );
       } else {
-        // 模拟响应
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        assistantResponse = '抱歉，AI 助手功能正在开发中，后端接口尚未实现。';
+        // 如果没有提供 onSendMessage，显示错误
+        setMessages(prev => 
+          prev.map(msg => 
+            msg.id === assistantMessageId 
+              ? { ...msg, content: '抱歉，AI 助手功能未正确配置。' }
+              : msg
+          )
+        );
+        setIsLoading(false);
       }
-
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: assistantResponse,
-        timestamp: new Date()
-      };
-
-      setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: '抱歉，发生了错误。请稍后再试。',
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, errorMessage]);
-    } finally {
+      setMessages(prev => 
+        prev.map(msg => 
+          msg.id === assistantMessageId 
+            ? { ...msg, content: '抱歉，发生了错误。请稍后再试。' }
+            : msg
+        )
+      );
       setIsLoading(false);
     }
   };

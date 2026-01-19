@@ -1,7 +1,9 @@
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Optional, List
 import os
+import json
 from dotenv import load_dotenv
 from openai import OpenAI
 
@@ -56,13 +58,9 @@ class ChatRequest(BaseModel):
     history: Optional[List[ChatMessage]] = []  # 对话历史
 
 
-class ChatResponse(BaseModel):
-    response: str
-
-
-@router.post("", response_model=ChatResponse)
+@router.post("")
 async def chat(request: ChatRequest):
-    """聊天接口"""
+    """流式聊天接口，返回 SSE 格式的流式响应"""
     try:
         client = get_client()
     except ValueError as e:
@@ -71,44 +69,62 @@ async def chat(request: ChatRequest):
             detail=str(e)
         )
     
-    try:
-        # 构建消息历史
-        messages = []
-        
-        # 添加系统提示词
-        system_prompt = """你是一个专业的供应链智能分析助手。你的任务是帮助用户分析供应链数据，回答关于交易、公司、品类、地理位置等相关问题。
+    async def generate():
+        try:
+            # 构建消息历史
+            messages = []
+            
+            # 添加系统提示词
+            system_prompt = """你是一个专业的供应链智能分析助手。你的任务是帮助用户分析供应链数据，回答关于交易、公司、品类、地理位置等相关问题。
 
 请用友好、专业的方式回答用户的问题。如果问题与供应链数据相关，可以提供详细的分析和建议。"""
-        
-        messages.append({"role": "system", "content": system_prompt})
-        
-        # 添加历史消息
-        for msg in request.history:
+            
+            messages.append({"role": "system", "content": system_prompt})
+            
+            # 添加历史消息
+            for msg in request.history:
+                messages.append({
+                    "role": msg.role,
+                    "content": msg.content
+                })
+            
+            # 添加当前用户消息
             messages.append({
-                "role": msg.role,
-                "content": msg.content
+                "role": "user",
+                "content": request.message
             })
-        
-        # 添加当前用户消息
-        messages.append({
-            "role": "user",
-            "content": request.message
-        })
-        
-        # 调用 OpenAI API
-        response = client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=messages,
-            temperature=0.7
-        )
-        
-        # 提取回复内容
-        response_text = response.choices[0].message.content
-        
-        return ChatResponse(response=response_text)
-        
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Chat error: {str(e)}"
-        )
+            
+            # 调用 OpenAI API（流式）
+            stream = client.chat.completions.create(
+                model=MODEL_NAME,
+                messages=messages,
+                temperature=0.7,
+                stream=True
+            )
+            
+            # 流式返回数据
+            for chunk in stream:
+                if chunk.choices and len(chunk.choices) > 0:
+                    delta = chunk.choices[0].delta
+                    if delta and delta.content is not None:
+                        content = delta.content
+                        # 使用 SSE 格式返回
+                        data = json.dumps({"content": content}, ensure_ascii=False)
+                        yield f"data: {data}\n\n"
+            
+            # 发送结束标记
+            yield f"data: {json.dumps({'done': True}, ensure_ascii=False)}\n\n"
+            
+        except Exception as e:
+            error_data = json.dumps({"error": str(e)}, ensure_ascii=False)
+            yield f"data: {error_data}\n\n"
+    
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+    )

@@ -291,18 +291,110 @@ export interface ChatResponse {
 }
 
 export const chatAPI = {
-  sendMessage: async (message: string, history?: ChatMessage[]): Promise<string> => {
+  sendMessage: async (
+    message: string,
+    history: ChatMessage[],
+    onChunk: (chunk: string) => void,
+    onComplete: () => void,
+    onError: (error: string) => void
+  ): Promise<void> => {
     const request: ChatRequest = {
       message,
       history: history || []
     };
     
-    const response = await fetchAPI<ChatResponse>('/api/chat', {
-      method: 'POST',
-      body: JSON.stringify(request)
-    });
+    const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
+    const url = `${API_BASE_URL}/api/chat`;
     
-    return response.response;
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(request)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      
+      if (!reader) {
+        throw new Error('Response body is not readable');
+      }
+      
+      let buffer = '';
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) {
+          // 处理剩余的 buffer
+          if (buffer.trim()) {
+            const lines = buffer.split('\n');
+            for (const line of lines) {
+              if (line.trim() && line.startsWith('data: ')) {
+                try {
+                  const data = JSON.parse(line.slice(6));
+                  
+                  if (data.error) {
+                    onError(data.error);
+                    return;
+                  }
+                  
+                  if (data.done) {
+                    onComplete();
+                    return;
+                  }
+                  
+                  if (data.content) {
+                    onChunk(data.content);
+                  }
+                } catch (e) {
+                  console.error('Failed to parse SSE data:', e);
+                }
+              }
+            }
+          }
+          break;
+        }
+        
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // 保留最后一个不完整的行
+        
+        for (const line of lines) {
+          if (line.trim() && line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              
+              if (data.error) {
+                onError(data.error);
+                return;
+              }
+              
+              if (data.done) {
+                onComplete();
+                return;
+              }
+              
+              if (data.content) {
+                onChunk(data.content);
+              }
+            } catch (e) {
+              console.error('Failed to parse SSE data:', e);
+            }
+          }
+        }
+      }
+      
+      onComplete();
+    } catch (error) {
+      onError(error instanceof Error ? error.message : 'Unknown error');
+    }
   },
 };
 
