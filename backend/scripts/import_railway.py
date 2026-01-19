@@ -4,11 +4,14 @@ Railway 数据库数据导入脚本
 用于从本地 CSV 文件导入数据到 Railway 部署的 PostgreSQL 数据库
 
 使用方法:
-1. 通过环境变量设置数据库连接:
+1. 只更新品类（不导入 CSV）:
+   python backend/scripts/import_railway.py 'postgresql://用户名:密码@主机:端口/数据库名'
+   
+   或通过环境变量:
    export DATABASE_URL='postgresql://用户名:密码@主机:端口/数据库名'
-   python backend/scripts/import_railway.py path/to/data.csv
+   python backend/scripts/import_railway.py
 
-2. 通过命令行参数指定:
+2. 导入 CSV 数据:
    python backend/scripts/import_railway.py 'postgresql://...' path/to/data.csv
 
 3. 交互式输入:
@@ -16,8 +19,8 @@ Railway 数据库数据导入脚本
 
 功能:
 - 自动初始化数据库表结构（如果不存在）
-- 自动更新品类显示名称为中文
-- 导入 CSV 数据到数据库
+- 自动更新品类显示名称为中文（设备、原材料、逻辑芯片、存储）
+- 导入 CSV 数据到数据库（如果提供了 CSV 文件）
 - 支持中文和英文品类名称查找
 """
 import csv
@@ -472,22 +475,28 @@ if __name__ == "__main__":
         print("❌ 错误: 未提供数据库连接字符串")
         sys.exit(1)
     
-    # 获取CSV文件路径
-    script_dir = Path(__file__).parent
-    project_root = script_dir.parent.parent
-    csv_path = os.getenv("CSV_PATH", str(project_root / "data" / "synthetic_data.csv"))
-    
-    # 如果提供了第二个参数，使用它作为CSV路径
+    # 获取CSV文件路径（可选）
+    csv_path = None
     if len(sys.argv) > 2:
         csv_path = sys.argv[2]
+    else:
+        csv_path = os.getenv("CSV_PATH")
     
-    if not os.path.exists(csv_path):
-        print(f"❌ 错误: CSV文件不存在: {csv_path}")
-        print(f"当前工作目录: {os.getcwd()}")
-        sys.exit(1)
-    
-    print(f"\n开始导入数据...")
-    print(f"CSV文件: {csv_path}")
-    import_data(csv_path, database_url)
-    print("\n导入完成!")
+    # 如果没有提供 CSV 文件，只更新品类
+    if not csv_path:
+        print(f"\n未提供 CSV 文件，只更新品类显示名称为中文...")
+        engine = create_engine(database_url, pool_pre_ping=True)
+        update_categories_chinese(engine)
+        print("\n✓ 品类更新完成!")
+    else:
+        # 检查 CSV 文件是否存在
+        if not os.path.exists(csv_path):
+            print(f"❌ 错误: CSV文件不存在: {csv_path}")
+            print(f"当前工作目录: {os.getcwd()}")
+            sys.exit(1)
+        
+        print(f"\n开始导入数据...")
+        print(f"CSV文件: {csv_path}")
+        import_data(csv_path, database_url)
+        print("\n导入完成!")
 
