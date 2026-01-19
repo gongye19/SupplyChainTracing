@@ -88,8 +88,8 @@ const StatsPanel: React.FC<StatsPanelProps> = ({ transactions }) => {
       {/* High Level KPIs - 只显示2个 */}
       <div className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-6">
         {[
-          { label: 'Network Value', value: `$${totalValue.toFixed(1)}M`, color: '#007AFF', icon: <DollarSign className="w-5 h-5" /> },
-          { label: 'Total Transactions', value: totalTransactions, color: '#34C759', icon: <Activity className="w-5 h-5" /> },
+          { label: '网络价值', value: `$${totalValue.toFixed(1)}M`, color: '#007AFF', icon: <DollarSign className="w-5 h-5" /> },
+          { label: '交易总数', value: totalTransactions, color: '#34C759', icon: <Activity className="w-5 h-5" /> },
         ].map((kpi, i) => (
           <div key={i} className="bg-white border border-black/5 p-8 rounded-[28px] shadow-sm hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between mb-4">
@@ -106,22 +106,22 @@ const StatsPanel: React.FC<StatsPanelProps> = ({ transactions }) => {
       <div className="lg:col-span-2 bg-white border border-black/5 p-8 rounded-[28px] shadow-sm">
         <div className="flex items-center justify-between mb-10">
           <h3 className="text-[18px] font-bold text-[#1D1D1F] flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-[#007AFF]" /> Flow Momentum
+            <TrendingUp className="w-5 h-5 text-[#007AFF]" /> 交易趋势
           </h3>
           <div className="px-3 py-1 bg-[#F5F5F7] rounded-full text-[11px] font-bold text-[#86868B] uppercase">
-            {flowMomentumData.length > 0 ? `${flowMomentumData.length} Periods` : 'No Data'}
+            {flowMomentumData.length > 0 ? `${flowMomentumData.length} 个周期` : '无数据'}
           </div>
         </div>
         <div className="h-[320px]">
           {flowMomentumData.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={flowMomentumData}>
-                <defs>
-                  <linearGradient id="appleGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#007AFF" stopOpacity={0.15}/>
-                    <stop offset="95%" stopColor="#007AFF" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
+              <defs>
+                <linearGradient id="appleGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#007AFF" stopOpacity={0.15}/>
+                  <stop offset="95%" stopColor="#007AFF" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
                 <XAxis 
                   dataKey="name" 
                   stroke="#86868B" 
@@ -142,16 +142,16 @@ const StatsPanel: React.FC<StatsPanelProps> = ({ transactions }) => {
                   tickLine={false}
                   tickFormatter={(value) => `$${value}M`}
                 />
-                <Tooltip 
-                  contentStyle={{ 
+              <Tooltip 
+                contentStyle={{ 
                     background: 'rgba(255, 255, 255, 0.9)', 
-                    backdropFilter: 'blur(10px)',
-                    border: '1px solid rgba(0,0,0,0.05)', 
-                    borderRadius: '14px', 
+                  backdropFilter: 'blur(10px)',
+                  border: '1px solid rgba(0,0,0,0.05)', 
+                  borderRadius: '14px', 
                     boxShadow: '0 10px 30px rgba(0,0,0,0.1)' 
-                  }}
+                }} 
                   formatter={(value: number) => formatTooltipValue(value)}
-                />
+              />
                 <Area 
                   type="monotone" 
                   dataKey="val" 
@@ -161,11 +161,11 @@ const StatsPanel: React.FC<StatsPanelProps> = ({ transactions }) => {
                   dot={{ fill: '#007AFF', r: 4 }}
                   activeDot={{ r: 6 }}
                 />
-              </AreaChart>
-            </ResponsiveContainer>
+            </AreaChart>
+          </ResponsiveContainer>
           ) : (
             <div className="h-full flex items-center justify-center text-[#86868B] text-sm">
-              No transaction data available
+              暂无交易数据
             </div>
           )}
         </div>
@@ -174,12 +174,12 @@ const StatsPanel: React.FC<StatsPanelProps> = ({ transactions }) => {
       {/* Material Mix Pie Chart */}
       <div className="bg-white border border-black/5 p-8 rounded-[28px] shadow-sm">
         <h3 className="text-[18px] font-bold text-[#1D1D1F] mb-10 flex items-center gap-2">
-          <Package className="w-5 h-5 text-[#34C759]" /> Material Mix
+          <Package className="w-5 h-5 text-[#34C759]" /> 物料分布
         </h3>
         <div className="h-[320px] flex items-center justify-center">
           {materialData.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
                 <Pie 
                   data={materialData} 
                   innerRadius={70} 
@@ -190,17 +190,17 @@ const StatsPanel: React.FC<StatsPanelProps> = ({ transactions }) => {
                   label={({ percentage }) => `${percentage}%`}
                   labelLine={false}
                 >
-                  {materialData.map((entry: any, index: number) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  contentStyle={{ 
+                {materialData.map((entry: any, index: number) => (
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip 
+                 contentStyle={{ 
                     background: 'rgba(255, 255, 255, 0.9)', 
-                    backdropFilter: 'blur(10px)',
-                    border: '1px solid rgba(0,0,0,0.05)', 
-                    borderRadius: '12px'
-                  }}
+                  backdropFilter: 'blur(10px)',
+                  border: '1px solid rgba(0,0,0,0.05)', 
+                  borderRadius: '12px'
+                }} 
                   formatter={(value: number, name: string, props: any) => [
                     `$${value}M (${props.payload.percentage}%)`,
                     props.payload.name
@@ -210,11 +210,11 @@ const StatsPanel: React.FC<StatsPanelProps> = ({ transactions }) => {
                   verticalAlign="bottom" 
                   height={36}
                   formatter={(value) => value}
-                />
-              </PieChart>
-            </ResponsiveContainer>
+              />
+            </PieChart>
+          </ResponsiveContainer>
           ) : (
-            <div className="text-[#86868B] text-sm">No category data available</div>
+            <div className="text-[#86868B] text-sm">暂无品类数据</div>
           )}
         </div>
       </div>
@@ -222,30 +222,30 @@ const StatsPanel: React.FC<StatsPanelProps> = ({ transactions }) => {
       {/* Strategic Corridor Priority - 显示所有交易 */}
       <div className="lg:col-span-3 bg-white border border-black/5 p-8 rounded-[28px] shadow-sm overflow-hidden">
         <div className="flex items-center justify-between mb-8">
-          <h3 className="text-[18px] font-bold text-[#1D1D1F]">All Transactions</h3>
+          <h3 className="text-[18px] font-bold text-[#1D1D1F]">所有交易</h3>
           <span className="text-[13px] text-[#86868B] font-medium">
-            {allRoutes.length} {allRoutes.length === 1 ? 'transaction' : 'transactions'}
+            {allRoutes.length} {allRoutes.length === 1 ? '笔交易' : '笔交易'}
           </span>
         </div>
         <div className="overflow-x-auto max-h-[600px] overflow-y-auto custom-scrollbar">
           <table className="w-full text-left">
             <thead className="sticky top-0 bg-white z-10">
               <tr className="text-[#86868B] text-[11px] font-bold uppercase tracking-widest border-b border-black/5">
-                <th className="pb-4 px-2">Logistics Route</th>
-                <th className="pb-4 px-2">Material Specification</th>
-                <th className="pb-4 px-2">Supply Status</th>
-                <th className="pb-4 px-2 text-right">Throughput</th>
+                <th className="pb-4 px-2">物流路线</th>
+                <th className="pb-4 px-2">物料规格</th>
+                <th className="pb-4 px-2">供应状态</th>
+                <th className="pb-4 px-2 text-right">交易额</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-black/[0.03]">
               {allRoutes.length > 0 ? (
                 allRoutes.map(s => (
-                  <tr key={s.id} className="group hover:bg-[#F5F5F7] transition-all">
+                <tr key={s.id} className="group hover:bg-[#F5F5F7] transition-all">
                     <td className="py-6 px-2 font-bold text-[#007AFF] text-[15px]">
                       {s.exporterCountryCode.toUpperCase()} &rarr; {s.importerCountryCode.toUpperCase()}
                     </td>
-                    <td className="py-6 px-2 text-[#1D1D1F] font-semibold text-[14px]">{s.material}</td>
-                    <td className="py-6 px-2">
+                  <td className="py-6 px-2 text-[#1D1D1F] font-semibold text-[14px]">{s.material}</td>
+                  <td className="py-6 px-2">
                       <span className={`px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                         s.status === 'in-transit' 
                           ? 'bg-[#007AFF]15 text-[#007AFF]' 
@@ -253,8 +253,8 @@ const StatsPanel: React.FC<StatsPanelProps> = ({ transactions }) => {
                             ? 'bg-[#FF9500]15 text-[#FF9500]' 
                             : 'bg-[#34C759]15 text-[#34C759]'
                       }`}>
-                        {s.status}
-                      </span>
+                      {s.status === 'completed' ? '已完成' : s.status === 'in-transit' ? '运输中' : s.status === 'pending' ? '待处理' : s.status === 'cancelled' ? '已取消' : s.status}
+                    </span>
                     </td>
                     <td className="py-6 px-2 text-right font-black text-[#1D1D1F] text-[16px] tracking-tight">
                       ${(s.totalValue / 1000000).toFixed(1)}M
@@ -264,7 +264,7 @@ const StatsPanel: React.FC<StatsPanelProps> = ({ transactions }) => {
               ) : (
                 <tr>
                   <td colSpan={4} className="py-12 text-center text-[#86868B] text-sm">
-                    No transactions found
+                    未找到交易记录
                   </td>
                 </tr>
               )}

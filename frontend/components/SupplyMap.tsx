@@ -273,22 +273,26 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
               const currentRadius = Math.max(0.5, storedBaseRadius / currentScale);
               d3.select(this).select('circle').transition().duration(200).attr('r', currentRadius * 1.5);
               
-            const companyType = (d as CompanyWithLocation).type || 'Unknown';
+            const companyType = (d as CompanyWithLocation).type || '未知';
             const companyData = d as CompanyWithLocation;
+            // 翻译公司类型
+            const companyTypeText = companyType === 'importer' ? '进口商' : 
+                                   companyType === 'exporter' ? '出口商' : 
+                                   companyType === 'both' ? '进出口商' : companyType;
               let tooltipHTML = `
                 <div style="display: flex; flex-direction: column; gap: 8px;">
                   <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
-                  <span style="font-weight: bold; font-size: 14px; color: #1D1D1F;">${companyData.name || 'Unknown Company'}</span>
-                    <span style="font-size: 10px; font-weight: bold; color: #86868B; text-transform: uppercase; letter-spacing: 0.05em;">${companyType}</span>
+                  <span style="font-weight: bold; font-size: 14px; color: #1D1D1F;">${companyData.name || '未知公司'}</span>
+                    <span style="font-size: 10px; font-weight: bold; color: #86868B; text-transform: uppercase; letter-spacing: 0.05em;">${companyTypeText}</span>
                   </div>
                   <div style="height: 0.5px; background: rgba(0,0,0,0.05);"></div>
                   <div style="display: flex; flex-direction: column; gap: 2px;">
-                    <span style="color: #86868B; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em;">Location</span>
-                  <span style="color: #1D1D1F; font-size: 12px; font-weight: 600;">${companyData.city || 'Unknown'}, ${companyData.countryName || companyData.countryCode || 'Unknown'}</span>
+                    <span style="color: #86868B; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em;">位置</span>
+                  <span style="color: #1D1D1F; font-size: 12px; font-weight: 600;">${companyData.city || '未知'}, ${companyData.countryName || companyData.countryCode || '未知'}</span>
                   </div>
                   ${cityCompanies.length > 1 ? `
                     <div style="color: #86868B; font-size: 10px; font-style: italic;">
-                      ${cityCompanies.length} companies at this location
+                      此位置有 ${cityCompanies.length} 家公司
                     </div>
                   ` : ''}
                 </div>
@@ -548,7 +552,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
       <div className="absolute top-6 left-6 z-20">
         <div className="bg-white/95 backdrop-blur-xl p-4 rounded-[18px] border border-black/[0.05] shadow-lg min-w-[160px] pointer-events-auto">
           <div className="mb-3 pb-2.5 border-b border-black/10">
-            <span className="text-[10px] text-[#86868B] font-bold uppercase tracking-widest">Material Categories</span>
+            <span className="text-[10px] text-[#86868B] font-bold uppercase tracking-widest">物料品类</span>
           </div>
           <div className="flex flex-col gap-3">
             {categories.map((cat) => (

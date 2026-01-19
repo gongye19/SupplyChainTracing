@@ -220,7 +220,7 @@ const App: React.FC = () => {
             <div className="w-9 h-9 bg-[#1D1D1F] rounded-[10px] flex items-center justify-center">
                <Globe className="text-white w-5 h-5" />
             </div>
-            <h1 className="text-lg font-bold tracking-tight">GlobalSupplyChainMap</h1>
+            <h1 className="text-lg font-bold tracking-tight">全球供应链地图</h1>
           </div>
         </div>
 
@@ -248,7 +248,7 @@ const App: React.FC = () => {
              >
                <div className="flex items-center gap-3">
                  <MapIcon className="w-4 h-4" />
-                 Global Map
+                 全球地图
                </div>
                {activeView === 'map' && <ChevronRight className="w-3.5 h-3.5" />}
              </button>
@@ -258,7 +258,7 @@ const App: React.FC = () => {
              >
                <div className="flex items-center gap-3">
                  <BarChart3 className="w-4 h-4" />
-                 Intelligence Hub
+                 智能分析中心
                </div>
                {activeView === 'stats' && <ChevronRight className="w-3.5 h-3.5" />}
              </button>
@@ -280,21 +280,21 @@ const App: React.FC = () => {
                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5 text-[#86868B]">
                     <TrendingUp className="w-4 h-4 text-[#007AFF]" />
-                    <span className="text-[10px] uppercase font-bold tracking-wider">Flows</span>
+                    <span className="text-[10px] uppercase font-bold tracking-wider">交易流</span>
                   </div>
                   <span className="text-sm font-bold">{stats.transactions}</span>
                </div>
                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5 text-[#86868B]">
                     <Users className="w-4 h-4 text-[#34C759]" />
-                    <span className="text-[10px] uppercase font-bold tracking-wider">Nodes</span>
+                    <span className="text-[10px] uppercase font-bold tracking-wider">节点</span>
                   </div>
                   <span className="text-sm font-bold">{stats.suppliers}</span>
                </div>
                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5 text-[#86868B]">
                     <Package className="w-4 h-4 text-[#FF2D55]" />
-                    <span className="text-[10px] uppercase font-bold tracking-wider">Classes</span>
+                    <span className="text-[10px] uppercase font-bold tracking-wider">品类</span>
                   </div>
                   <span className="text-sm font-bold">{stats.categories}</span>
                </div>
@@ -316,7 +316,7 @@ const App: React.FC = () => {
                   {/* 筛选更新时的轻微提示（可选） */}
                   {filterLoading && (
                     <div className="absolute top-4 right-4 z-20 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs text-[#86868B] shadow-sm">
-                      Updating...
+                      更新中...
                     </div>
                   )}
                   <SupplyMap 
@@ -334,12 +334,12 @@ const App: React.FC = () => {
           ) : (
             <div className="h-full overflow-y-auto custom-scrollbar pr-4">
               <div className="mb-10">
-                <h2 className="text-[32px] font-bold tracking-tight text-[#1D1D1F]">Network Insights</h2>
-                <p className="text-[#86868B] text-[16px] font-medium mt-1">Real-time performance metrics and material distribution.</p>
+                <h2 className="text-[32px] font-bold tracking-tight text-[#1D1D1F]">网络洞察</h2>
+                <p className="text-[#86868B] text-[16px] font-medium mt-1">实时性能指标和物料分布分析。</p>
               </div>
               {initialLoading ? (
                 <div className="flex items-center justify-center h-full">
-                  <div className="text-[#86868B]">Loading...</div>
+                  <div className="text-[#86868B]">加载中...</div>
                 </div>
               ) : (
                 <StatsPanel transactions={transactions} />

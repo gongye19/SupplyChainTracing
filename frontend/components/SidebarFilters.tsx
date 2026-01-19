@@ -173,16 +173,16 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, ca
 
       const nextIdx = getIndexFromClientX(x);
 
-      setFilters(prev => {
-        const curL = toMonthIndex(prev.startDate);
-        const curR = toMonthIndex(prev.endDate);
+    setFilters(prev => {
+      const curL = toMonthIndex(prev.startDate);
+      const curR = toMonthIndex(prev.endDate);
 
-        const res =
-          activeThumb === 'start'
-            ? applyDragLeft(nextIdx, curL, curR, totalMonths)
-            : applyDragRight(nextIdx, curL, curR, totalMonths);
+      const res =
+        activeThumb === 'start'
+          ? applyDragLeft(nextIdx, curL, curR, totalMonths)
+          : applyDragRight(nextIdx, curL, curR, totalMonths);
 
-        return { ...prev, startDate: fromMonthIndex(res.left), endDate: fromMonthIndex(res.right) };
+      return { ...prev, startDate: fromMonthIndex(res.left), endDate: fromMonthIndex(res.right) };
       });
     });
   };
@@ -226,7 +226,7 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, ca
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-[#007AFF]">
           <Filter className="w-4 h-4" />
-          <span className="text-[12px] font-bold uppercase tracking-widest text-[#1D1D1F]">Controls</span>
+          <span className="text-[12px] font-bold uppercase tracking-widest text-[#1D1D1F]">筛选控制</span>
         </div>
         <button 
           onClick={() => setFilters({ 
@@ -238,27 +238,27 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, ca
           })}
           className="text-[12px] text-[#007AFF] hover:underline font-semibold"
         >
-          Reset
+          重置
         </button>
       </div>
 
       {/* Date Range - Dual Slider */}
       <section className="space-y-5">
         <label className="text-[11px] font-bold text-[#86868B] uppercase tracking-widest flex items-center gap-2.5">
-          <Calendar className="w-4 h-4" /> Time Horizon
+          <Calendar className="w-4 h-4" /> 时间范围
         </label>
         
         <div className="space-y-2">
           {/* Date Display */}
           <div className="flex items-center justify-between px-1">
             <div className="flex flex-col">
-              <span className="text-[9px] text-[#86868B] uppercase font-bold tracking-wider">From</span>
+              <span className="text-[9px] text-[#86868B] uppercase font-bold tracking-wider">起始</span>
               <span className="text-[12px] text-[#1D1D1F] font-semibold mt-0.5">
                 {formatDateDisplay(filters.startDate)}
               </span>
             </div>
             <div className="flex flex-col items-end">
-              <span className="text-[9px] text-[#86868B] uppercase font-bold tracking-wider">To</span>
+              <span className="text-[9px] text-[#86868B] uppercase font-bold tracking-wider">结束</span>
               <span className="text-[12px] text-[#1D1D1F] font-semibold mt-0.5">
                 {formatDateDisplay(filters.endDate)}
               </span>
@@ -287,7 +287,7 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, ca
               {/* left thumb */}
               <div
                 role="slider"
-                aria-label="Start date"
+                aria-label="起始日期"
                 aria-valuemin={0}
                 aria-valuemax={totalMonths}
                 aria-valuenow={left}
@@ -304,7 +304,7 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, ca
               {/* right thumb */}
               <div
                 role="slider"
-                aria-label="End date"
+                aria-label="结束日期"
                 aria-valuemin={0}
                 aria-valuemax={totalMonths}
                 aria-valuenow={right}
@@ -325,7 +325,7 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, ca
       {/* Countries Dropdown */}
       <section className="space-y-2.5">
         <label className="text-[11px] font-bold text-[#86868B] uppercase tracking-widest flex items-center gap-2.5">
-          <Building2 className="w-4 h-4" /> Countries
+          <Building2 className="w-4 h-4" /> 国家
         </label>
         <div className="relative" ref={countriesRef}>
           <button 
@@ -334,8 +334,8 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, ca
           >
             <span className="truncate">
               {filters.selectedCountries.length === 0 
-                ? 'All Countries' 
-                : `${filters.selectedCountries.length} Selected`}
+                ? '所有国家' 
+                : `已选 ${filters.selectedCountries.length} 个`}
             </span>
             <ChevronDown className={`w-3.5 h-3.5 text-[#86868B] transition-transform ${countriesOpen ? 'rotate-180' : ''}`} />
           </button>
@@ -367,7 +367,7 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, ca
       {/* Categories Dropdown */}
       <section className="space-y-2.5">
         <label className="text-[11px] font-bold text-[#86868B] uppercase tracking-widest flex items-center gap-2.5">
-          <Package className="w-4 h-4" /> Material Class
+          <Package className="w-4 h-4" /> 物料品类
         </label>
         <div className="relative" ref={categoriesRef}>
           <button 
@@ -376,8 +376,8 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, ca
           >
             <span className="truncate">
               {filters.selectedCategories.length === 0 
-                ? 'All Material Flows' 
-                : `${filters.selectedCategories.length} Selected`}
+                ? '所有物料流' 
+                : `已选 ${filters.selectedCategories.length} 个`}
             </span>
             <ChevronDown className={`w-3.5 h-3.5 text-[#86868B] transition-transform ${categoriesOpen ? 'rotate-180' : ''}`} />
           </button>
@@ -418,7 +418,7 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, ca
       {/* Companies Dropdown */}
       <section className="space-y-2.5">
         <label className="text-[11px] font-bold text-[#86868B] uppercase tracking-widest flex items-center gap-2.5">
-          <Building className="w-4 h-4" /> Companies
+          <Building className="w-4 h-4" /> 公司
         </label>
         <div className="relative" ref={companiesRef}>
           <button 
@@ -427,8 +427,8 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, ca
           >
             <span className="truncate">
               {filters.selectedCompanies.length === 0 
-                ? 'All Companies' 
-                : `${filters.selectedCompanies.length} Selected`}
+                ? '所有公司' 
+                : `已选 ${filters.selectedCompanies.length} 个`}
             </span>
             <ChevronDown className={`w-3.5 h-3.5 text-[#86868B] transition-transform ${companiesOpen ? 'rotate-180' : ''}`} />
           </button>
