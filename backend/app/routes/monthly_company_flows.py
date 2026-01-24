@@ -93,13 +93,26 @@ def get_monthly_company_flows(
                 flow_dict = row._asdict()
             else:
                 # 回退方案：手动构建字典
-                flow_dict = {}
-                for i, col in enumerate(result.keys()):
-                    flow_dict[col] = row[i]
+                try:
+                    # 尝试获取列名
+                    columns = result.keys() if hasattr(result, 'keys') else []
+                    flow_dict = {}
+                    if columns:
+                        for i, col in enumerate(columns):
+                            flow_dict[col] = row[i]
+                    else:
+                        # 如果无法获取列名，使用索引
+                        flow_dict = {f'col_{i}': val for i, val in enumerate(row)}
+                except:
+                    # 最后的回退：使用枚举
+                    flow_dict = {f'col_{i}': val for i, val in enumerate(row)}
             flows.append(flow_dict)
         
         return flows
     except Exception as e:
+        import traceback
+        error_detail = f"数据库查询错误: {str(e)}\n{traceback.format_exc()}"
+        print(f"[ERROR] {error_detail}")  # 打印到日志
         from fastapi import HTTPException
         raise HTTPException(status_code=500, detail=f"数据库查询错误: {str(e)}")
 
