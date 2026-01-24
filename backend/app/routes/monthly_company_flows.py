@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List, Optional
+from datetime import date, datetime
 
 from ..database import get_db
 from ..schemas import MonthlyCompanyFlow
@@ -106,6 +107,16 @@ def get_monthly_company_flows(
                 except:
                     # 最后的回退：使用枚举
                     flow_dict = {f'col_{i}': val for i, val in enumerate(row)}
+            
+            # 转换日期字段为字符串（如果存在）
+            if 'first_transaction_date' in flow_dict and flow_dict['first_transaction_date'] is not None:
+                if isinstance(flow_dict['first_transaction_date'], (date, datetime)):
+                    flow_dict['first_transaction_date'] = flow_dict['first_transaction_date'].strftime('%Y-%m-%d')
+            
+            if 'last_transaction_date' in flow_dict and flow_dict['last_transaction_date'] is not None:
+                if isinstance(flow_dict['last_transaction_date'], (date, datetime)):
+                    flow_dict['last_transaction_date'] = flow_dict['last_transaction_date'].strftime('%Y-%m-%d')
+            
             flows.append(flow_dict)
         
         return flows
