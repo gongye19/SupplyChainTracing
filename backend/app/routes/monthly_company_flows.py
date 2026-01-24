@@ -73,17 +73,33 @@ def get_monthly_company_flows(
         
         query = base_query
     
-    query += " ORDER BY year_month DESC, total_value_usd DESC"
+    # 根据查询类型添加正确的 ORDER BY
+    if category_id:
+        query += " ORDER BY m.year_month DESC, m.total_value_usd DESC"
+    else:
+        query += " ORDER BY year_month DESC, total_value_usd DESC"
     
-    result = db.execute(text(query), params)
-    rows = result.fetchall()
-    
-    # 转换为字典列表
-    columns = result.keys()
-    flows = []
-    for row in rows:
-        flow_dict = dict(zip(columns, row))
-        flows.append(flow_dict)
-    
-    return flows
+    try:
+        result = db.execute(text(query), params)
+        rows = result.fetchall()
+        
+        # 转换为字典列表 - 使用 row._mapping 或 row._asdict() (SQLAlchemy 2.0)
+        flows = []
+        for row in rows:
+            # SQLAlchemy 2.0 支持 _mapping 属性
+            if hasattr(row, '_mapping'):
+                flow_dict = dict(row._mapping)
+            elif hasattr(row, '_asdict'):
+                flow_dict = row._asdict()
+            else:
+                # 回退方案：手动构建字典
+                flow_dict = {}
+                for i, col in enumerate(result.keys()):
+                    flow_dict[col] = row[i]
+            flows.append(flow_dict)
+        
+        return flows
+    except Exception as e:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=500, detail=f"数据库查询错误: {str(e)}")
 
