@@ -21,10 +21,14 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
   monthlyFlows
 }) => {
   const { t } = useLanguage();
+  const [startDateOpen, setStartDateOpen] = useState(false);
+  const [endDateOpen, setEndDateOpen] = useState(false);
   const [countriesOpen, setCountriesOpen] = useState(false);
   const [hsCodeCategoriesOpen, setHsCodeCategoriesOpen] = useState(false);
   const [companiesOpen, setCompaniesOpen] = useState(false);
   
+  const startDateRef = useRef<HTMLDivElement>(null);
+  const endDateRef = useRef<HTMLDivElement>(null);
   const countriesRef = useRef<HTMLDivElement>(null);
   const hsCodeCategoriesRef = useRef<HTMLDivElement>(null);
   const companiesRef = useRef<HTMLDivElement>(null);
@@ -32,6 +36,12 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
   // 点击外部关闭下拉框
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      if (startDateRef.current && !startDateRef.current.contains(event.target as Node)) {
+        setStartDateOpen(false);
+      }
+      if (endDateRef.current && !endDateRef.current.contains(event.target as Node)) {
+        setEndDateOpen(false);
+      }
       if (countriesRef.current && !countriesRef.current.contains(event.target as Node)) {
         setCountriesOpen(false);
       }
@@ -43,14 +53,14 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
       }
     };
 
-    if (countriesOpen || hsCodeCategoriesOpen || companiesOpen) {
+    if (startDateOpen || endDateOpen || countriesOpen || hsCodeCategoriesOpen || companiesOpen) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [countriesOpen, hsCodeCategoriesOpen, companiesOpen]);
+  }, [startDateOpen, endDateOpen, countriesOpen, hsCodeCategoriesOpen, companiesOpen]);
 
   // 生成年月选项（从2003-01到当前）
   const generateYearMonthOptions = () => {
@@ -122,38 +132,80 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
       </div>
 
       {/* 时间范围 - 年月选择器 */}
-      <section className="space-y-5">
+      <section className="space-y-2.5">
         <label className="text-[11px] font-bold text-[#86868B] uppercase tracking-widest flex items-center gap-2.5">
           <Calendar className="w-4 h-4" /> {t('filters.dateRange')}
         </label>
         
         <div className="space-y-3">
           {/* 起始年月 */}
-          <div className="flex flex-col">
-            <span className="text-[9px] text-[#86868B] uppercase font-bold tracking-wider mb-1">{t('filters.start')}</span>
-            <select
-              value={filters.startYearMonth}
-              onChange={(e) => setFilters(prev => ({ ...prev, startYearMonth: e.target.value }))}
-              className="w-full bg-[#F5F5F7] border border-black/5 rounded-[12px] px-3 py-2.5 pr-8 text-[12px] text-[#1D1D1F] font-semibold hover:bg-[#EBEBEB] transition-all shadow-sm appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%2386868B%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22><polyline points=%226 9 12 15 18 9%22></polyline></svg>')] bg-[length:16px_16px] bg-[right_0.75rem_center] bg-no-repeat"
+          <div className="relative" ref={startDateRef}>
+            <div className="flex flex-col mb-1">
+              <span className="text-[9px] text-[#86868B] uppercase font-bold tracking-wider">{t('filters.start')}</span>
+            </div>
+            <button 
+              onClick={() => {
+                setEndDateOpen(false); // 关闭结束日期下拉框
+                setStartDateOpen(!startDateOpen);
+              }}
+              className="w-full bg-[#F5F5F7] border border-black/5 rounded-[12px] px-3 py-2.5 flex items-center justify-between text-[12px] text-[#1D1D1F] font-semibold hover:bg-[#EBEBEB] transition-all shadow-sm"
             >
-              {yearMonthOptions.map(ym => (
-                <option key={ym} value={ym}>{ym}</option>
-              ))}
-            </select>
+              <span className="truncate">{filters.startYearMonth}</span>
+              <ChevronDown className={`w-3.5 h-3.5 text-[#86868B] transition-transform ${startDateOpen ? 'rotate-180' : ''}`} />
+            </button>
+            
+            {startDateOpen && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-white/90 backdrop-blur-xl border border-black/5 rounded-[16px] shadow-2xl z-50 max-h-72 overflow-y-auto custom-scrollbar p-1.5 animate-in fade-in zoom-in-95 duration-200">
+                {yearMonthOptions.map(ym => (
+                  <div 
+                    key={ym}
+                    onClick={() => {
+                      setFilters(prev => ({ ...prev, startYearMonth: ym }));
+                      setStartDateOpen(false);
+                    }}
+                    className={`px-3 py-2.5 text-[12px] flex items-center justify-between cursor-pointer rounded-[8px] transition-colors mb-0.5 last:mb-0 ${filters.startYearMonth === ym ? 'bg-[#007AFF] text-white font-bold' : 'text-[#1D1D1F] hover:bg-black/5'}`}
+                  >
+                    <span>{ym}</span>
+                    {filters.startYearMonth === ym && <Check className="w-3.5 h-3.5 flex-shrink-0 ml-2" />}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* 结束年月 */}
-          <div className="flex flex-col">
-            <span className="text-[9px] text-[#86868B] uppercase font-bold tracking-wider mb-1">{t('filters.end')}</span>
-            <select
-              value={filters.endYearMonth}
-              onChange={(e) => setFilters(prev => ({ ...prev, endYearMonth: e.target.value }))}
-              className="w-full bg-[#F5F5F7] border border-black/5 rounded-[12px] px-3 py-2.5 pr-8 text-[12px] text-[#1D1D1F] font-semibold hover:bg-[#EBEBEB] transition-all shadow-sm appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%2386868B%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22><polyline points=%226 9 12 15 18 9%22></polyline></svg>')] bg-[length:16px_16px] bg-[right_0.75rem_center] bg-no-repeat"
+          <div className="relative" ref={endDateRef}>
+            <div className="flex flex-col mb-1">
+              <span className="text-[9px] text-[#86868B] uppercase font-bold tracking-wider">{t('filters.end')}</span>
+            </div>
+            <button 
+              onClick={() => {
+                setStartDateOpen(false); // 关闭起始日期下拉框
+                setEndDateOpen(!endDateOpen);
+              }}
+              className="w-full bg-[#F5F5F7] border border-black/5 rounded-[12px] px-3 py-2.5 flex items-center justify-between text-[12px] text-[#1D1D1F] font-semibold hover:bg-[#EBEBEB] transition-all shadow-sm"
             >
-              {yearMonthOptions.map(ym => (
-                <option key={ym} value={ym}>{ym}</option>
-              ))}
-            </select>
+              <span className="truncate">{filters.endYearMonth}</span>
+              <ChevronDown className={`w-3.5 h-3.5 text-[#86868B] transition-transform ${endDateOpen ? 'rotate-180' : ''}`} />
+            </button>
+            
+            {endDateOpen && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-white/90 backdrop-blur-xl border border-black/5 rounded-[16px] shadow-2xl z-50 max-h-72 overflow-y-auto custom-scrollbar p-1.5 animate-in fade-in zoom-in-95 duration-200">
+                {yearMonthOptions.map(ym => (
+                  <div 
+                    key={ym}
+                    onClick={() => {
+                      setFilters(prev => ({ ...prev, endYearMonth: ym }));
+                      setEndDateOpen(false);
+                    }}
+                    className={`px-3 py-2.5 text-[12px] flex items-center justify-between cursor-pointer rounded-[8px] transition-colors mb-0.5 last:mb-0 ${filters.endYearMonth === ym ? 'bg-[#007AFF] text-white font-bold' : 'text-[#1D1D1F] hover:bg-black/5'}`}
+                  >
+                    <span>{ym}</span>
+                    {filters.endYearMonth === ym && <Check className="w-3.5 h-3.5 flex-shrink-0 ml-2" />}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </section>
