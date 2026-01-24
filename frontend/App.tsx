@@ -208,35 +208,56 @@ const App: React.FC = () => {
   }, [countries]);
 
   // 将 MonthlyCompanyFlow 转换为 Shipment 格式（用于地图组件）
+  // 每个品类一条独立的线，所以需要按 HS Code 大类拆分
   const shipments = useMemo(() => {
-    return monthlyFlows.map(flow => {
+    const result: any[] = [];
+    
+    monthlyFlows.forEach(flow => {
       // 从 HS Code 获取品类（处理空格和格式）
       const hsCodesArray = flow.hsCodes?.split(',').map(code => code.trim()) || [];
-      const firstHsCode = hsCodesArray[0]?.slice(0, 2) || '';
-      const hsCategory = hsCodeCategories.find(cat => cat.hsCode === firstHsCode);
       
-      // 根据HS Code生成唯一颜色（96个大类，96种颜色）
-      const categoryColor = getHSCodeColorCached(firstHsCode);
+      // 按 HS Code 大类分组（前2位）
+      const hsCodeGroups = new Map<string, string[]>(); // category -> [hs codes]
+      hsCodesArray.forEach(code => {
+        const categoryCode = code.slice(0, 2);
+        if (!hsCodeGroups.has(categoryCode)) {
+          hsCodeGroups.set(categoryCode, []);
+        }
+        hsCodeGroups.get(categoryCode)!.push(code);
+      });
       
       // 将国家名称转换为国家代码
       const originCountryCode = getCountryCode(flow.originCountry);
       const destinationCountryCode = getCountryCode(flow.destinationCountry);
       
-      return {
-        id: `${flow.yearMonth}-${flow.exporterName}-${flow.importerName}`,
-        originId: originCountryCode, // 使用国家代码而不是名称
-        destinationId: destinationCountryCode, // 使用国家代码而不是名称
-        exporterCompanyName: flow.exporterName,
-        importerCompanyName: flow.importerName,
-        material: flow.hsCodes,
-        category: hsCategory?.chapterName || 'Unknown', // 使用 HS Code 分类表中的章节名称
-        categoryColor,
-        quantity: flow.totalQuantity,
-        value: flow.totalValueUsd / 1000000, // 转换为百万美元
-        status: 'completed',
-        timestamp: flow.firstTransactionDate
-      };
+      // 为每个品类创建一个 shipment
+      hsCodeGroups.forEach((hsCodes, categoryCode) => {
+        const hsCategory = hsCodeCategories.find(cat => cat.hsCode === categoryCode);
+        
+        // 根据HS Code生成唯一颜色（96个大类，96种颜色）
+        const categoryColor = getHSCodeColorCached(categoryCode);
+        
+        // 计算该品类在这个flow中的价值比例（简单平均分配）
+        const categoryValueRatio = hsCodes.length / hsCodesArray.length;
+        
+        result.push({
+          id: `${flow.yearMonth}-${flow.exporterName}-${flow.importerName}-${categoryCode}`,
+          originId: originCountryCode, // 使用国家代码而不是名称
+          destinationId: destinationCountryCode, // 使用国家代码而不是名称
+          exporterCompanyName: flow.exporterName,
+          importerCompanyName: flow.importerName,
+          material: hsCodes.join(','), // 只包含该品类的 HS Codes
+          category: hsCategory?.chapterName || 'Unknown', // 使用 HS Code 分类表中的章节名称
+          categoryColor,
+          quantity: flow.totalQuantity * categoryValueRatio, // 按比例分配数量
+          value: (flow.totalValueUsd / 1000000) * categoryValueRatio, // 按比例分配价值（百万美元）
+          status: 'completed',
+          timestamp: flow.firstTransactionDate
+        });
+      });
     });
+    
+    return result;
   }, [monthlyFlows, hsCodeCategories, getCountryCode]);
 
   // 调试信息

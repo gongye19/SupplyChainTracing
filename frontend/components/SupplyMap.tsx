@@ -330,12 +330,15 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
 
     // 绘制路径和粒子（preview 模式限制粒子数量）
       if (shipments.length > 0) {
-      // 按公司对聚合交易（相同出口商和进口商的交易合并）
+      // 按公司对和品类聚合交易（相同出口商、进口商和品类的交易合并）
+      // 每个品类一条独立的线
       const routeGroups = new Map<string, {
         exporterCompanyId?: string;
         importerCompanyId?: string;
         originId: string;
         destinationId: string;
+        originCountry: string;
+        destinationCountry: string;
         shipments: typeof shipments;
         count: number;
         totalValue: number;
@@ -344,18 +347,25 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
       }>();
 
       shipments.forEach(shipment => {
-        const routeKey = `${shipment.exporterCompanyId || shipment.originId}-${shipment.importerCompanyId || shipment.destinationId}`;
+        // 按公司对和品类分组，每个品类一条独立的线
+        const routeKey = `${shipment.exporterCompanyId || shipment.originId}-${shipment.importerCompanyId || shipment.destinationId}-${shipment.category}`;
         
         if (!routeGroups.has(routeKey)) {
           // 优先使用交易数据中的品类颜色，然后尝试从品类列表匹配，最后使用默认颜色
           const category = categories.find(c => c.displayName === shipment.category || c.name === shipment.category || c.id === shipment.category);
           const color = (shipment as any).categoryColor || category?.color || categoryColors[shipment.category] || '#8E8E93';
           
+          // 获取国家名称
+          const originCountry = countries.find(c => c.countryCode === shipment.originId)?.countryName || shipment.originId;
+          const destinationCountry = countries.find(c => c.countryCode === shipment.destinationId)?.countryName || shipment.destinationId;
+          
           routeGroups.set(routeKey, {
             exporterCompanyId: shipment.exporterCompanyId,
             importerCompanyId: shipment.importerCompanyId,
             originId: shipment.originId,
             destinationId: shipment.destinationId,
+            originCountry,
+            destinationCountry,
             shipments: [shipment],
             count: 1,
             totalValue: shipment.value,
@@ -367,18 +377,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
           group.shipments.push(shipment);
           group.count += 1;
           group.totalValue += shipment.value;
-          // 更新主要品类（选择出现最多的品类）
-          const categoryCounts = new Map<string, number>();
-          group.shipments.forEach(s => {
-            categoryCounts.set(s.category, (categoryCounts.get(s.category) || 0) + 1);
-          });
-          const mostFrequentCategory = Array.from(categoryCounts.entries())
-            .sort((a, b) => b[1] - a[1])[0][0];
-          group.mainCategory = mostFrequentCategory;
-          // 找到该品类对应的 shipment，使用其 categoryColor
-          const categoryShipment = group.shipments.find(s => s.category === mostFrequentCategory);
-          const category = categories.find(c => c.displayName === mostFrequentCategory || c.name === mostFrequentCategory || c.id === mostFrequentCategory);
-          group.mainColor = (categoryShipment as any)?.categoryColor || category?.color || categoryColors[mostFrequentCategory] || '#8E8E93';
+          // 品类已经确定（因为按品类分组），不需要更新
         }
       });
 
@@ -487,6 +486,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
                 <div class="flex flex-col gap-1">
                   <span class="text-[#86868B] text-[10px] font-bold uppercase">${directionLabel}</span>
                   <span class="text-[#007AFF] font-semibold text-[13px]">${origin.name} &rarr; ${dest.name}</span>
+                  <span class="text-[#86868B] text-[11px] mt-0.5">${routeGroup.originCountry} &rarr; ${routeGroup.destinationCountry}</span>
                 </div>
                 <div class="flex justify-between items-center">
                   <span class="text-[#86868B] text-[10px] font-bold uppercase">${transactionCountLabel}</span>
