@@ -177,24 +177,64 @@ const App: React.FC = () => {
     };
   }, [filters, hsCodeCategories.length, countries.length, scheduleFetch]);
 
+  // 国家名称到国家代码的映射函数
+  const getCountryCode = useCallback((countryName: string): string => {
+    if (!countryName) return '';
+    
+    // 特殊映射（处理数据中的特殊情况）
+    const specialMappings: Record<string, string> = {
+      'Dubai': 'AE',
+      'United Arab Emirates': 'AE',
+      'UAE': 'AE',
+    };
+    
+    if (specialMappings[countryName]) {
+      return specialMappings[countryName];
+    }
+    
+    // 从 countries 列表中查找匹配的国家
+    const country = countries.find(c => 
+      c.countryName.toLowerCase() === countryName.toLowerCase() ||
+      c.countryName === countryName
+    );
+    
+    return country?.countryCode || countryName; // 如果找不到，返回原名称（作为后备）
+  }, [countries]);
+
   // 将 MonthlyCompanyFlow 转换为 Shipment 格式（用于地图组件）
   const shipments = useMemo(() => {
     return monthlyFlows.map(flow => {
-      // 从 HS Code 获取品类颜色
-      const firstHsCode = flow.hsCodes.split(',')[0]?.slice(0, 2) || '';
+      // 从 HS Code 获取品类（处理空格和格式）
+      const hsCodesArray = flow.hsCodes?.split(',').map(code => code.trim()) || [];
+      const firstHsCode = hsCodesArray[0]?.slice(0, 2) || '';
       const hsCategory = hsCodeCategories.find(cat => cat.hsCode === firstHsCode);
-      const categoryColor = hsCategory ? 
-        (hsCategory.categoryId === 'equipment' ? '#5856D6' : 
-         hsCategory.categoryId === 'raw_material' ? '#30B0C7' : '#007AFF') : '#007AFF';
+      
+      // 根据品类ID获取颜色
+      let categoryColor = '#007AFF'; // 默认颜色
+      if (hsCategory) {
+        if (hsCategory.categoryId === 'equipment') {
+          categoryColor = '#5856D6';
+        } else if (hsCategory.categoryId === 'raw_material') {
+          categoryColor = '#30B0C7';
+        } else if (hsCategory.categoryId === 'logic') {
+          categoryColor = '#007AFF';
+        } else if (hsCategory.categoryId === 'memory') {
+          categoryColor = '#FF9500';
+        }
+      }
+      
+      // 将国家名称转换为国家代码
+      const originCountryCode = getCountryCode(flow.originCountry);
+      const destinationCountryCode = getCountryCode(flow.destinationCountry);
       
       return {
         id: `${flow.yearMonth}-${flow.exporterName}-${flow.importerName}`,
-        originId: flow.originCountry,
-        destinationId: flow.destinationCountry,
+        originId: originCountryCode, // 使用国家代码而不是名称
+        destinationId: destinationCountryCode, // 使用国家代码而不是名称
         exporterCompanyName: flow.exporterName,
         importerCompanyName: flow.importerName,
         material: flow.hsCodes,
-        category: hsCategory?.categoryName || 'Unknown',
+        category: hsCategory?.categoryName || 'Unknown', // 使用 HS Code 分类表中的品类名称
         categoryColor,
         quantity: flow.totalQuantity,
         value: flow.totalValueUsd / 1000000, // 转换为百万美元
@@ -202,7 +242,7 @@ const App: React.FC = () => {
         timestamp: flow.firstTransactionDate
       };
     });
-  }, [monthlyFlows, hsCodeCategories]);
+  }, [monthlyFlows, hsCodeCategories, getCountryCode]);
 
   // 调试信息
   useEffect(() => {

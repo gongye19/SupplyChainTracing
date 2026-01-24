@@ -198,10 +198,10 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
         </div>
       </section>
 
-      {/* HS Code 品类筛选 */}
+      {/* HS Code 品类筛选 - 按品类分组显示 */}
       <section className="space-y-2.5">
         <label className="text-[11px] font-bold text-[#86868B] uppercase tracking-widest flex items-center gap-2.5">
-          <Package className="w-4 h-4" /> HS Code 品类
+          <Package className="w-4 h-4" /> {t('filters.categories')}
         </label>
         <div className="relative" ref={hsCodeCategoriesRef}>
           <button 
@@ -210,8 +210,8 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
           >
             <span className="truncate">
               {filters.selectedHSCodeCategories.length === 0 
-                ? '全部品类' 
-                : `已选择 ${filters.selectedHSCodeCategories.length}`}
+                ? t('filters.selectAll') 
+                : `${filters.selectedHSCodeCategories.length} ${t('filters.selected')}`}
             </span>
             <ChevronDown className={`w-3.5 h-3.5 text-[#86868B] transition-transform ${hsCodeCategoriesOpen ? 'rotate-180' : ''}`} />
           </button>
@@ -220,25 +220,33 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
             <div className="absolute top-full left-0 right-0 mt-2 bg-white/90 backdrop-blur-xl border border-black/5 rounded-[16px] shadow-2xl z-50 max-h-72 overflow-y-auto custom-scrollbar p-1.5 animate-in fade-in zoom-in-95 duration-200">
               {hsCodeCategories.length === 0 ? (
                 <div className="px-3 py-2 text-[12px] text-[#86868B]">{t('filters.loading')}</div>
-              ) : (
-                hsCodeCategories.map(cat => (
-                <div 
-                  key={cat.hsCode}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleHSCodeCategory(cat.categoryId);
-                  }}
-                  className={`px-3 py-2.5 text-[12px] flex items-center justify-between cursor-pointer rounded-[8px] transition-colors mb-0.5 last:mb-0 ${filters.selectedHSCodeCategories.includes(cat.categoryId) ? 'bg-[#007AFF] text-white font-bold' : 'text-[#1D1D1F] hover:bg-black/5'}`}
-                >
-                  <span 
-                    className={`font-semibold flex-1 ${filters.selectedHSCodeCategories.includes(cat.categoryId) ? 'text-white' : 'text-[#1D1D1F]'}`}
+              ) : (() => {
+                // 按品类ID分组，只显示唯一的品类
+                const uniqueCategories = new Map<string, HSCodeCategory>();
+                hsCodeCategories.forEach(cat => {
+                  if (!uniqueCategories.has(cat.categoryId)) {
+                    uniqueCategories.set(cat.categoryId, cat);
+                  }
+                });
+                
+                return Array.from(uniqueCategories.values()).map(cat => (
+                  <div 
+                    key={cat.categoryId}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleHSCodeCategory(cat.categoryId);
+                    }}
+                    className={`px-3 py-2.5 text-[12px] flex items-center justify-between cursor-pointer rounded-[8px] transition-colors mb-0.5 last:mb-0 ${filters.selectedHSCodeCategories.includes(cat.categoryId) ? 'bg-[#007AFF] text-white font-bold' : 'text-[#1D1D1F] hover:bg-black/5'}`}
                   >
-                    {cat.categoryName} ({cat.hsCode})
-                  </span>
-                  {filters.selectedHSCodeCategories.includes(cat.categoryId) && <Check className="w-3.5 h-3.5 flex-shrink-0 ml-2" />}
-                </div>
-                ))
-              )}
+                    <span 
+                      className={`font-semibold flex-1 ${filters.selectedHSCodeCategories.includes(cat.categoryId) ? 'text-white' : 'text-[#1D1D1F]'}`}
+                    >
+                      {cat.categoryName}
+                    </span>
+                    {filters.selectedHSCodeCategories.includes(cat.categoryId) && <Check className="w-3.5 h-3.5 flex-shrink-0 ml-2" />}
+                  </div>
+                ));
+              })()}
             </div>
           )}
         </div>
