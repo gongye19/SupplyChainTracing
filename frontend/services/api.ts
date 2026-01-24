@@ -101,7 +101,8 @@ export const monthlyCompanyFlowsAPI = {
       filters.selectedCompanies.forEach(name => params.append('company', name));
     }
     if (filters?.selectedHSCodeCategories?.length) {
-      filters.selectedHSCodeCategories.forEach(id => params.append('category_id', id));
+      // 使用 hs_code 参数（2位大类），而不是 category_id
+      filters.selectedHSCodeCategories.forEach(hsCode => params.append('hs_code', hsCode));
     }
 
     const data = await fetchAPI<any[]>(`/api/monthly-company-flows?${params.toString()}`);
@@ -167,7 +168,8 @@ export const transactionsAPI = {
       filters.selectedCountries.forEach(name => params.append('country', name));
     }
     if (filters?.selectedHSCodeCategories?.length) {
-      filters.selectedHSCodeCategories.forEach(id => params.append('category_id', id));
+      // 使用 hs_code 参数（2位大类），而不是 category_id
+      filters.selectedHSCodeCategories.forEach(hsCode => params.append('hs_code', hsCode));
     }
     if (filters?.selectedCompanies?.length) {
       filters.selectedCompanies.forEach(name => params.append('company', name));

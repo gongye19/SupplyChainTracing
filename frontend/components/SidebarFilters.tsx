@@ -255,16 +255,16 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
                     key={cat.hsCode}
                     onClick={(e) => {
                       e.stopPropagation();
-                      toggleHSCodeCategory(cat.categoryId);
+                      toggleHSCodeCategory(cat.hsCode); // 使用 hsCode（2位），而不是 categoryId
                     }}
-                    className={`px-3 py-2.5 text-[12px] flex items-center justify-between cursor-pointer rounded-[8px] transition-colors mb-0.5 last:mb-0 ${filters.selectedHSCodeCategories.includes(cat.categoryId) ? 'bg-[#007AFF] text-white font-bold' : 'text-[#1D1D1F] hover:bg-black/5'}`}
+                    className={`px-3 py-2.5 text-[12px] flex items-center justify-between cursor-pointer rounded-[8px] transition-colors mb-0.5 last:mb-0 ${filters.selectedHSCodeCategories.includes(cat.hsCode) ? 'bg-[#007AFF] text-white font-bold' : 'text-[#1D1D1F] hover:bg-black/5'}`}
                   >
                     <span 
-                      className={`font-semibold flex-1 ${filters.selectedHSCodeCategories.includes(cat.categoryId) ? 'text-white' : 'text-[#1D1D1F]'}`}
+                      className={`font-semibold flex-1 ${filters.selectedHSCodeCategories.includes(cat.hsCode) ? 'text-white' : 'text-[#1D1D1F]'}`}
                     >
                       {cat.chapterName} ({cat.hsCode})
                     </span>
-                    {filters.selectedHSCodeCategories.includes(cat.categoryId) && <Check className="w-3.5 h-3.5 flex-shrink-0 ml-2" />}
+                    {filters.selectedHSCodeCategories.includes(cat.hsCode) && <Check className="w-3.5 h-3.5 flex-shrink-0 ml-2" />}
                   </div>
                 ));
               })()}

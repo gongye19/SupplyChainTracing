@@ -16,6 +16,7 @@ def get_monthly_company_flows(
     country: Optional[List[str]] = Query(None, description="国家筛选（可多个）"),
     company: Optional[List[str]] = Query(None, description="公司名称筛选（可多个）"),
     category_id: Optional[List[str]] = Query(None, description="HS Code 品类ID筛选（可多个）"),
+    hs_code: Optional[List[str]] = Query(None, description="HS Code 2位大类筛选（可多个，如 42, 54, 62）"),
     db: Session = Depends(get_db)
 ):
     """获取月度公司流量数据"""
@@ -42,8 +43,39 @@ def get_monthly_company_flows(
         for i, c in enumerate(company):
             params[f'company_{i}'] = c
     
-    if category_id:
-        # 需要通过 hs_code_categories 表关联查询
+    # 支持按 HS Code 2位大类筛选（优先于 category_id）
+    if hs_code:
+        # 直接按 HS Code 前2位筛选
+        placeholders = ', '.join([f':hs_code_{i}' for i in range(len(hs_code))])
+        base_query = """
+            SELECT DISTINCT m.* FROM monthly_company_flows m
+            CROSS JOIN LATERAL unnest(string_to_array(m.hs_codes, ',')) AS hs_code_val
+            WHERE LEFT(TRIM(hs_code_val), 2) IN ({})
+        """.format(placeholders)
+        
+        params = {f'hs_code_{i}': c for i, c in enumerate(hs_code)}
+        
+        # 添加其他筛选条件
+        if start_year_month:
+            base_query += " AND m.year_month >= :start_year_month"
+            params['start_year_month'] = start_year_month
+        if end_year_month:
+            base_query += " AND m.year_month <= :end_year_month"
+            params['end_year_month'] = end_year_month
+        if country:
+            placeholders_country = ', '.join([f':country_{i}' for i in range(len(country))])
+            base_query += f" AND (m.origin_country IN ({placeholders_country}) OR m.destination_country IN ({placeholders_country}))"
+            for i, c in enumerate(country):
+                params[f'country_{i}'] = c
+        if company:
+            placeholders_company = ', '.join([f':company_{i}' for i in range(len(company))])
+            base_query += f" AND (m.exporter_name IN ({placeholders_company}) OR m.importer_name IN ({placeholders_company}))"
+            for i, c in enumerate(company):
+                params[f'company_{i}'] = c
+        
+        query = base_query
+    elif category_id:
+        # 需要通过 hs_code_categories 表关联查询（按品类ID筛选）
         placeholders = ', '.join([f':cat_{i}' for i in range(len(category_id))])
         base_query = """
             SELECT DISTINCT m.* FROM monthly_company_flows m
@@ -75,7 +107,7 @@ def get_monthly_company_flows(
         query = base_query
     
     # 根据查询类型添加正确的 ORDER BY
-    if category_id:
+    if hs_code or category_id:
         query += " ORDER BY m.year_month DESC, m.total_value_usd DESC"
     else:
         query += " ORDER BY year_month DESC, total_value_usd DESC"

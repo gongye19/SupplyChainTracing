@@ -74,7 +74,7 @@ export interface Filters {
   startYearMonth: string; // YYYY-MM 格式
   endYearMonth: string;   // YYYY-MM 格式
   selectedCountries: string[]; // 国家名称数组
-  selectedHSCodeCategories: string[]; // HS Code 品类ID数组
+  selectedHSCodeCategories: string[]; // HS Code 2位大类数组（如 ["42", "54", "62"]）
   selectedCompanies: string[]; // 公司名称数组
 }
 
