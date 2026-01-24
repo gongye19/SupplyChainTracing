@@ -36,6 +36,7 @@ const translations: Record<Language, Record<string, string>> = {
     'filters.selected': 'selected',
     'filters.clearAll': 'Clear All',
     'filters.loading': 'Loading...',
+    'filters.noCompanies': 'No companies found',
     
     // Stats Panel
     'stats.totalTransactions': 'Total Transactions',
@@ -120,6 +121,7 @@ const translations: Record<Language, Record<string, string>> = {
     'filters.selected': '已选',
     'filters.clearAll': '清除全部',
     'filters.loading': '加载中...',
+    'filters.noCompanies': '未找到公司',
     
     // Stats Panel
     'stats.totalTransactions': '总交易数',

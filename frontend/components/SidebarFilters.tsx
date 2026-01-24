@@ -156,19 +156,31 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
             
             {startDateOpen && (
               <div className="absolute top-full left-0 right-0 mt-2 bg-white/90 backdrop-blur-xl border border-black/5 rounded-[16px] shadow-2xl z-50 max-h-72 overflow-y-auto custom-scrollbar p-1.5 animate-in fade-in zoom-in-95 duration-200">
-                {yearMonthOptions.map(ym => (
-                  <div 
-                    key={ym}
-                    onClick={() => {
-                      setFilters(prev => ({ ...prev, startYearMonth: ym }));
-                      setStartDateOpen(false);
-                    }}
-                    className={`px-3 py-2.5 text-[12px] flex items-center justify-between cursor-pointer rounded-[8px] transition-colors mb-0.5 last:mb-0 ${filters.startYearMonth === ym ? 'bg-[#007AFF] text-white font-bold' : 'text-[#1D1D1F] hover:bg-black/5'}`}
-                  >
-                    <span>{ym}</span>
-                    {filters.startYearMonth === ym && <Check className="w-3.5 h-3.5 flex-shrink-0 ml-2" />}
-                  </div>
-                ))}
+                {yearMonthOptions.map(ym => {
+                  // 开始日期不能晚于结束日期
+                  const isDisabled = ym > filters.endYearMonth;
+                  return (
+                    <div 
+                      key={ym}
+                      onClick={() => {
+                        if (!isDisabled) {
+                          setFilters(prev => ({ ...prev, startYearMonth: ym }));
+                          setStartDateOpen(false);
+                        }
+                      }}
+                      className={`px-3 py-2.5 text-[12px] flex items-center justify-between rounded-[8px] transition-colors mb-0.5 last:mb-0 ${
+                        isDisabled 
+                          ? 'text-[#86868B] cursor-not-allowed opacity-50' 
+                          : filters.startYearMonth === ym 
+                            ? 'bg-[#007AFF] text-white font-bold cursor-pointer' 
+                            : 'text-[#1D1D1F] hover:bg-black/5 cursor-pointer'
+                      }`}
+                    >
+                      <span>{ym}</span>
+                      {filters.startYearMonth === ym && !isDisabled && <Check className="w-3.5 h-3.5 flex-shrink-0 ml-2" />}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -191,19 +203,31 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
             
             {endDateOpen && (
               <div className="absolute top-full left-0 right-0 mt-2 bg-white/90 backdrop-blur-xl border border-black/5 rounded-[16px] shadow-2xl z-50 max-h-72 overflow-y-auto custom-scrollbar p-1.5 animate-in fade-in zoom-in-95 duration-200">
-                {yearMonthOptions.map(ym => (
-                  <div 
-                    key={ym}
-                    onClick={() => {
-                      setFilters(prev => ({ ...prev, endYearMonth: ym }));
-                      setEndDateOpen(false);
-                    }}
-                    className={`px-3 py-2.5 text-[12px] flex items-center justify-between cursor-pointer rounded-[8px] transition-colors mb-0.5 last:mb-0 ${filters.endYearMonth === ym ? 'bg-[#007AFF] text-white font-bold' : 'text-[#1D1D1F] hover:bg-black/5'}`}
-                  >
-                    <span>{ym}</span>
-                    {filters.endYearMonth === ym && <Check className="w-3.5 h-3.5 flex-shrink-0 ml-2" />}
-                  </div>
-                ))}
+                {yearMonthOptions.map(ym => {
+                  // 结束日期不能早于开始日期
+                  const isDisabled = ym < filters.startYearMonth;
+                  return (
+                    <div 
+                      key={ym}
+                      onClick={() => {
+                        if (!isDisabled) {
+                          setFilters(prev => ({ ...prev, endYearMonth: ym }));
+                          setEndDateOpen(false);
+                        }
+                      }}
+                      className={`px-3 py-2.5 text-[12px] flex items-center justify-between rounded-[8px] transition-colors mb-0.5 last:mb-0 ${
+                        isDisabled 
+                          ? 'text-[#86868B] cursor-not-allowed opacity-50' 
+                          : filters.endYearMonth === ym 
+                            ? 'bg-[#007AFF] text-white font-bold cursor-pointer' 
+                            : 'text-[#1D1D1F] hover:bg-black/5 cursor-pointer'
+                      }`}
+                    >
+                      <span>{ym}</span>
+                      {filters.endYearMonth === ym && !isDisabled && <Check className="w-3.5 h-3.5 flex-shrink-0 ml-2" />}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -346,7 +370,9 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
           {companiesOpen && (
             <div className="absolute top-full left-0 right-0 mt-2 bg-white/90 backdrop-blur-xl border border-black/5 rounded-[16px] shadow-2xl z-50 max-h-72 overflow-y-auto custom-scrollbar p-1.5 animate-in fade-in zoom-in-95 duration-200">
               {companies.length === 0 ? (
-                <div className="px-3 py-2 text-[12px] text-[#86868B]">{t('filters.loading')}</div>
+                <div className="px-3 py-2 text-[12px] text-[#86868B]">
+                  {monthlyFlows.length === 0 ? t('filters.loading') : t('filters.noCompanies')}
+                </div>
               ) : (
                 companies.map(companyName => (
                 <div 
