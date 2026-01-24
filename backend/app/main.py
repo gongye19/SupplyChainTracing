@@ -1,8 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
 import os
 
 from .routes import categories, transactions, companies, locations, chat, monthly_company_flows, hs_code_categories, country_locations
+from .database import get_db
 
 app = FastAPI(title="Supply Chain API", version="1.0.0")
 
