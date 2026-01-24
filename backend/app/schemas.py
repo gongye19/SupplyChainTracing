@@ -160,3 +160,45 @@ class StatsResponse(BaseModel):
     category_breakdown: List[CategoryBreakdown]
     top_routes: List[TopRoute]
 
+# Monthly Company Flow Schemas
+class MonthlyCompanyFlow(BaseModel):
+    year_month: str
+    exporter_name: str
+    importer_name: str
+    origin_country: str
+    destination_country: str
+    hs_codes: Optional[str] = None
+    transport_mode: Optional[str] = None
+    trade_term: Optional[str] = None
+    transaction_count: int
+    total_value_usd: float
+    total_weight_kg: Optional[float] = None
+    total_quantity: Optional[float] = None
+    first_transaction_date: Optional[str] = None
+    last_transaction_date: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
+# HS Code Category Schemas
+class HSCodeCategory(BaseModel):
+    hs_code: str
+    chapter_name: str
+    category_id: str
+    category_name: str
+    
+    class Config:
+        from_attributes = True
+
+# Country Location Schemas
+class CountryLocation(BaseModel):
+    country_code: str
+    country_name: str
+    latitude: float
+    longitude: float
+    region: Optional[str] = None
+    continent: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
