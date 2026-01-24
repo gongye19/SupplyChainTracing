@@ -223,7 +223,7 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
               {hsCodeCategories.length === 0 ? (
                 <div className="px-3 py-2 text-[12px] text-[#86868B]">{t('filters.loading')}</div>
               ) : (() => {
-                // 从实际数据中提取出现的 HS Code 和对应的品类
+                // 从实际数据中提取出现的 HS Code（前两位）
                 const actualHsCodes = new Set<string>();
                 monthlyFlows.forEach(flow => {
                   if (flow.hsCodes) {
@@ -236,31 +236,23 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
                   }
                 });
                 
-                // 根据实际出现的 HS Code 找到对应的品类
-                const actualCategories = new Map<string, HSCodeCategory>();
+                // 根据实际出现的 HS Code 找到对应的章节（显示 chapterName）
+                const actualChapters: HSCodeCategory[] = [];
                 actualHsCodes.forEach(hsCode => {
                   const category = hsCodeCategories.find(cat => cat.hsCode === hsCode);
-                  if (category && !actualCategories.has(category.categoryId)) {
-                    actualCategories.set(category.categoryId, category);
+                  if (category) {
+                    actualChapters.push(category);
                   }
                 });
                 
-                // 如果没有任何数据，显示所有品类（用于初始状态）
-                const categoriesToShow = actualCategories.size > 0 
-                  ? Array.from(actualCategories.values())
-                  : (() => {
-                      const uniqueCategories = new Map<string, HSCodeCategory>();
-                      hsCodeCategories.forEach(cat => {
-                        if (!uniqueCategories.has(cat.categoryId)) {
-                          uniqueCategories.set(cat.categoryId, cat);
-                        }
-                      });
-                      return Array.from(uniqueCategories.values());
-                    })();
+                // 如果没有任何数据，显示所有章节（用于初始状态）
+                const chaptersToShow = actualChapters.length > 0 
+                  ? actualChapters.sort((a, b) => a.hsCode.localeCompare(b.hsCode))
+                  : hsCodeCategories.sort((a, b) => a.hsCode.localeCompare(b.hsCode));
                 
-                return categoriesToShow.map(cat => (
+                return chaptersToShow.map(cat => (
                   <div 
-                    key={cat.categoryId}
+                    key={cat.hsCode}
                     onClick={(e) => {
                       e.stopPropagation();
                       toggleHSCodeCategory(cat.categoryId);
@@ -270,7 +262,7 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
                     <span 
                       className={`font-semibold flex-1 ${filters.selectedHSCodeCategories.includes(cat.categoryId) ? 'text-white' : 'text-[#1D1D1F]'}`}
                     >
-                      {cat.categoryName}
+                      {cat.chapterName} ({cat.hsCode})
                     </span>
                     {filters.selectedHSCodeCategories.includes(cat.categoryId) && <Check className="w-3.5 h-3.5 flex-shrink-0 ml-2" />}
                   </div>

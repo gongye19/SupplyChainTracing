@@ -101,7 +101,6 @@ export interface HSCodeCategory {
   hsCode: string; // 前2位章节
   chapterName: string;
   categoryId: string;
-  categoryName: string;
 }
 
 // 向后兼容的 Shipment 接口（用于地图组件）

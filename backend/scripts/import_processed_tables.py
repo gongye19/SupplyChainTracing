@@ -68,7 +68,7 @@ def create_tables(engine):
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS hs_code_categories (
                 hs_code VARCHAR(10) PRIMARY KEY, chapter_name VARCHAR(200) NOT NULL,
-                category_id VARCHAR(50) NOT NULL, category_name VARCHAR(100) NOT NULL,
+                category_id VARCHAR(50) NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );

@@ -132,7 +132,6 @@ export const hsCodeCategoriesAPI = {
       hsCode: item.hs_code,
       chapterName: item.chapter_name,
       categoryId: item.category_id,
-      categoryName: item.category_name,
     }));
   },
 };

@@ -239,7 +239,7 @@ const App: React.FC = () => {
         exporterCompanyName: flow.exporterName,
         importerCompanyName: flow.importerName,
         material: flow.hsCodes,
-        category: hsCategory?.categoryName || 'Unknown', // 使用 HS Code 分类表中的品类名称
+        category: hsCategory?.chapterName || 'Unknown', // 使用 HS Code 分类表中的章节名称
         categoryColor,
         quantity: flow.totalQuantity,
         value: flow.totalValueUsd / 1000000, // 转换为百万美元

@@ -185,7 +185,6 @@ class HSCodeCategory(BaseModel):
     hs_code: str
     chapter_name: str
     category_id: str
-    category_name: str
     
     class Config:
         from_attributes = True
