@@ -61,23 +61,9 @@ export function getHSCodeColor(hsCode: string): string {
   // 使用 (codeNum - 1) 确保从0开始，97个代码分布在0-360度
   const hue = ((codeNum - 1) * 360) / 97;
   
-  // 饱和度：根据category_id调整
-  // equipment类别使用较高饱和度，raw_material使用中等饱和度
-  // 这里可以根据需要调整，目前使用统一的饱和度
+  // 统一使用固定的饱和度和亮度，确保所有颜色清晰可见且视觉一致
   const saturation = 65; // 65% 饱和度，确保颜色鲜艳但不刺眼
-  
-  // 亮度：根据category_id调整
-  // equipment类别稍暗，raw_material稍亮
-  let lightness = 50; // 默认50%
-  
-  // 根据HS Code范围调整亮度（可选，用于区分equipment和raw_material）
-  // Equipment章节：37, 38, 82-96
-  const equipmentChapters = [37, 38, ...Array.from({length: 15}, (_, i) => i + 82)];
-  if (equipmentChapters.includes(codeNum)) {
-    lightness = 45; // Equipment稍暗
-  } else {
-    lightness = 52; // Raw Material稍亮
-  }
+  const lightness = 50; // 50% 亮度，确保颜色清晰可见
 
   return hslToHex(hue, saturation, lightness);
 }

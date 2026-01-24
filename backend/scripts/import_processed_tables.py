@@ -68,7 +68,6 @@ def create_tables(engine):
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS hs_code_categories (
                 hs_code VARCHAR(10) PRIMARY KEY, chapter_name VARCHAR(200) NOT NULL,
-                category_id VARCHAR(50) NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
@@ -90,7 +89,6 @@ def create_tables(engine):
             CREATE INDEX IF NOT EXISTS idx_monthly_flows_importer ON monthly_company_flows(importer_name);
             CREATE INDEX IF NOT EXISTS idx_monthly_flows_origin_country ON monthly_company_flows(origin_country);
             CREATE INDEX IF NOT EXISTS idx_monthly_flows_dest_country ON monthly_company_flows(destination_country);
-            CREATE INDEX IF NOT EXISTS idx_hs_categories_category ON hs_code_categories(category_id);
             CREATE INDEX IF NOT EXISTS idx_country_locations_name ON country_locations(country_name);
         """))
     

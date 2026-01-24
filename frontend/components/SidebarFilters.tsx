@@ -82,12 +82,12 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
     }));
   };
 
-  const toggleHSCodeCategory = (categoryId: string) => {
+  const toggleHSCodeCategory = (hsCode: string) => {
     setFilters(prev => ({
       ...prev,
-      selectedHSCodeCategories: prev.selectedHSCodeCategories.includes(categoryId)
-        ? prev.selectedHSCodeCategories.filter(c => c !== categoryId)
-        : [...prev.selectedHSCodeCategories, categoryId]
+      selectedHSCodeCategories: prev.selectedHSCodeCategories.includes(hsCode)
+        ? prev.selectedHSCodeCategories.filter(c => c !== hsCode)
+        : [...prev.selectedHSCodeCategories, hsCode]
     }));
   };
 

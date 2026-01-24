@@ -132,7 +132,6 @@ export const hsCodeCategoriesAPI = {
     return data.map((item: any) => ({
       hsCode: item.hs_code,
       chapterName: item.chapter_name,
-      categoryId: item.category_id,
     }));
   },
 };

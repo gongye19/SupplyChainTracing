@@ -406,15 +406,13 @@ def preprocess_tables(input_csv: str, output_dir: str):
     print("生成表3: hs_code_categories.csv (完整 HS 2022 标准)")
     hs_code_categories = []
     for chapter in sorted(HS_CODE_CHAPTERS.keys()):
-        category_id, _ = get_hs_code_category(chapter)  # 不再使用 category_name
         hs_code_categories.append({
             'hs_code': chapter,
             'chapter_name': HS_CODE_CHAPTERS[chapter],
-            'category_id': category_id,
         })
     
     with open(output_path / "hs_code_categories.csv", 'w', encoding='utf-8', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=['hs_code', 'chapter_name', 'category_id'])
+        writer = csv.DictWriter(f, fieldnames=['hs_code', 'chapter_name'])
         writer.writeheader()
         writer.writerows(hs_code_categories)
     print(f"✓ {len(hs_code_categories)} 条记录（完整 HS 2022 标准）\n")
