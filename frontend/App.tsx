@@ -8,6 +8,7 @@ import { Transaction, Filters, HSCodeCategory, CountryLocation, Location, Monthl
 import { monthlyCompanyFlowsAPI, hsCodeCategoriesAPI, countryLocationsAPI, chatAPI, ChatMessage } from './services/api';
 import { Globe, BarChart3, Map as MapIcon, Package, TrendingUp, Users, ChevronRight } from 'lucide-react';
 import { useLanguage } from './contexts/LanguageContext';
+import { getHSCodeColorCached } from './utils/hsCodeColors';
 
 const App: React.FC = () => {
   const { language, setLanguage, t } = useLanguage();
@@ -214,19 +215,8 @@ const App: React.FC = () => {
       const firstHsCode = hsCodesArray[0]?.slice(0, 2) || '';
       const hsCategory = hsCodeCategories.find(cat => cat.hsCode === firstHsCode);
       
-      // 根据品类ID获取颜色
-      let categoryColor = '#007AFF'; // 默认颜色
-      if (hsCategory) {
-        if (hsCategory.categoryId === 'equipment') {
-          categoryColor = '#5856D6';
-        } else if (hsCategory.categoryId === 'raw_material') {
-          categoryColor = '#30B0C7';
-        } else if (hsCategory.categoryId === 'logic') {
-          categoryColor = '#007AFF';
-        } else if (hsCategory.categoryId === 'memory') {
-          categoryColor = '#FF9500';
-        }
-      }
+      // 根据HS Code生成唯一颜色（96个大类，96种颜色）
+      const categoryColor = getHSCodeColorCached(firstHsCode);
       
       // 将国家名称转换为国家代码
       const originCountryCode = getCountryCode(flow.originCountry);
