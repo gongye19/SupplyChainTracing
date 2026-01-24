@@ -4,8 +4,8 @@ import SupplyMap from './components/SupplyMap';
 import StatsPanel from './components/StatsPanel';
 import SidebarFilters from './components/SidebarFilters';
 import AIAssistant from './components/AIAssistant';
-import { Transaction, Filters, Category, CountryLocation, Location, CompanyWithLocation } from './types';
-import { transactionsAPI, categoriesAPI, locationsAPI, companiesAPI, chatAPI, ChatMessage } from './services/api';
+import { Transaction, Filters, HSCodeCategory, CountryLocation, Location, MonthlyCompanyFlow } from './types';
+import { monthlyCompanyFlowsAPI, hsCodeCategoriesAPI, countryLocationsAPI, chatAPI, ChatMessage } from './services/api';
 import { Globe, BarChart3, Map as MapIcon, Package, TrendingUp, Users, ChevronRight } from 'lucide-react';
 import { useLanguage } from './contexts/LanguageContext';
 
@@ -13,23 +13,22 @@ const App: React.FC = () => {
   const { language, setLanguage, t } = useLanguage();
   const [activeView, setActiveView] = useState<'map' | 'stats'>('map');
   
-  const START_DATE = new Date('2023-01-01');
-  const TODAY = new Date();
-  const startDateStr = START_DATE.toISOString().split('T')[0];
-  const endDateStr = TODAY.toISOString().split('T')[0];
+  const now = new Date();
+  const startYearMonth = '2003-01';
+  const endYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
   const [filters, setFilters] = useState<Filters>({
-    startDate: startDateStr,
-    endDate: endDateStr,
+    startYearMonth,
+    endYearMonth,
     selectedCountries: [],
-    selectedCategories: [],
+    selectedHSCodeCategories: [],
     selectedCompanies: []
   });
 
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [monthlyFlows, setMonthlyFlows] = useState<MonthlyCompanyFlow[]>([]);
+  const [hsCodeCategories, setHsCodeCategories] = useState<HSCodeCategory[]>([]);
   const [countries, setCountries] = useState<CountryLocation[]>([]);
-  const [companies, setCompanies] = useState<CompanyWithLocation[]>([]);
+  const [companies, setCompanies] = useState<string[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
   const [filterLoading, setFilterLoading] = useState(false);
   const [isInteracting, setIsInteracting] = useState(false); // 是否正在交互(拖动/快速点击)
@@ -52,17 +51,15 @@ const App: React.FC = () => {
     const loadInitialData = async () => {
       try {
         setInitialLoading(true);
-        console.log('Loading categories, countries, and companies...');
-        const [catsData, locationsData, companiesData] = await Promise.all([
-          categoriesAPI.getAll(),
-          locationsAPI.getCountries(),
-          companiesAPI.getWithLocations()
+        console.log('Loading HS Code categories, countries...');
+        const [hsCodeCatsData, locationsData] = await Promise.all([
+          hsCodeCategoriesAPI.getAll(),
+          countryLocationsAPI.getAll()
         ]);
-        console.log('Categories loaded:', catsData);
+        console.log('HS Code Categories loaded:', hsCodeCatsData);
         console.log('Countries loaded:', locationsData);
-        console.log('Companies loaded:', companiesData);
-        setCategories(catsData);
-        // 将 Location 转换为 CountryLocation 格式（向后兼容，用于筛选器）
+        setHsCodeCategories(hsCodeCatsData);
+        // 将 Location 转换为 CountryLocation 格式
         const countriesData: CountryLocation[] = locationsData.map(loc => ({
           countryCode: loc.countryCode,
           countryName: loc.countryName,
@@ -72,7 +69,6 @@ const App: React.FC = () => {
           continent: loc.continent
         }));
         setCountries(countriesData);
-        setCompanies(companiesData);
       } catch (error) {
         console.error('Failed to load initial data:', error);
         alert(t('app.loadDataError') + (error as Error).message);
@@ -83,29 +79,25 @@ const App: React.FC = () => {
     loadInitialData();
   }, []);
 
-  // 加载交易数据的函数 - 支持 preview/final 模式
-  const loadTransactions = useCallback(async (filtersToUse: Filters, mode: 'preview' | 'final') => {
-    // 取消之前的请求
+  // 加载聚合数据
+  const loadMonthlyFlows = useCallback(async (filtersToUse: Filters, mode: 'preview' | 'final') => {
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
 
-    const limit = mode === 'preview' ? 200 : 1000;
-
     try {
-      // final 模式：智能 loading - 只在请求耗时超过 100ms 时显示
       let loadingTimer: number | null = null;
       if (mode === 'final') {
         loadingTimer = window.setTimeout(() => {
           if (!controller.signal.aborted) {
-      setFilterLoading(true);
+            setFilterLoading(true);
           }
-        }, 100); // 如果 100ms 内完成就不显示 loading
+        }, 100);
       }
 
-      console.log(`Loading transactions (${mode}) with filters:`, filtersToUse);
+      console.log(`Loading monthly flows (${mode}) with filters:`, filtersToUse);
       const startTime = performance.now();
-      const response = await transactionsAPI.getTransactions(filtersToUse, 1, limit, { signal: controller.signal });
+      const flows = await monthlyCompanyFlowsAPI.getAll(filtersToUse);
       const duration = performance.now() - startTime;
 
       if (controller.signal.aborted) {
@@ -113,57 +105,57 @@ const App: React.FC = () => {
         return;
       }
 
-      // 如果请求很快完成（<100ms），取消显示 loading
       if (loadingTimer && duration < 100) {
         window.clearTimeout(loadingTimer);
       }
 
-      console.log(`Transactions loaded (${mode}) in ${duration.toFixed(0)}ms:`, response.transactions.length);
-      setTransactions(response.transactions);
+      console.log(`Monthly flows loaded (${mode}) in ${duration.toFixed(0)}ms:`, flows.length);
+      setMonthlyFlows(flows);
       
-      // stats 建议只在 final 更新（preview 不必算，省 CPU）
+      // 提取唯一的公司名称
+      const uniqueCompanies = new Set<string>();
+      flows.forEach(f => {
+        uniqueCompanies.add(f.exporterName);
+        uniqueCompanies.add(f.importerName);
+      });
+      setCompanies(Array.from(uniqueCompanies).sort());
+      
+      // 更新统计
       if (mode === 'final') {
-      const uniqueCountries = new Set<string>();
-      const uniqueCategories = new Set<string>();
-      response.transactions.forEach(t => {
-        uniqueCountries.add(t.exporterCountryCode);
-        uniqueCountries.add(t.importerCountryCode);
-        uniqueCategories.add(t.categoryId);
-      });
-      setStats({
-        transactions: response.transactions.length,
-        suppliers: uniqueCountries.size,
-        categories: uniqueCategories.size
-      });
+        const uniqueCountries = new Set<string>();
+        flows.forEach(f => {
+          uniqueCountries.add(f.originCountry);
+          uniqueCountries.add(f.destinationCountry);
+        });
+        setStats({
+          transactions: flows.reduce((sum, f) => sum + f.transactionCount, 0),
+          suppliers: uniqueCountries.size,
+          categories: new Set(flows.map(f => f.hsCodes.split(',')[0]?.slice(0, 2))).size
+        });
       }
     } catch (e: any) {
       if (e?.name === 'AbortError') return;
-      console.error('Failed to load transactions:', e);
+      console.error('Failed to load monthly flows:', e);
       if (mode === 'final') {
-        alert('无法加载交易数据。错误: ' + (e as Error).message);
+        alert('无法加载数据。错误: ' + (e as Error).message);
       }
     } finally {
       if (mode === 'final' && !controller.signal.aborted) {
-      setFilterLoading(false);
+        setFilterLoading(false);
       }
     }
   }, []);
 
   // 调度器：任何 filters 变化 => 立刻 preview + 延迟 final
   const scheduleFetch = useCallback((nextFilters: Filters, reason: 'drag' | 'click') => {
-    // 进入交互状态（用于 SupplyMap preview 渲染）
     setIsInteracting(true);
-
-    // 立刻发 preview（取消旧请求）
-    loadTransactions(nextFilters, 'preview');
-
-    // 延迟触发 final：用户停止后快速触发（减少延迟时间）
+    loadMonthlyFlows(nextFilters, 'preview');
     if (finalTimerRef.current) window.clearTimeout(finalTimerRef.current);
     finalTimerRef.current = window.setTimeout(() => {
       setIsInteracting(false);
-      loadTransactions(filtersRef.current, 'final');
-    }, reason === 'drag' ? 180 : 120); // 从 260/220ms 减少到 180/120ms
-  }, [loadTransactions]);
+      loadMonthlyFlows(filtersRef.current, 'final');
+    }, reason === 'drag' ? 180 : 120);
+  }, [loadMonthlyFlows]);
 
   // 暴露拖动状态控制函数给子组件
   const setDragging = useCallback((dragging: boolean) => {
@@ -173,46 +165,51 @@ const App: React.FC = () => {
 
   // 统一监听 filters 变化：触发 scheduleFetch
   useEffect(() => {
-    // 只有在categories和companies加载完成后才加载交易数据
-    if (categories.length === 0 || companies.length === 0) {
+    if (hsCodeCategories.length === 0 || countries.length === 0) {
       return;
     }
     
-    // 拖动期间 filters 会频繁变更：这里直接走 scheduleFetch
     const reason: 'drag' | 'click' = isDraggingRef.current ? 'drag' : 'click';
     scheduleFetch(filters, reason);
 
     return () => {
       if (finalTimerRef.current) window.clearTimeout(finalTimerRef.current);
     };
-  }, [filters, categories.length, companies.length, scheduleFetch]);
+  }, [filters, hsCodeCategories.length, countries.length, scheduleFetch]);
 
-  // 将Transaction转换为Shipment格式（用于地图组件）- 使用 useMemo 优化
+  // 将 MonthlyCompanyFlow 转换为 Shipment 格式（用于地图组件）
   const shipments = useMemo(() => {
-    return transactions.map(t => ({
-      id: t.id,
-      originId: t.exporterCompanyId || t.exporterCountryCode, // 使用公司ID，如果没有则使用国家代码
-      destinationId: t.importerCompanyId || t.importerCountryCode,
-      exporterCompanyId: t.exporterCompanyId,
-      importerCompanyId: t.importerCompanyId,
-      exporterCompanyName: t.exporterCompanyName,
-      importerCompanyName: t.importerCompanyName,
-      material: t.material,
-      category: t.categoryName,
-      categoryColor: t.categoryColor, // 添加品类颜色，直接从交易数据获取
-      quantity: t.quantity,
-      value: t.totalValue / 1000000, // 转换为百万美元
-      status: t.status,
-      timestamp: t.transactionDate
-    }));
-  }, [transactions]);
+    return monthlyFlows.map(flow => {
+      // 从 HS Code 获取品类颜色
+      const firstHsCode = flow.hsCodes.split(',')[0]?.slice(0, 2) || '';
+      const hsCategory = hsCodeCategories.find(cat => cat.hsCode === firstHsCode);
+      const categoryColor = hsCategory ? 
+        (hsCategory.categoryId === 'equipment' ? '#5856D6' : 
+         hsCategory.categoryId === 'raw_material' ? '#30B0C7' : '#007AFF') : '#007AFF';
+      
+      return {
+        id: `${flow.yearMonth}-${flow.exporterName}-${flow.importerName}`,
+        originId: flow.originCountry,
+        destinationId: flow.destinationCountry,
+        exporterCompanyName: flow.exporterName,
+        importerCompanyName: flow.importerName,
+        material: flow.hsCodes,
+        category: hsCategory?.categoryName || 'Unknown',
+        categoryColor,
+        quantity: flow.totalQuantity,
+        value: flow.totalValueUsd / 1000000, // 转换为百万美元
+        status: 'completed',
+        timestamp: flow.firstTransactionDate
+      };
+    });
+  }, [monthlyFlows, hsCodeCategories]);
 
   // 调试信息
   useEffect(() => {
     console.log('Shipments for map:', shipments.length, shipments);
     console.log('Countries for map:', countries.length, countries);
-    console.log('Categories for map:', categories.length, categories);
-  }, [shipments, countries, categories]);
+    console.log('HS Code Categories:', hsCodeCategories.length, hsCodeCategories);
+  }, [shipments, countries, hsCodeCategories]);
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F5F5F7] text-[#1D1D1F]">
@@ -268,10 +265,9 @@ const App: React.FC = () => {
            <SidebarFilters 
              filters={filters} 
              setFilters={setFilters}
-             categories={categories}
+             hsCodeCategories={hsCodeCategories}
              countries={countries}
              companies={companies}
-             onDragChange={setDragging}
            />
            
            <div className="mt-auto pt-8 border-t border-black/5 space-y-4">
@@ -320,11 +316,11 @@ const App: React.FC = () => {
                   )}
                   <SupplyMap 
                     shipments={shipments}
-                    transactions={transactions}
+                    transactions={[]}
                     selectedCountries={filters.selectedCountries}
                     countries={countries}
-                    companies={companies}
-                    categories={categories}
+                    companies={[]}
+                    categories={[]}
                     isPreview={isInteracting}
                   />
                 </>
@@ -341,7 +337,7 @@ const App: React.FC = () => {
                   <div className="text-[#86868B]">{t('app.loading')}</div>
                 </div>
               ) : (
-                <StatsPanel transactions={transactions} />
+                <StatsPanel transactions={[]} />
               )}
             </div>
           )}

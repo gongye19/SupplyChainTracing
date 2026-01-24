@@ -80,7 +80,10 @@ logs/
 # Data files (large files)
 data/*.xlsx
 data/*.xls
+data/*.csv
 *.zip
+processed_tables/
+check_db_data.py
 
 # Frontend build
 frontend/dist/

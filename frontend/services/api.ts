@@ -1,4 +1,4 @@
-import { Category, Transaction, Company, CompanyWithLocation, Location, Filters } from '../types';
+import { Category, Transaction, Company, CompanyWithLocation, Location, Filters, MonthlyCompanyFlow, HSCodeCategory } from '../types';
 
 // 前端在浏览器中运行，所以使用localhost（通过Vite代理或直接连接）
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
@@ -88,6 +88,72 @@ export interface TransactionStats {
   }>;
 }
 
+// 月度公司流量API（聚合表）
+export const monthlyCompanyFlowsAPI = {
+  getAll: async (filters?: Partial<Filters>): Promise<MonthlyCompanyFlow[]> => {
+    const params = new URLSearchParams();
+    if (filters?.startYearMonth) params.append('start_year_month', filters.startYearMonth);
+    if (filters?.endYearMonth) params.append('end_year_month', filters.endYearMonth);
+    if (filters?.selectedCountries?.length) {
+      filters.selectedCountries.forEach(name => params.append('country', name));
+    }
+    if (filters?.selectedCompanies?.length) {
+      filters.selectedCompanies.forEach(name => params.append('company', name));
+    }
+    if (filters?.selectedHSCodeCategories?.length) {
+      filters.selectedHSCodeCategories.forEach(id => params.append('category_id', id));
+    }
+
+    const data = await fetchAPI<any[]>(`/api/monthly-company-flows?${params.toString()}`);
+    return data.map((item: any) => ({
+      yearMonth: item.year_month,
+      exporterName: item.exporter_name,
+      importerName: item.importer_name,
+      originCountry: item.origin_country,
+      destinationCountry: item.destination_country,
+      hsCodes: item.hs_codes,
+      transportMode: item.transport_mode,
+      tradeTerm: item.trade_term,
+      transactionCount: parseInt(item.transaction_count) || 0,
+      totalValueUsd: parseFloat(item.total_value_usd) || 0,
+      totalWeightKg: parseFloat(item.total_weight_kg) || 0,
+      totalQuantity: parseFloat(item.total_quantity) || 0,
+      firstTransactionDate: item.first_transaction_date,
+      lastTransactionDate: item.last_transaction_date,
+    }));
+  },
+};
+
+// HS Code 品类API
+export const hsCodeCategoriesAPI = {
+  getAll: async (): Promise<HSCodeCategory[]> => {
+    const data = await fetchAPI<any[]>(`/api/hs-code-categories`);
+    return data.map((item: any) => ({
+      hsCode: item.hs_code,
+      chapterName: item.chapter_name,
+      categoryId: item.category_id,
+      categoryName: item.category_name,
+    }));
+  },
+};
+
+// 国家位置API（使用 country_locations 表）
+export const countryLocationsAPI = {
+  getAll: async (): Promise<Location[]> => {
+    const data = await fetchAPI<any[]>(`/api/country-locations`);
+    return data.map((item: any) => ({
+      id: item.country_code,
+      type: 'country' as const,
+      countryCode: item.country_code,
+      countryName: item.country_name,
+      latitude: parseFloat(item.latitude),
+      longitude: parseFloat(item.longitude),
+      region: item.region,
+      continent: item.continent,
+    }));
+  },
+};
+
 export const transactionsAPI = {
   getTransactions: async (
     filters?: Partial<Filters>,
@@ -96,75 +162,76 @@ export const transactionsAPI = {
     options?: { signal?: AbortSignal }
   ): Promise<TransactionListResponse> => {
     const params = new URLSearchParams();
-    if (filters?.startDate) params.append('start_date', filters.startDate);
-    if (filters?.endDate) params.append('end_date', filters.endDate);
+    if (filters?.startYearMonth) params.append('start_year_month', filters.startYearMonth);
+    if (filters?.endYearMonth) params.append('end_year_month', filters.endYearMonth);
     if (filters?.selectedCountries?.length) {
-      filters.selectedCountries.forEach(code => params.append('origin_country', code));
+      filters.selectedCountries.forEach(name => params.append('country', name));
     }
-    if (filters?.selectedCategories?.length) {
-      filters.selectedCategories.forEach(id => params.append('category_id', id));
+    if (filters?.selectedHSCodeCategories?.length) {
+      filters.selectedHSCodeCategories.forEach(id => params.append('category_id', id));
     }
     if (filters?.selectedCompanies?.length) {
-      filters.selectedCompanies.forEach(id => params.append('company_id', id));
+      filters.selectedCompanies.forEach(name => params.append('company', name));
     }
-    if (filters?.minValue !== undefined) params.append('min_value', filters.minValue.toString());
-    if (filters?.maxValue !== undefined) params.append('max_value', filters.maxValue.toString());
-    if (filters?.status?.length) params.append('status', filters.status.join(','));
 
     params.append('page', page.toString());
     params.append('limit', limit.toString());
 
-    const response = await fetchAPI<any>(`/api/transactions?${params.toString()}`, {
+    const response = await fetchAPI<any>(`/api/monthly-company-flows?${params.toString()}`, {
       signal: options?.signal
     });
     
-    // 转换字段名从下划线格式到驼峰格式
-    const transactions = response.transactions.map((t: any) => ({
-      id: t.id,
-      exporterCompanyId: t.exporter_company_id,
-      exporterCompanyName: t.exporter_company_name,
-      exporterCountryCode: t.exporter_country_code,
-      exporterCountryName: t.exporter_country_name,
-      importerCompanyId: t.importer_company_id,
-      importerCompanyName: t.importer_company_name,
-      importerCountryCode: t.importer_country_code,
-      importerCountryName: t.importer_country_name,
-      material: t.material,
-      categoryId: t.category_id,
-      categoryName: t.category_name,
-      categoryColor: t.category_color,
-      quantity: t.quantity,
-      unit: t.unit,
-      price: t.price,
-      totalValue: t.total_value,
-      transactionDate: t.transaction_date,
-      status: t.status,
-      notes: t.notes
-    }));
+    // 将聚合数据转换为 Transaction 格式（用于兼容）
+    const transactions: Transaction[] = (response as MonthlyCompanyFlow[]).flatMap((flow: MonthlyCompanyFlow) => {
+      // 这里可以根据需要展开聚合数据，或者直接返回聚合数据
+      return [{
+        id: `${flow.yearMonth}-${flow.exporterName}-${flow.importerName}`,
+        exporterCompanyName: flow.exporterName,
+        exporterCountryCode: flow.originCountry,
+        exporterCountryName: flow.originCountry,
+        importerCompanyName: flow.importerName,
+        importerCountryCode: flow.destinationCountry,
+        importerCountryName: flow.destinationCountry,
+        material: flow.hsCodes,
+        categoryId: '', // 需要从 HS Code 映射
+        categoryName: '',
+        categoryColor: '',
+        quantity: flow.totalQuantity,
+        totalValue: flow.totalValueUsd,
+        transactionDate: flow.firstTransactionDate,
+        status: 'completed' as const,
+      }];
+    });
 
     return {
       transactions,
-      pagination: response.pagination
+      pagination: {
+        total: transactions.length,
+        page: 1,
+        limit: transactions.length,
+        totalPages: 1,
+      }
     };
   },
   getStats: async (filters?: Partial<Filters>): Promise<TransactionStats> => {
-    const params = new URLSearchParams();
-    if (filters?.startDate) params.append('start_date', filters.startDate);
-    if (filters?.endDate) params.append('end_date', filters.endDate);
-    if (filters?.selectedCountries?.length) {
-      filters.selectedCountries.forEach(code => params.append('origin_country', code));
-    }
-    if (filters?.selectedCategories?.length) {
-      filters.selectedCategories.forEach(id => params.append('category_id', id));
-    }
-    if (filters?.selectedCompanies?.length) {
-      filters.selectedCompanies.forEach(id => params.append('company_id', id));
-    }
-    if (filters?.minValue !== undefined) params.append('min_value', filters.minValue.toString());
-    if (filters?.maxValue !== undefined) params.append('max_value', filters.maxValue.toString());
-    if (filters?.status?.length) params.append('status', filters.status.join(','));
-
-    return fetchAPI<TransactionStats>(`/api/transactions/stats?${params.toString()}`);
+    // 简化版统计，基于聚合表
+    const flows = await monthlyCompanyFlowsAPI.getAll(filters);
+    const totalValue = flows.reduce((sum, f) => sum + f.totalValueUsd, 0);
+    const totalTransactions = flows.reduce((sum, f) => sum + f.transactionCount, 0);
+    const countries = new Set<string>();
+    flows.forEach(f => {
+      countries.add(f.originCountry);
+      countries.add(f.destinationCountry);
+    });
+    
+    return {
+      totalTransactions,
+      totalValue,
+      activeCountries: countries.size,
+      activeCompanies: 0,
+      categoryBreakdown: [],
+      topRoutes: [],
+    };
   },
 };
 

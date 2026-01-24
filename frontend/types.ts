@@ -71,14 +71,37 @@ export interface Location {
 
 // 筛选条件
 export interface Filters {
-  startDate: string;
-  endDate: string;
-  selectedCountries: string[];
-  selectedCategories: string[];
-  selectedCompanies: string[];
-  minValue?: number;
-  maxValue?: number;
-  status?: string[];
+  startYearMonth: string; // YYYY-MM 格式
+  endYearMonth: string;   // YYYY-MM 格式
+  selectedCountries: string[]; // 国家名称数组
+  selectedHSCodeCategories: string[]; // HS Code 品类ID数组
+  selectedCompanies: string[]; // 公司名称数组
+}
+
+// 月度公司流量（聚合表）
+export interface MonthlyCompanyFlow {
+  yearMonth: string;
+  exporterName: string;
+  importerName: string;
+  originCountry: string;
+  destinationCountry: string;
+  hsCodes: string; // 逗号分隔的HS Code列表
+  transportMode: string;
+  tradeTerm: string;
+  transactionCount: number;
+  totalValueUsd: number;
+  totalWeightKg: number;
+  totalQuantity: number;
+  firstTransactionDate: string;
+  lastTransactionDate: string;
+}
+
+// HS Code 品类
+export interface HSCodeCategory {
+  hsCode: string; // 前2位章节
+  chapterName: string;
+  categoryId: string;
+  categoryName: string;
 }
 
 // 向后兼容的 Shipment 接口（用于地图组件）

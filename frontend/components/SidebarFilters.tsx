@@ -1,32 +1,31 @@
-
 import React, { useState, useEffect, useRef } from 'react';
-import { Filters, Category, CountryLocation, CompanyWithLocation } from '../types';
+import { Filters, HSCodeCategory, CountryLocation } from '../types';
 import { Calendar, Building2, Package, Filter, ChevronDown, Check, Building } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface SidebarFiltersProps {
   filters: Filters;
   setFilters: React.Dispatch<React.SetStateAction<Filters>>;
-  categories: Category[];
+  hsCodeCategories: HSCodeCategory[];
   countries: CountryLocation[];
-  companies: CompanyWithLocation[];
-  onDragChange?: (isDragging: boolean) => void;
+  companies: string[]; // 公司名称列表
 }
 
-const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, categories, countries, companies, onDragChange }) => {
-  const { t, language } = useLanguage();
+const SidebarFilters: React.FC<SidebarFiltersProps> = ({ 
+  filters, 
+  setFilters, 
+  hsCodeCategories, 
+  countries, 
+  companies 
+}) => {
+  const { t } = useLanguage();
   const [countriesOpen, setCountriesOpen] = useState(false);
-  const [categoriesOpen, setCategoriesOpen] = useState(false);
+  const [hsCodeCategoriesOpen, setHsCodeCategoriesOpen] = useState(false);
   const [companiesOpen, setCompaniesOpen] = useState(false);
-  const [activeThumb, setActiveThumb] = useState<'start' | 'end' | null>(null);
-  const countriesRef = useRef<HTMLDivElement>(null);
-  const categoriesRef = useRef<HTMLDivElement>(null);
-  const companiesRef = useRef<HTMLDivElement>(null);
-  const trackRef = useRef<HTMLDivElement>(null);
   
-  // rAF throttle for smooth dragging
-  const rafRef = useRef<number | null>(null);
-  const latestXRef = useRef<number | null>(null);
+  const countriesRef = useRef<HTMLDivElement>(null);
+  const hsCodeCategoriesRef = useRef<HTMLDivElement>(null);
+  const companiesRef = useRef<HTMLDivElement>(null);
 
   // 点击外部关闭下拉框
   useEffect(() => {
@@ -34,192 +33,68 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, ca
       if (countriesRef.current && !countriesRef.current.contains(event.target as Node)) {
         setCountriesOpen(false);
       }
-      if (categoriesRef.current && !categoriesRef.current.contains(event.target as Node)) {
-        setCategoriesOpen(false);
+      if (hsCodeCategoriesRef.current && !hsCodeCategoriesRef.current.contains(event.target as Node)) {
+        setHsCodeCategoriesOpen(false);
       }
       if (companiesRef.current && !companiesRef.current.contains(event.target as Node)) {
         setCompaniesOpen(false);
       }
     };
 
-    if (countriesOpen || categoriesOpen || companiesOpen) {
+    if (countriesOpen || hsCodeCategoriesOpen || companiesOpen) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [countriesOpen, categoriesOpen, companiesOpen]);
+  }, [countriesOpen, hsCodeCategoriesOpen, companiesOpen]);
 
-  // 全局鼠标事件，确保拖动状态正确重置
-  useEffect(() => {
-    const handlePointerUp = () => {
-      setActiveThumb(null);
-    };
+  // 生成年月选项（从2003-01到当前）
+  const generateYearMonthOptions = () => {
+    const options: string[] = [];
+    const startYear = 2003;
+    const startMonth = 1;
+    const now = new Date();
+    const endYear = now.getFullYear();
+    const endMonth = now.getMonth() + 1;
 
-    document.addEventListener('pointerup', handlePointerUp);
-    return () => {
-      document.removeEventListener('pointerup', handlePointerUp);
-    };
-  }, []);
-
-  // 清理 rAF
-  useEffect(() => () => {
-    if (rafRef.current) cancelAnimationFrame(rafRef.current);
-  }, []);
-
-  const START_DATE = new Date('2023-01-01');
-  const TODAY = new Date();
-
-  // 工具函数 - 按月计算
-  const MIN_GAP = 1; // 最小间隔：1个月
-
-  // 计算两个日期之间的月份差
-  const toMonthIndex = (dateStr: string) => {
-    const d = new Date(dateStr);
-    const yearDiff = d.getFullYear() - START_DATE.getFullYear();
-    const monthDiff = d.getMonth() - START_DATE.getMonth();
-    return yearDiff * 12 + monthDiff;
-  };
-
-  // 从月份索引恢复日期（该月的第一天）
-  const fromMonthIndex = (idx: number) => {
-    const d = new Date(START_DATE);
-    d.setMonth(d.getMonth() + idx);
-    // 设置为该月的第一天
-    d.setDate(1);
-    return d.toISOString().split('T')[0];
-  };
-
-  const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(v, hi));
-
-  // 计算总月数
-  const totalMonths = Math.max(1, toMonthIndex(TODAY.toISOString().split('T')[0]) + 1);
-
-  // 推挤逻辑
-  function applyDragLeft(nextLeft: number, left: number, right: number, max: number) {
-    nextLeft = clamp(nextLeft, 0, max);
-
-    if (nextLeft <= right - MIN_GAP) return { left: nextLeft, right };
-
-    let newLeft = nextLeft;
-    let newRight = newLeft + MIN_GAP;
-    if (newRight > max) {
-      newRight = max;
-      newLeft = newRight - MIN_GAP;
+    for (let year = startYear; year <= endYear; year++) {
+      const monthStart = year === startYear ? startMonth : 1;
+      const monthEnd = year === endYear ? endMonth : 12;
+      for (let month = monthStart; month <= monthEnd; month++) {
+        options.push(`${year}-${String(month).padStart(2, '0')}`);
+      }
     }
-    return { left: newLeft, right: newRight };
-  }
-
-  function applyDragRight(nextRight: number, left: number, right: number, max: number) {
-    nextRight = clamp(nextRight, 0, max);
-
-    if (nextRight >= left + MIN_GAP) return { left, right: nextRight };
-
-    let newRight = nextRight;
-    let newLeft = newRight - MIN_GAP;
-    if (newLeft < 0) {
-      newLeft = 0;
-      newRight = newLeft + MIN_GAP;
-    }
-    return { left: newLeft, right: newRight };
-  }
-
-  // 格式化日期显示
-  const formatDateDisplay = (dateStr: string): string => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    return options;
   };
 
-  // 计算当前位置（按月）
-  const left = clamp(toMonthIndex(filters.startDate), 0, totalMonths);
-  const right = clamp(toMonthIndex(filters.endDate), 0, totalMonths);
+  const yearMonthOptions = generateYearMonthOptions();
 
-  // 确保百分比在 0-100% 范围内
-  const leftPct = clamp((left / totalMonths) * 100, 0, 100);
-  const rightPct = clamp((right / totalMonths) * 100, 0, 100);
-
-  // 从鼠标位置获取索引（月份）
-  const getIndexFromClientX = (clientX: number) => {
-    const el = trackRef.current;
-    if (!el) return 0;
-    const rect = el.getBoundingClientRect();
-    // 考虑 thumb 的半径（9px），确保 thumb 不会超出边界
-    const thumbRadius = 9;
-    const trackWidth = rect.width - thumbRadius * 2;
-    const x = clamp(clientX - rect.left - thumbRadius, 0, trackWidth);
-    const ratio = trackWidth === 0 ? 0 : x / trackWidth;
-    return Math.round(ratio * totalMonths);
-  };
-
-  // 拖动处理
-  const onPointerDownThumb = (thumb: 'start' | 'end') => (e: React.PointerEvent) => {
-    e.preventDefault();
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    setActiveThumb(thumb);
-    // 通知父组件开始拖动
-    onDragChange?.(true);
-  };
-
-  const onPointerMove = (e: React.PointerEvent) => {
-    if (!activeThumb) return;
-
-    latestXRef.current = e.clientX;
-
-    if (rafRef.current != null) return;
-
-    rafRef.current = requestAnimationFrame(() => {
-      rafRef.current = null;
-      const x = latestXRef.current;
-      if (x == null) return;
-
-      const nextIdx = getIndexFromClientX(x);
-
-    setFilters(prev => {
-      const curL = toMonthIndex(prev.startDate);
-      const curR = toMonthIndex(prev.endDate);
-
-      const res =
-        activeThumb === 'start'
-          ? applyDragLeft(nextIdx, curL, curR, totalMonths)
-          : applyDragRight(nextIdx, curL, curR, totalMonths);
-
-      return { ...prev, startDate: fromMonthIndex(res.left), endDate: fromMonthIndex(res.right) };
-      });
-    });
-  };
-
-  const onPointerUp = () => {
-    setActiveThumb(null);
-    // 通知父组件拖动结束
-    onDragChange?.(false);
-  };
-
-  const toggleCountry = (code: string) => {
+  const toggleCountry = (countryName: string) => {
     setFilters(prev => ({
       ...prev,
-      selectedCountries: prev.selectedCountries.includes(code) 
-        ? prev.selectedCountries.filter(c => c !== code)
-        : [...prev.selectedCountries, code]
+      selectedCountries: prev.selectedCountries.includes(countryName) 
+        ? prev.selectedCountries.filter(c => c !== countryName)
+        : [...prev.selectedCountries, countryName]
     }));
   };
 
-  const toggleCategory = (categoryId: string) => {
+  const toggleHSCodeCategory = (categoryId: string) => {
     setFilters(prev => ({
       ...prev,
-      selectedCategories: prev.selectedCategories.includes(categoryId)
-        ? prev.selectedCategories.filter(c => c !== categoryId)
-        : [...prev.selectedCategories, categoryId]
+      selectedHSCodeCategories: prev.selectedHSCodeCategories.includes(categoryId)
+        ? prev.selectedHSCodeCategories.filter(c => c !== categoryId)
+        : [...prev.selectedHSCodeCategories, categoryId]
     }));
-    // 点击后不关闭下拉框，让用户可以多选
   };
 
-  const toggleCompany = (companyId: string) => {
+  const toggleCompany = (companyName: string) => {
     setFilters(prev => ({
       ...prev,
-      selectedCompanies: prev.selectedCompanies.includes(companyId)
-        ? prev.selectedCompanies.filter(c => c !== companyId)
-        : [...prev.selectedCompanies, companyId]
+      selectedCompanies: prev.selectedCompanies.includes(companyName)
+        ? prev.selectedCompanies.filter(c => c !== companyName)
+        : [...prev.selectedCompanies, companyName]
     }));
   };
 
@@ -232,10 +107,10 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, ca
         </div>
         <button 
           onClick={() => setFilters({ 
-            startDate: START_DATE.toISOString().split('T')[0], 
-            endDate: TODAY.toISOString().split('T')[0], 
+            startYearMonth: yearMonthOptions[0] || '2003-01',
+            endYearMonth: yearMonthOptions[yearMonthOptions.length - 1] || new Date().toISOString().slice(0, 7),
             selectedCountries: [], 
-            selectedCategories: [],
+            selectedHSCodeCategories: [],
             selectedCompanies: []
           })}
           className="text-[12px] text-[#007AFF] hover:underline font-semibold"
@@ -244,87 +119,44 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, ca
         </button>
       </div>
 
-      {/* Date Range - Dual Slider */}
+      {/* 时间范围 - 年月选择器 */}
       <section className="space-y-5">
         <label className="text-[11px] font-bold text-[#86868B] uppercase tracking-widest flex items-center gap-2.5">
           <Calendar className="w-4 h-4" /> {t('filters.dateRange')}
         </label>
         
-        <div className="space-y-2">
-          {/* Date Display */}
-          <div className="flex items-center justify-between px-1">
-            <div className="flex flex-col">
-              <span className="text-[9px] text-[#86868B] uppercase font-bold tracking-wider">{t('filters.start')}</span>
-              <span className="text-[12px] text-[#1D1D1F] font-semibold mt-0.5">
-                {formatDateDisplay(filters.startDate)}
-              </span>
-            </div>
-            <div className="flex flex-col items-end">
-              <span className="text-[9px] text-[#86868B] uppercase font-bold tracking-wider">{t('filters.end')}</span>
-              <span className="text-[12px] text-[#1D1D1F] font-semibold mt-0.5">
-                {formatDateDisplay(filters.endDate)}
-              </span>
-            </div>
+        <div className="space-y-3">
+          {/* 起始年月 */}
+          <div className="flex flex-col">
+            <span className="text-[9px] text-[#86868B] uppercase font-bold tracking-wider mb-1">{t('filters.start')}</span>
+            <select
+              value={filters.startYearMonth}
+              onChange={(e) => setFilters(prev => ({ ...prev, startYearMonth: e.target.value }))}
+              className="w-full bg-[#F5F5F7] border border-black/5 rounded-[12px] px-3 py-2.5 text-[12px] text-[#1D1D1F] font-semibold hover:bg-[#EBEBEB] transition-all shadow-sm"
+            >
+              {yearMonthOptions.map(ym => (
+                <option key={ym} value={ym}>{ym}</option>
+              ))}
+            </select>
           </div>
 
-          {/* Custom Dual Slider Container */}
-          <div className="relative py-1.5 select-none">
-            {/* Track */}
-            <div
-              ref={trackRef}
-              onPointerMove={onPointerMove}
-              onPointerUp={onPointerUp}
-              onPointerCancel={onPointerUp}
-              className="relative h-6"
+          {/* 结束年月 */}
+          <div className="flex flex-col">
+            <span className="text-[9px] text-[#86868B] uppercase font-bold tracking-wider mb-1">{t('filters.end')}</span>
+            <select
+              value={filters.endYearMonth}
+              onChange={(e) => setFilters(prev => ({ ...prev, endYearMonth: e.target.value }))}
+              className="w-full bg-[#F5F5F7] border border-black/5 rounded-[12px] px-3 py-2.5 text-[12px] text-[#1D1D1F] font-semibold hover:bg-[#EBEBEB] transition-all shadow-sm"
             >
-              {/* background track */}
-              <div className="absolute top-1/2 left-0 right-0 h-1.5 bg-[#EBEBEB] rounded-full -translate-y-1/2" />
-
-              {/* active range */}
-              <div
-                className="absolute top-1/2 h-1.5 bg-[#007AFF] rounded-full -translate-y-1/2 transition-all"
-                style={{ left: `${leftPct}%`, width: `${rightPct - leftPct}%` }}
-              />
-
-              {/* left thumb */}
-              <div
-                role="slider"
-                aria-label={t('filters.startDate')}
-                aria-valuemin={0}
-                aria-valuemax={totalMonths}
-                aria-valuenow={left}
-                onPointerDown={onPointerDownThumb('start')}
-                className="absolute top-1/2 w-[18px] h-[18px] rounded-full bg-[#007AFF] border-[3px] border-white cursor-pointer -translate-y-1/2 transition-all hover:scale-110 active:scale-115"
-                style={{
-                  left: `max(0px, calc(${leftPct}% - 9px))`,
-                  boxShadow: activeThumb === 'start' 
-                    ? '0 3px 12px rgba(0, 122, 255, 0.4), 0 0 0 1px rgba(0, 0, 0, 0.05)' 
-                    : '0 2px 8px rgba(0, 122, 255, 0.3), 0 0 0 1px rgba(0, 0, 0, 0.05)'
-                }}
-              />
-
-              {/* right thumb */}
-              <div
-                role="slider"
-                aria-label={t('filters.endDate')}
-                aria-valuemin={0}
-                aria-valuemax={totalMonths}
-                aria-valuenow={right}
-                onPointerDown={onPointerDownThumb('end')}
-                className="absolute top-1/2 w-[18px] h-[18px] rounded-full bg-[#007AFF] border-[3px] border-white cursor-pointer -translate-y-1/2 transition-all hover:scale-110 active:scale-115"
-                style={{
-                  left: `min(calc(100% - 18px), calc(${rightPct}% - 9px))`,
-                  boxShadow: activeThumb === 'end' 
-                    ? '0 3px 12px rgba(0, 122, 255, 0.4), 0 0 0 1px rgba(0, 0, 0, 0.05)' 
-                    : '0 2px 8px rgba(0, 122, 255, 0.3), 0 0 0 1px rgba(0, 0, 0, 0.05)'
-                }}
-              />
-            </div>
+              {yearMonthOptions.map(ym => (
+                <option key={ym} value={ym}>{ym}</option>
+              ))}
+            </select>
           </div>
         </div>
       </section>
 
-      {/* Countries Dropdown */}
+      {/* 国家筛选 */}
       <section className="space-y-2.5">
         <label className="text-[11px] font-bold text-[#86868B] uppercase tracking-widest flex items-center gap-2.5">
           <Building2 className="w-4 h-4" /> {t('filters.countries')}
@@ -350,14 +182,14 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, ca
                 countries.map(country => (
                 <div 
                   key={country.countryCode}
-                  onClick={() => toggleCountry(country.countryCode)}
-                  className={`px-3 py-2 text-[12px] flex items-center justify-between cursor-pointer rounded-[8px] transition-colors mb-0.5 last:mb-0 ${filters.selectedCountries.includes(country.countryCode) ? 'bg-[#007AFF] text-white font-bold' : 'text-[#1D1D1F] hover:bg-black/5'}`}
+                  onClick={() => toggleCountry(country.countryName)}
+                  className={`px-3 py-2 text-[12px] flex items-center justify-between cursor-pointer rounded-[8px] transition-colors mb-0.5 last:mb-0 ${filters.selectedCountries.includes(country.countryName) ? 'bg-[#007AFF] text-white font-bold' : 'text-[#1D1D1F] hover:bg-black/5'}`}
                 >
                   <div className="flex flex-col">
                     <span>{country.countryName}</span>
                     <span className={`text-[9px] uppercase font-bold opacity-60`}>{country.countryCode}</span>
                   </div>
-                  {filters.selectedCountries.includes(country.countryCode) && <Check className="w-3.5 h-3.5" />}
+                  {filters.selectedCountries.includes(country.countryName) && <Check className="w-3.5 h-3.5" />}
                 </div>
                 ))
               )}
@@ -366,49 +198,44 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, ca
         </div>
       </section>
 
-      {/* Categories Dropdown */}
+      {/* HS Code 品类筛选 */}
       <section className="space-y-2.5">
         <label className="text-[11px] font-bold text-[#86868B] uppercase tracking-widest flex items-center gap-2.5">
-          <Package className="w-4 h-4" /> {t('filters.categories')}
+          <Package className="w-4 h-4" /> HS Code 品类
         </label>
-        <div className="relative" ref={categoriesRef}>
+        <div className="relative" ref={hsCodeCategoriesRef}>
           <button 
-            onClick={() => setCategoriesOpen(!categoriesOpen)}
+            onClick={() => setHsCodeCategoriesOpen(!hsCodeCategoriesOpen)}
             className="w-full bg-[#F5F5F7] border border-black/5 rounded-[12px] px-3 py-2.5 flex items-center justify-between text-[12px] text-[#1D1D1F] font-semibold hover:bg-[#EBEBEB] transition-all shadow-sm"
           >
             <span className="truncate">
-              {filters.selectedCategories.length === 0 
-                ? t('filters.allMaterialFlows') 
-                : `${t('filters.selected')} ${filters.selectedCategories.length}`}
+              {filters.selectedHSCodeCategories.length === 0 
+                ? '全部品类' 
+                : `已选择 ${filters.selectedHSCodeCategories.length}`}
             </span>
-            <ChevronDown className={`w-3.5 h-3.5 text-[#86868B] transition-transform ${categoriesOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown className={`w-3.5 h-3.5 text-[#86868B] transition-transform ${hsCodeCategoriesOpen ? 'rotate-180' : ''}`} />
           </button>
           
-          {categoriesOpen && (
+          {hsCodeCategoriesOpen && (
             <div className="absolute top-full left-0 right-0 mt-2 bg-white/90 backdrop-blur-xl border border-black/5 rounded-[16px] shadow-2xl z-50 max-h-72 overflow-y-auto custom-scrollbar p-1.5 animate-in fade-in zoom-in-95 duration-200">
-              {categories.length === 0 ? (
+              {hsCodeCategories.length === 0 ? (
                 <div className="px-3 py-2 text-[12px] text-[#86868B]">{t('filters.loading')}</div>
               ) : (
-                categories.map(cat => (
+                hsCodeCategories.map(cat => (
                 <div 
-                  key={cat.id}
+                  key={cat.hsCode}
                   onClick={(e) => {
                     e.stopPropagation();
-                    toggleCategory(cat.id);
+                    toggleHSCodeCategory(cat.categoryId);
                   }}
-                  className={`px-3 py-2.5 text-[12px] flex items-center justify-between cursor-pointer rounded-[8px] transition-colors mb-0.5 last:mb-0 ${filters.selectedCategories.includes(cat.id) ? 'bg-[#007AFF] text-white font-bold' : 'text-[#1D1D1F] hover:bg-black/5'}`}
+                  className={`px-3 py-2.5 text-[12px] flex items-center justify-between cursor-pointer rounded-[8px] transition-colors mb-0.5 last:mb-0 ${filters.selectedHSCodeCategories.includes(cat.categoryId) ? 'bg-[#007AFF] text-white font-bold' : 'text-[#1D1D1F] hover:bg-black/5'}`}
                 >
                   <span 
-                    className={`font-semibold flex-1 ${filters.selectedCategories.includes(cat.id) ? 'text-white' : 'text-[#1D1D1F]'}`}
-                    style={{ 
-                      whiteSpace: 'nowrap',
-                      overflow: 'visible',
-                      textOverflow: 'clip'
-                    }}
+                    className={`font-semibold flex-1 ${filters.selectedHSCodeCategories.includes(cat.categoryId) ? 'text-white' : 'text-[#1D1D1F]'}`}
                   >
-                    {cat.displayName || cat.name || cat.id}
+                    {cat.categoryName} ({cat.hsCode})
                   </span>
-                  {filters.selectedCategories.includes(cat.id) && <Check className="w-3.5 h-3.5 flex-shrink-0 ml-2" />}
+                  {filters.selectedHSCodeCategories.includes(cat.categoryId) && <Check className="w-3.5 h-3.5 flex-shrink-0 ml-2" />}
                 </div>
                 ))
               )}
@@ -417,7 +244,7 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, ca
         </div>
       </section>
 
-      {/* Companies Dropdown */}
+      {/* 公司筛选 */}
       <section className="space-y-2.5">
         <label className="text-[11px] font-bold text-[#86868B] uppercase tracking-widest flex items-center gap-2.5">
           <Building className="w-4 h-4" /> {t('filters.companies')}
@@ -440,19 +267,14 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({ filters, setFilters, ca
               {companies.length === 0 ? (
                 <div className="px-3 py-2 text-[12px] text-[#86868B]">{t('filters.loading')}</div>
               ) : (
-                companies.map(company => (
+                companies.map(companyName => (
                 <div 
-                  key={company.id}
-                  onClick={() => toggleCompany(company.id)}
-                  className={`px-3 py-2 text-[12px] flex items-center justify-between cursor-pointer rounded-[8px] transition-colors mb-0.5 last:mb-0 ${filters.selectedCompanies.includes(company.id) ? 'bg-[#007AFF] text-white font-bold' : 'text-[#1D1D1F] hover:bg-black/5'}`}
+                  key={companyName}
+                  onClick={() => toggleCompany(companyName)}
+                  className={`px-3 py-2 text-[12px] flex items-center justify-between cursor-pointer rounded-[8px] transition-colors mb-0.5 last:mb-0 ${filters.selectedCompanies.includes(companyName) ? 'bg-[#007AFF] text-white font-bold' : 'text-[#1D1D1F] hover:bg-black/5'}`}
                 >
-                  <div className="flex flex-col flex-1 min-w-0">
-                    <span className="truncate">{company.name}</span>
-                    <span className={`text-[9px] uppercase font-bold ${filters.selectedCompanies.includes(company.id) ? 'text-white/80' : 'text-[#86868B]'}`}>
-                      {company.city}, {company.countryCode}
-                    </span>
-                  </div>
-                  {filters.selectedCompanies.includes(company.id) && <Check className="w-3.5 h-3.5 flex-shrink-0 ml-2" />}
+                  <span className="truncate">{companyName}</span>
+                  {filters.selectedCompanies.includes(companyName) && <Check className="w-3.5 h-3.5 flex-shrink-0 ml-2" />}
                 </div>
                 ))
               )}
