@@ -7,12 +7,14 @@ from .routes import categories, transactions, companies, locations, chat, monthl
 app = FastAPI(title="Supply Chain API", version="1.0.0")
 
 # CORS配置 - 支持多域名（开发和生产环境）
-cors_origins_str = os.getenv("CORS_ORIGINS", "http://localhost:3001,http://localhost:3000,https://supply-chain-tracing.vercel.app")
+# 从环境变量读取，如果没有设置则使用空列表（生产环境必须设置）
+cors_origins_str = os.getenv("CORS_ORIGINS", "")
 # 支持逗号分隔的多个域名
 cors_origins = [origin.strip() for origin in cors_origins_str.split(",") if origin.strip()]
 
 # Vercel 预览域名的正则表达式模式（支持所有 supply-chain-tracing 的预览域名）
-vercel_origin_regex = r"https://supply-chain-tracing(-[a-z0-9]+)?\.vercel\.app"
+# 匹配：supply-chain-tracing.vercel.app, supply-chain-tracing-git-main.vercel.app, supply-chain-tracing-git-*.vercel.app 等
+vercel_origin_regex = r"https://supply-chain-tracing(-git-[a-z0-9-]+)?\.vercel\.app"
 
 app.add_middleware(
     CORSMiddleware,
