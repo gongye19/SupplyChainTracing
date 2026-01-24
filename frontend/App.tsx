@@ -127,10 +127,15 @@ const App: React.FC = () => {
           uniqueCountries.add(f.originCountry);
           uniqueCountries.add(f.destinationCountry);
         });
+        // 计算实际显示的shipments数量（不是transaction_count的总和）
+        // Transaction Flow 应该显示实际显示的shipments数量
         setStats({
-          transactions: flows.reduce((sum, f) => sum + f.transactionCount, 0),
+          transactions: flows.length, // 显示实际shipments数量，而不是transaction_count总和
           suppliers: uniqueCountries.size,
-          categories: new Set(flows.map(f => f.hsCodes.split(',')[0]?.slice(0, 2))).size
+          categories: new Set(flows.map(f => {
+            const firstHsCode = f.hsCodes?.split(',')[0]?.trim()?.slice(0, 2) || '';
+            return firstHsCode;
+          }).filter(code => code)).size
         });
       }
     } catch (e: any) {
@@ -308,6 +313,7 @@ const App: React.FC = () => {
              hsCodeCategories={hsCodeCategories}
              countries={countries}
              companies={companies}
+             monthlyFlows={monthlyFlows}
            />
            
            <div className="mt-auto pt-8 border-t border-black/5 space-y-4">

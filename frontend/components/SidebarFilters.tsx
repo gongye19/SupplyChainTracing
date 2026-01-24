@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Filters, HSCodeCategory, CountryLocation } from '../types';
+import { Filters, HSCodeCategory, CountryLocation, MonthlyCompanyFlow } from '../types';
 import { Calendar, Building2, Package, Filter, ChevronDown, Check, Building } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -9,6 +9,7 @@ interface SidebarFiltersProps {
   hsCodeCategories: HSCodeCategory[];
   countries: CountryLocation[];
   companies: string[]; // 公司名称列表
+  monthlyFlows: MonthlyCompanyFlow[]; // 实际数据，用于提取出现的品类
 }
 
 const SidebarFilters: React.FC<SidebarFiltersProps> = ({ 
@@ -16,7 +17,8 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
   setFilters, 
   hsCodeCategories, 
   countries, 
-  companies 
+  companies,
+  monthlyFlows
 }) => {
   const { t } = useLanguage();
   const [countriesOpen, setCountriesOpen] = useState(false);
@@ -132,7 +134,7 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
             <select
               value={filters.startYearMonth}
               onChange={(e) => setFilters(prev => ({ ...prev, startYearMonth: e.target.value }))}
-              className="w-full bg-[#F5F5F7] border border-black/5 rounded-[12px] px-3 py-2.5 text-[12px] text-[#1D1D1F] font-semibold hover:bg-[#EBEBEB] transition-all shadow-sm"
+              className="w-full bg-[#F5F5F7] border border-black/5 rounded-[12px] px-3 py-2.5 pr-8 text-[12px] text-[#1D1D1F] font-semibold hover:bg-[#EBEBEB] transition-all shadow-sm appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%2386868B%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22><polyline points=%226 9 12 15 18 9%22></polyline></svg>')] bg-[length:16px_16px] bg-[right_0.75rem_center] bg-no-repeat"
             >
               {yearMonthOptions.map(ym => (
                 <option key={ym} value={ym}>{ym}</option>
@@ -146,7 +148,7 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
             <select
               value={filters.endYearMonth}
               onChange={(e) => setFilters(prev => ({ ...prev, endYearMonth: e.target.value }))}
-              className="w-full bg-[#F5F5F7] border border-black/5 rounded-[12px] px-3 py-2.5 text-[12px] text-[#1D1D1F] font-semibold hover:bg-[#EBEBEB] transition-all shadow-sm"
+              className="w-full bg-[#F5F5F7] border border-black/5 rounded-[12px] px-3 py-2.5 pr-8 text-[12px] text-[#1D1D1F] font-semibold hover:bg-[#EBEBEB] transition-all shadow-sm appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%2386868B%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22><polyline points=%226 9 12 15 18 9%22></polyline></svg>')] bg-[length:16px_16px] bg-[right_0.75rem_center] bg-no-repeat"
             >
               {yearMonthOptions.map(ym => (
                 <option key={ym} value={ym}>{ym}</option>
@@ -221,15 +223,42 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
               {hsCodeCategories.length === 0 ? (
                 <div className="px-3 py-2 text-[12px] text-[#86868B]">{t('filters.loading')}</div>
               ) : (() => {
-                // 按品类ID分组，只显示唯一的品类
-                const uniqueCategories = new Map<string, HSCodeCategory>();
-                hsCodeCategories.forEach(cat => {
-                  if (!uniqueCategories.has(cat.categoryId)) {
-                    uniqueCategories.set(cat.categoryId, cat);
+                // 从实际数据中提取出现的 HS Code 和对应的品类
+                const actualHsCodes = new Set<string>();
+                monthlyFlows.forEach(flow => {
+                  if (flow.hsCodes) {
+                    const codes = flow.hsCodes.split(',').map(code => code.trim());
+                    codes.forEach(code => {
+                      if (code.length >= 2) {
+                        actualHsCodes.add(code.slice(0, 2)); // 取前两位
+                      }
+                    });
                   }
                 });
                 
-                return Array.from(uniqueCategories.values()).map(cat => (
+                // 根据实际出现的 HS Code 找到对应的品类
+                const actualCategories = new Map<string, HSCodeCategory>();
+                actualHsCodes.forEach(hsCode => {
+                  const category = hsCodeCategories.find(cat => cat.hsCode === hsCode);
+                  if (category && !actualCategories.has(category.categoryId)) {
+                    actualCategories.set(category.categoryId, category);
+                  }
+                });
+                
+                // 如果没有任何数据，显示所有品类（用于初始状态）
+                const categoriesToShow = actualCategories.size > 0 
+                  ? Array.from(actualCategories.values())
+                  : (() => {
+                      const uniqueCategories = new Map<string, HSCodeCategory>();
+                      hsCodeCategories.forEach(cat => {
+                        if (!uniqueCategories.has(cat.categoryId)) {
+                          uniqueCategories.set(cat.categoryId, cat);
+                        }
+                      });
+                      return Array.from(uniqueCategories.values());
+                    })();
+                
+                return categoriesToShow.map(cat => (
                   <div 
                     key={cat.categoryId}
                     onClick={(e) => {
