@@ -98,6 +98,10 @@ const App: React.FC = () => {
       }
 
       console.log(`Loading shipments (${mode}) with filters:`, filtersToUse);
+      if (filtersToUse.selectedHSCodeSubcategories?.length > 0) {
+        console.log(`  - HS Code 大类:`, filtersToUse.selectedHSCodeCategories);
+        console.log(`  - HS Code 小类:`, filtersToUse.selectedHSCodeSubcategories);
+      }
       const startTime = performance.now();
       const data = await shipmentsAPI.getAll(filtersToUse);
       const duration = performance.now() - startTime;
@@ -112,6 +116,10 @@ const App: React.FC = () => {
       }
 
       console.log(`Shipments loaded (${mode}) in ${duration.toFixed(0)}ms:`, data.length);
+      if (data.length > 0) {
+        const hsCodes = new Set(data.map(s => s.hsCode).filter(Boolean));
+        console.log(`  - 包含的 HS Codes:`, Array.from(hsCodes).sort());
+      }
       setShipments(data);
       
       // 提取唯一的公司名称
@@ -219,10 +227,10 @@ const App: React.FC = () => {
     return country?.countryCode || countryName; // 如果找不到，返回原名称（作为后备）
   }, [countries]);
 
-  // 将原始 shipments 按公司对聚合，转换为地图组件格式
-  // 每个公司对（exporter + importer）合并成一条线
+  // 将原始 shipments 按公司对+原产国+目的地国家聚合，转换为地图组件格式
+  // 每个公司对+国家组合合并成一条线（这样筛选后线位置不会变）
   const shipmentsForMap = useMemo(() => {
-    // 按公司对聚合
+    // 按公司对+原产国+目的地国家聚合
     const companyPairGroups = new Map<string, {
       exporterName: string;
       importerName: string;
@@ -235,9 +243,10 @@ const App: React.FC = () => {
     }>();
     
     shipments.forEach(shipment => {
-      const pairKey = `${shipment.exporterName}-${shipment.importerName}`;
       const originCountryCode = getCountryCode(shipment.countryOfOrigin);
       const destinationCountryCode = getCountryCode(shipment.destinationCountry);
+      // 使用公司对+原产国+目的地国家作为聚合键
+      const pairKey = `${shipment.exporterName}-${shipment.importerName}-${originCountryCode}-${destinationCountryCode}`;
       
       if (!companyPairGroups.has(pairKey)) {
         companyPairGroups.set(pairKey, {
@@ -273,7 +282,7 @@ const App: React.FC = () => {
       const categoryColor = getHSCodeColorCached(mainCategoryCode);
       
       return {
-        id: `pair-${index}-${group.exporterName}-${group.importerName}`,
+        id: `pair-${index}-${group.exporterName}-${group.importerName}-${group.originId}-${group.destinationId}`,
         originId: group.originId,
         destinationId: group.destinationId,
         exporterCompanyName: group.exporterName,
@@ -291,10 +300,14 @@ const App: React.FC = () => {
 
   // 调试信息
   useEffect(() => {
-    console.log('Shipments (raw):', shipments.length, shipments);
-    console.log('Shipments for map:', shipmentsForMap.length, shipmentsForMap);
-    console.log('Countries for map:', countries.length, countries);
-    console.log('HS Code Categories:', hsCodeCategories.length, hsCodeCategories);
+    console.log('Shipments (raw):', shipments.length);
+    console.log('Shipments for map:', shipmentsForMap.length);
+    if (shipmentsForMap.length > 0) {
+      console.log('  - 公司对:', shipmentsForMap.map(s => `${s.exporterCompanyName} → ${s.importerCompanyName}`));
+      console.log('  - 总价值:', shipmentsForMap.map(s => `$${s.value.toFixed(2)}M`));
+    }
+    console.log('Countries for map:', countries.length);
+    console.log('HS Code Categories:', hsCodeCategories.length);
   }, [shipments, shipmentsForMap, countries, hsCodeCategories]);
 
   return (
@@ -408,6 +421,7 @@ const App: React.FC = () => {
                     countries={countries}
                     companies={[]}
                     categories={[]}
+                    filters={filters}
                     isPreview={isInteracting}
                   />
                 </>

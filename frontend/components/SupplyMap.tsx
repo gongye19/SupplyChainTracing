@@ -1,7 +1,7 @@
 
 import React, { useEffect, useRef, useMemo } from 'react';
 import * as d3 from 'd3';
-import { Shipment, CountryLocation, Category, Transaction, CompanyWithLocation } from '../types';
+import { Shipment, CountryLocation, Category, Transaction, CompanyWithLocation, Filters } from '../types';
 import { translateMaterials } from '../utils/materialTranslations';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -12,6 +12,7 @@ interface SupplyMapProps {
   countries: CountryLocation[];
   companies: CompanyWithLocation[];
   categories: Category[];
+  filters?: Filters; // 添加 filters 属性
   isPreview?: boolean;
 }
 
@@ -31,6 +32,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
   countries, 
   companies, 
   categories,
+  filters,
   isPreview = false 
 }) => {
   const { t, language } = useLanguage();
@@ -542,31 +544,74 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
 
   return (
     <div className="w-full h-full relative overflow-hidden rounded-[24px] border border-black/5 bg-white shadow-[0_4px_24px_rgba(0,0,0,0.04)]">
-      {/* 固定图例 - 左上角 */}
+      {/* 固定筛选信息 - 左上角 */}
       <div className="absolute top-6 left-6 z-20">
-        <div className="bg-white/95 backdrop-blur-xl p-4 rounded-[18px] border border-black/[0.05] shadow-lg min-w-[160px] pointer-events-auto">
+        <div className="bg-white/95 backdrop-blur-xl p-4 rounded-[18px] border border-black/[0.05] shadow-lg min-w-[200px] max-w-[280px] pointer-events-auto">
           <div className="mb-3 pb-2.5 border-b border-black/10">
-            <span className="text-[10px] text-[#86868B] font-bold uppercase tracking-widest">{t('map.materialCategories')}</span>
+            <span className="text-[10px] text-[#86868B] font-bold uppercase tracking-widest">{t('map.activeFilters') || 'Active Filters'}</span>
           </div>
-          <div className="flex flex-col gap-3">
-            {categories.map((cat) => (
-              <div key={cat.id} className="flex items-center gap-3">
-                <div 
-                  className="w-3.5 h-3.5 rounded-full flex-shrink-0 border border-black/10" 
-                  style={{ backgroundColor: cat.color }}
-                ></div>
-                <span 
-                  className="text-[11px] text-[#1D1D1F] font-semibold tracking-tight leading-tight"
-                  style={{ 
-                    color: '#1D1D1F',
-                    display: 'block',
-                    whiteSpace: 'nowrap'
-                  }}
-                >
-                  {cat.displayName || cat.name || cat.id}
-                </span>
-              </div>
-            ))}
+          <div className="flex flex-col gap-2.5 text-[11px]">
+            {/* 时间范围 */}
+            {filters && (
+              <>
+                <div className="flex items-start gap-2">
+                  <span className="text-[#86868B] font-semibold min-w-[60px]">时间:</span>
+                  <span className="text-[#1D1D1F]">{filters.startDate} ~ {filters.endDate}</span>
+                </div>
+                
+                {/* 国家 */}
+                {filters.selectedCountries.length > 0 && (
+                  <div className="flex items-start gap-2">
+                    <span className="text-[#86868B] font-semibold min-w-[60px]">国家:</span>
+                    <span className="text-[#1D1D1F]">
+                      {filters.selectedCountries.length <= 2 
+                        ? filters.selectedCountries.join(', ')
+                        : `${filters.selectedCountries.slice(0, 2).join(', ')} +${filters.selectedCountries.length - 2}`}
+                    </span>
+                  </div>
+                )}
+                
+                {/* 公司 */}
+                {filters.selectedCompanies.length > 0 && (
+                  <div className="flex items-start gap-2">
+                    <span className="text-[#86868B] font-semibold min-w-[60px]">公司:</span>
+                    <span className="text-[#1D1D1F]">
+                      {filters.selectedCompanies.length <= 1 
+                        ? filters.selectedCompanies.join(', ')
+                        : `${filters.selectedCompanies[0]} +${filters.selectedCompanies.length - 1}`}
+                    </span>
+                  </div>
+                )}
+                
+                {/* 大类 */}
+                {filters.selectedHSCodeCategories.length > 0 && (
+                  <div className="flex items-start gap-2">
+                    <span className="text-[#86868B] font-semibold min-w-[60px]">大类:</span>
+                    <span className="text-[#1D1D1F]">
+                      {filters.selectedHSCodeCategories.map(code => `HS${code}`).join(', ')}
+                    </span>
+                  </div>
+                )}
+                
+                {/* 小类 */}
+                {filters.selectedHSCodeSubcategories.length > 0 && (
+                  <div className="flex items-start gap-2">
+                    <span className="text-[#86868B] font-semibold min-w-[60px]">小类:</span>
+                    <span className="text-[#1D1D1F]">
+                      {filters.selectedHSCodeSubcategories.join(', ')}
+                    </span>
+                  </div>
+                )}
+                
+                {/* 无筛选时显示 */}
+                {filters.selectedCountries.length === 0 && 
+                 filters.selectedCompanies.length === 0 && 
+                 filters.selectedHSCodeCategories.length === 0 && 
+                 filters.selectedHSCodeSubcategories.length === 0 && (
+                  <div className="text-[#86868B] text-[10px] italic">无筛选条件</div>
+                )}
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -575,6 +620,20 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
   );
 }, (prevProps, nextProps) => {
   // 自定义比较函数
+  const filtersEqual = prevProps.filters === nextProps.filters || (
+    prevProps.filters && nextProps.filters &&
+    prevProps.filters.startDate === nextProps.filters.startDate &&
+    prevProps.filters.endDate === nextProps.filters.endDate &&
+    prevProps.filters.selectedCountries.length === nextProps.filters.selectedCountries.length &&
+    prevProps.filters.selectedCountries.every((c, i) => c === nextProps.filters.selectedCountries[i]) &&
+    prevProps.filters.selectedCompanies.length === nextProps.filters.selectedCompanies.length &&
+    prevProps.filters.selectedCompanies.every((c, i) => c === nextProps.filters.selectedCompanies[i]) &&
+    prevProps.filters.selectedHSCodeCategories.length === nextProps.filters.selectedHSCodeCategories.length &&
+    prevProps.filters.selectedHSCodeCategories.every((c, i) => c === nextProps.filters.selectedHSCodeCategories[i]) &&
+    prevProps.filters.selectedHSCodeSubcategories.length === nextProps.filters.selectedHSCodeSubcategories.length &&
+    prevProps.filters.selectedHSCodeSubcategories.every((c, i) => c === nextProps.filters.selectedHSCodeSubcategories[i])
+  );
+  
   return (
     prevProps.shipments.length === nextProps.shipments.length &&
     prevProps.shipments.every((s, i) => s.id === nextProps.shipments[i]?.id) &&
@@ -586,7 +645,8 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
     prevProps.companies.length === nextProps.companies.length &&
     prevProps.companies.every((c, i) => c.id === nextProps.companies[i]?.id) &&
     prevProps.categories.length === nextProps.categories.length &&
-    prevProps.isPreview === nextProps.isPreview
+    prevProps.isPreview === nextProps.isPreview &&
+    filtersEqual
   );
 });
 
