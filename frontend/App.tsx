@@ -227,51 +227,51 @@ const App: React.FC = () => {
     return country?.countryCode || countryName; // 如果找不到，返回原名称（作为后备）
   }, [countries]);
 
-  // 将原始 shipments 按公司对+原产国+目的地国家聚合，转换为地图组件格式
-  // 每个公司对+国家组合合并成一条线（这样筛选后线位置不会变）
+  // 将原始 shipments 按国家对聚合，转换为地图组件格式
+  // 每个国家对（原产国 → 目的地国家）合并成一条线，顺序不能相反
   const shipmentsForMap = useMemo(() => {
-    // 按公司对+原产国+目的地国家聚合
-    const companyPairGroups = new Map<string, {
-      exporterName: string;
-      importerName: string;
+    // 按国家对聚合所有交易
+    const countryPairGroups = new Map<string, {
       originId: string;
       destinationId: string;
       shipments: Shipment[];
       totalValue: number;
       totalQuantity: number;
       hsCodes: Set<string>;
+      companies: Set<string>; // 统计涉及的公司对
     }>();
     
     shipments.forEach(shipment => {
       const originCountryCode = getCountryCode(shipment.countryOfOrigin);
       const destinationCountryCode = getCountryCode(shipment.destinationCountry);
-      // 使用公司对+原产国+目的地国家作为聚合键
-      const pairKey = `${shipment.exporterName}-${shipment.importerName}-${originCountryCode}-${destinationCountryCode}`;
+      // 使用原产国-目的地国家作为聚合键（顺序固定，不能相反）
+      const pairKey = `${originCountryCode}-${destinationCountryCode}`;
       
-      if (!companyPairGroups.has(pairKey)) {
-        companyPairGroups.set(pairKey, {
-          exporterName: shipment.exporterName,
-          importerName: shipment.importerName,
+      if (!countryPairGroups.has(pairKey)) {
+        countryPairGroups.set(pairKey, {
           originId: originCountryCode,
           destinationId: destinationCountryCode,
           shipments: [],
           totalValue: 0,
           totalQuantity: 0,
-          hsCodes: new Set()
+          hsCodes: new Set(),
+          companies: new Set()
         });
       }
       
-      const group = companyPairGroups.get(pairKey)!;
+      const group = countryPairGroups.get(pairKey)!;
       group.shipments.push(shipment);
       group.totalValue += shipment.totalValueUsd || 0;
       group.totalQuantity += shipment.quantity || 0;
       if (shipment.hsCode) {
         group.hsCodes.add(shipment.hsCode);
       }
+      // 记录涉及的公司对
+      group.companies.add(`${shipment.exporterName} → ${shipment.importerName}`);
     });
     
     // 转换为地图组件格式
-    return Array.from(companyPairGroups.values()).map((group, index) => {
+    return Array.from(countryPairGroups.values()).map((group, index) => {
       // 获取所有品类（HS Code 前2位）
       const categoryCodes = Array.from(group.hsCodes).map(code => code.slice(0, 2));
       const uniqueCategories = Array.from(new Set(categoryCodes));
@@ -281,12 +281,17 @@ const App: React.FC = () => {
       const hsCategory = hsCodeCategories.find(cat => cat.hsCode === mainCategoryCode);
       const categoryColor = getHSCodeColorCached(mainCategoryCode);
       
+      // 获取涉及的公司名称（用于显示）
+      const companyNames = Array.from(group.companies);
+      const exporterName = companyNames.length > 0 ? companyNames[0].split(' → ')[0] : '';
+      const importerName = companyNames.length > 0 ? companyNames[0].split(' → ')[1] : '';
+      
       return {
-        id: `pair-${index}-${group.exporterName}-${group.importerName}-${group.originId}-${group.destinationId}`,
+        id: `country-pair-${index}-${group.originId}-${group.destinationId}`,
         originId: group.originId,
         destinationId: group.destinationId,
-        exporterCompanyName: group.exporterName,
-        importerCompanyName: group.importerName,
+        exporterCompanyName: exporterName, // 主要出口商（用于显示）
+        importerCompanyName: importerName, // 主要进口商（用于显示）
         material: Array.from(group.hsCodes).join(','),
         category: hsCategory?.chapterName || 'Unknown',
         categoryColor,
@@ -301,9 +306,9 @@ const App: React.FC = () => {
   // 调试信息
   useEffect(() => {
     console.log('Shipments (raw):', shipments.length);
-    console.log('Shipments for map:', shipmentsForMap.length);
+    console.log('Shipments for map (按国家对聚合):', shipmentsForMap.length);
     if (shipmentsForMap.length > 0) {
-      console.log('  - 公司对:', shipmentsForMap.map(s => `${s.exporterCompanyName} → ${s.importerCompanyName}`));
+      console.log('  - 国家对:', shipmentsForMap.map(s => `${s.originId} → ${s.destinationId}`));
       console.log('  - 总价值:', shipmentsForMap.map(s => `$${s.value.toFixed(2)}M`));
     }
     console.log('Countries for map:', countries.length);
