@@ -355,27 +355,9 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
               {hsCodeCategories.length === 0 ? (
                 <div className="px-3 py-2 text-[12px] text-[#86868B]">{t('filters.loading')}</div>
               ) : (() => {
-                // 从实际数据中提取出现的 HS Code（前两位）
-                const actualHsCodes = new Set<string>();
-                shipments.forEach(shipment => {
-                  if (shipment.hsCode && shipment.hsCode.length >= 2) {
-                    actualHsCodes.add(shipment.hsCode.slice(0, 2)); // 取前两位
-                  }
-                });
-                
-                // 根据实际出现的 HS Code 找到对应的章节（显示 chapterName）
-                const actualChapters: HSCodeCategory[] = [];
-                actualHsCodes.forEach(hsCode => {
-                  const category = hsCodeCategories.find(cat => cat.hsCode === hsCode);
-                  if (category) {
-                    actualChapters.push(category);
-                  }
-                });
-                
-                // 如果没有任何数据，显示所有章节（用于初始状态）
-                const chaptersToShow = actualChapters.length > 0 
-                  ? actualChapters.sort((a, b) => a.hsCode.localeCompare(b.hsCode))
-                  : hsCodeCategories.sort((a, b) => a.hsCode.localeCompare(b.hsCode));
+                // 始终显示所有可用的 HS Code 大类选项，支持多选
+                // 排序后显示
+                const chaptersToShow = hsCodeCategories.sort((a, b) => a.hsCode.localeCompare(b.hsCode));
                 
                 return chaptersToShow.map(cat => (
                   <div 
