@@ -71,11 +71,35 @@ export interface Location {
 
 // 筛选条件
 export interface Filters {
-  startYearMonth: string; // YYYY-MM 格式
-  endYearMonth: string;   // YYYY-MM 格式
+  startDate: string; // YYYY-MM-DD 格式
+  endDate: string;   // YYYY-MM-DD 格式
   selectedCountries: string[]; // 国家名称数组
   selectedHSCodeCategories: string[]; // HS Code 2位大类数组（如 ["42", "54", "62"]）
+  selectedHSCodeSubcategories: string[]; // HS Code 2位小类数组（如 ["04", "07", "05"]）
   selectedCompanies: string[]; // 公司名称数组
+}
+
+// 原始交易数据（从 shipments_raw 表）
+export interface Shipment {
+  date: string; // YYYY-MM-DD
+  importerName: string;
+  exporterName: string;
+  hsCode: string; // 4位 HS Code
+  productEnglish?: string;
+  productDescription?: string;
+  weightKg?: number;
+  quantity?: number;
+  quantityUnit?: string;
+  totalValueUsd?: number;
+  unitPricePerKg?: number;
+  unitPricePerItem?: number;
+  countryOfOrigin: string;
+  destinationCountry: string;
+  portOfDeparture?: string;
+  portOfArrival?: string;
+  importExport?: string;
+  transportMode?: string;
+  tradeTerm?: string;
 }
 
 // 月度公司流量（聚合表）

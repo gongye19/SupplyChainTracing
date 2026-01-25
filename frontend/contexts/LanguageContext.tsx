@@ -37,6 +37,9 @@ const translations: Record<Language, Record<string, string>> = {
     'filters.clearAll': 'Clear All',
     'filters.loading': 'Loading...',
     'filters.noCompanies': 'No companies found',
+    'filters.hsCodeSubcategories': 'HS Code Subcategories',
+    'filters.selectCategoryFirst': 'Please select category first',
+    'filters.noSubcategories': 'No subcategories found',
     
     // Stats Panel
     'stats.totalTransactions': 'Total Transactions',
@@ -122,6 +125,9 @@ const translations: Record<Language, Record<string, string>> = {
     'filters.clearAll': '清除全部',
     'filters.loading': '加载中...',
     'filters.noCompanies': '未找到公司',
+    'filters.hsCodeSubcategories': 'HS Code 小类',
+    'filters.selectCategoryFirst': '请先选择大类',
+    'filters.noSubcategories': '未找到小类',
     
     // Stats Panel
     'stats.totalTransactions': '总交易数',

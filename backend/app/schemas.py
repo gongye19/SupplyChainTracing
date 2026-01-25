@@ -188,6 +188,31 @@ class HSCodeCategory(BaseModel):
     class Config:
         from_attributes = True
 
+# Shipment Schema (from shipments_raw table)
+class Shipment(BaseModel):
+    date: str  # YYYY-MM-DD
+    importer_name: str
+    exporter_name: str
+    hs_code: str  # 4位 HS Code
+    product_english: Optional[str] = None
+    product_description: Optional[str] = None
+    weight_kg: Optional[float] = None
+    quantity: Optional[float] = None
+    quantity_unit: Optional[str] = None
+    total_value_usd: Optional[float] = None
+    unit_price_per_kg: Optional[float] = None
+    unit_price_per_item: Optional[float] = None
+    country_of_origin: str
+    destination_country: str
+    port_of_departure: Optional[str] = None
+    port_of_arrival: Optional[str] = None
+    import_export: Optional[str] = None
+    transport_mode: Optional[str] = None
+    trade_term: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
 # Country Location Schemas
 class CountryLocation(BaseModel):
     country_code: str

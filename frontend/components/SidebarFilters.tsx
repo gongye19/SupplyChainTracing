@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Filters, HSCodeCategory, CountryLocation, MonthlyCompanyFlow } from '../types';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Filters, HSCodeCategory, CountryLocation, Shipment } from '../types';
 import { Calendar, Building2, Package, Filter, ChevronDown, Check, Building } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -9,7 +9,7 @@ interface SidebarFiltersProps {
   hsCodeCategories: HSCodeCategory[];
   countries: CountryLocation[];
   companies: string[]; // 公司名称列表
-  monthlyFlows: MonthlyCompanyFlow[]; // 实际数据，用于提取出现的品类
+  shipments: Shipment[]; // 实际数据，用于提取出现的品类和小类
 }
 
 const SidebarFilters: React.FC<SidebarFiltersProps> = ({ 
@@ -18,19 +18,21 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
   hsCodeCategories, 
   countries, 
   companies,
-  monthlyFlows
+  shipments
 }) => {
   const { t } = useLanguage();
   const [startDateOpen, setStartDateOpen] = useState(false);
   const [endDateOpen, setEndDateOpen] = useState(false);
   const [countriesOpen, setCountriesOpen] = useState(false);
   const [hsCodeCategoriesOpen, setHsCodeCategoriesOpen] = useState(false);
+  const [hsCodeSubcategoriesOpen, setHsCodeSubcategoriesOpen] = useState(false);
   const [companiesOpen, setCompaniesOpen] = useState(false);
   
   const startDateRef = useRef<HTMLDivElement>(null);
   const endDateRef = useRef<HTMLDivElement>(null);
   const countriesRef = useRef<HTMLDivElement>(null);
   const hsCodeCategoriesRef = useRef<HTMLDivElement>(null);
+  const hsCodeSubcategoriesRef = useRef<HTMLDivElement>(null);
   const companiesRef = useRef<HTMLDivElement>(null);
 
   // 点击外部关闭下拉框
@@ -48,40 +50,59 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
       if (hsCodeCategoriesRef.current && !hsCodeCategoriesRef.current.contains(event.target as Node)) {
         setHsCodeCategoriesOpen(false);
       }
+      if (hsCodeSubcategoriesRef.current && !hsCodeSubcategoriesRef.current.contains(event.target as Node)) {
+        setHsCodeSubcategoriesOpen(false);
+      }
       if (companiesRef.current && !companiesRef.current.contains(event.target as Node)) {
         setCompaniesOpen(false);
       }
     };
 
-    if (startDateOpen || endDateOpen || countriesOpen || hsCodeCategoriesOpen || companiesOpen) {
+    if (startDateOpen || endDateOpen || countriesOpen || hsCodeCategoriesOpen || hsCodeSubcategoriesOpen || companiesOpen) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [startDateOpen, endDateOpen, countriesOpen, hsCodeCategoriesOpen, companiesOpen]);
+  }, [startDateOpen, endDateOpen, countriesOpen, hsCodeCategoriesOpen, hsCodeSubcategoriesOpen, companiesOpen]);
 
-  // 生成年月选项（从2003-01到当前）
-  const generateYearMonthOptions = () => {
+  // 生成日期选项（从2003-01-01到当前）
+  const generateDateOptions = () => {
     const options: string[] = [];
-    const startYear = 2003;
-    const startMonth = 1;
-    const now = new Date();
-    const endYear = now.getFullYear();
-    const endMonth = now.getMonth() + 1;
-
-    for (let year = startYear; year <= endYear; year++) {
-      const monthStart = year === startYear ? startMonth : 1;
-      const monthEnd = year === endYear ? endMonth : 12;
-      for (let month = monthStart; month <= monthEnd; month++) {
-        options.push(`${year}-${String(month).padStart(2, '0')}`);
-      }
+    const startDate = new Date('2003-01-01');
+    const endDate = new Date();
+    const currentDate = new Date(startDate);
+    
+    while (currentDate <= endDate) {
+      options.push(currentDate.toISOString().split('T')[0]); // YYYY-MM-DD
+      currentDate.setDate(currentDate.getDate() + 1);
     }
     return options;
   };
 
-  const yearMonthOptions = generateYearMonthOptions();
+  const dateOptions = generateDateOptions();
+  
+  // 从实际数据中提取可选的小类（HS Code 后2位）
+  // 只显示已选择大类下实际出现的小类
+  const availableSubcategories = useMemo(() => {
+    if (filters.selectedHSCodeCategories.length === 0) {
+      return [];
+    }
+    
+    const subcategories = new Set<string>();
+    shipments.forEach(shipment => {
+      if (shipment.hsCode && shipment.hsCode.length >= 4) {
+        const prefix = shipment.hsCode.slice(0, 2);
+        const suffix = shipment.hsCode.slice(2, 4);
+        if (filters.selectedHSCodeCategories.includes(prefix)) {
+          subcategories.add(suffix);
+        }
+      }
+    });
+    
+    return Array.from(subcategories).sort();
+  }, [shipments, filters.selectedHSCodeCategories]);
 
   const toggleCountry = (countryName: string) => {
     setFilters(prev => ({
@@ -93,11 +114,43 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
   };
 
   const toggleHSCodeCategory = (hsCode: string) => {
+    setFilters(prev => {
+      const newCategories = prev.selectedHSCodeCategories.includes(hsCode)
+        ? prev.selectedHSCodeCategories.filter(c => c !== hsCode)
+        : [...prev.selectedHSCodeCategories, hsCode];
+      
+      // 如果移除大类，同时清除该大类下的小类选择
+      const removedCategory = prev.selectedHSCodeCategories.includes(hsCode);
+      let newSubcategories = prev.selectedHSCodeSubcategories;
+      if (removedCategory) {
+        // 检查哪些小类属于被移除的大类
+        const subcategoriesToRemove = new Set<string>();
+        shipments.forEach(s => {
+          if (s.hsCode && s.hsCode.length >= 4) {
+            const prefix = s.hsCode.slice(0, 2);
+            const suffix = s.hsCode.slice(2, 4);
+            if (prefix === hsCode) {
+              subcategoriesToRemove.add(suffix);
+            }
+          }
+        });
+        newSubcategories = prev.selectedHSCodeSubcategories.filter(s => !subcategoriesToRemove.has(s));
+      }
+      
+      return {
+        ...prev,
+        selectedHSCodeCategories: newCategories,
+        selectedHSCodeSubcategories: newSubcategories
+      };
+    });
+  };
+
+  const toggleHSCodeSubcategory = (suffix: string) => {
     setFilters(prev => ({
       ...prev,
-      selectedHSCodeCategories: prev.selectedHSCodeCategories.includes(hsCode)
-        ? prev.selectedHSCodeCategories.filter(c => c !== hsCode)
-        : [...prev.selectedHSCodeCategories, hsCode]
+      selectedHSCodeSubcategories: prev.selectedHSCodeSubcategories.includes(suffix)
+        ? prev.selectedHSCodeSubcategories.filter(s => s !== suffix)
+        : [...prev.selectedHSCodeSubcategories, suffix]
     }));
   };
 
@@ -118,66 +171,69 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
           <span className="text-[12px] font-bold uppercase tracking-widest text-[#1D1D1F]">{t('filters.filterControl')}</span>
         </div>
         <button 
-          onClick={() => setFilters({ 
-            startYearMonth: yearMonthOptions[0] || '2003-01',
-            endYearMonth: yearMonthOptions[yearMonthOptions.length - 1] || new Date().toISOString().slice(0, 7),
-            selectedCountries: [], 
-            selectedHSCodeCategories: [],
-            selectedCompanies: []
-          })}
+          onClick={() => {
+            const now = new Date();
+            setFilters({ 
+              startDate: '2003-01-01',
+              endDate: now.toISOString().split('T')[0],
+              selectedCountries: [], 
+              selectedHSCodeCategories: [],
+              selectedHSCodeSubcategories: [],
+              selectedCompanies: []
+            });
+          }}
           className="text-[12px] text-[#007AFF] hover:underline font-semibold"
         >
           {t('filters.reset')}
         </button>
       </div>
 
-      {/* 时间范围 - 年月选择器 */}
+      {/* 时间范围 - 日期选择器 */}
       <section className="space-y-2.5">
         <label className="text-[11px] font-bold text-[#86868B] uppercase tracking-widest flex items-center gap-2.5">
           <Calendar className="w-4 h-4" /> {t('filters.dateRange')}
         </label>
         
         <div className="space-y-3">
-          {/* 起始年月 */}
+          {/* 起始日期 */}
           <div className="relative" ref={startDateRef}>
             <div className="flex flex-col mb-1">
               <span className="text-[9px] text-[#86868B] uppercase font-bold tracking-wider">{t('filters.start')}</span>
             </div>
             <button 
               onClick={() => {
-                setEndDateOpen(false); // 关闭结束日期下拉框
+                setEndDateOpen(false);
                 setStartDateOpen(!startDateOpen);
               }}
               className="w-full bg-[#F5F5F7] border border-black/5 rounded-[12px] px-3 py-2.5 flex items-center justify-between text-[12px] text-[#1D1D1F] font-semibold hover:bg-[#EBEBEB] transition-all shadow-sm"
             >
-              <span className="truncate">{filters.startYearMonth}</span>
+              <span className="truncate">{filters.startDate}</span>
               <ChevronDown className={`w-3.5 h-3.5 text-[#86868B] transition-transform ${startDateOpen ? 'rotate-180' : ''}`} />
             </button>
             
             {startDateOpen && (
               <div className="absolute top-full left-0 right-0 mt-2 bg-white/90 backdrop-blur-xl border border-black/5 rounded-[16px] shadow-2xl z-50 max-h-72 overflow-y-auto custom-scrollbar p-1.5 animate-in fade-in zoom-in-95 duration-200">
-                {yearMonthOptions.map(ym => {
-                  // 开始日期不能晚于结束日期
-                  const isDisabled = ym > filters.endYearMonth;
+                {dateOptions.map(date => {
+                  const isDisabled = date > filters.endDate;
                   return (
                     <div 
-                      key={ym}
+                      key={date}
                       onClick={() => {
                         if (!isDisabled) {
-                          setFilters(prev => ({ ...prev, startYearMonth: ym }));
+                          setFilters(prev => ({ ...prev, startDate: date }));
                           setStartDateOpen(false);
                         }
                       }}
                       className={`px-3 py-2.5 text-[12px] flex items-center justify-between rounded-[8px] transition-colors mb-0.5 last:mb-0 ${
                         isDisabled 
                           ? 'text-[#86868B] cursor-not-allowed opacity-50' 
-                          : filters.startYearMonth === ym 
+                          : filters.startDate === date 
                             ? 'bg-[#007AFF] text-white font-bold cursor-pointer' 
                             : 'text-[#1D1D1F] hover:bg-black/5 cursor-pointer'
                       }`}
                     >
-                      <span>{ym}</span>
-                      {filters.startYearMonth === ym && !isDisabled && <Check className="w-3.5 h-3.5 flex-shrink-0 ml-2" />}
+                      <span>{date}</span>
+                      {filters.startDate === date && !isDisabled && <Check className="w-3.5 h-3.5 flex-shrink-0 ml-2" />}
                     </div>
                   );
                 })}
@@ -185,46 +241,45 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
             )}
           </div>
 
-          {/* 结束年月 */}
+          {/* 结束日期 */}
           <div className="relative" ref={endDateRef}>
             <div className="flex flex-col mb-1">
               <span className="text-[9px] text-[#86868B] uppercase font-bold tracking-wider">{t('filters.end')}</span>
             </div>
             <button 
               onClick={() => {
-                setStartDateOpen(false); // 关闭起始日期下拉框
+                setStartDateOpen(false);
                 setEndDateOpen(!endDateOpen);
               }}
               className="w-full bg-[#F5F5F7] border border-black/5 rounded-[12px] px-3 py-2.5 flex items-center justify-between text-[12px] text-[#1D1D1F] font-semibold hover:bg-[#EBEBEB] transition-all shadow-sm"
             >
-              <span className="truncate">{filters.endYearMonth}</span>
+              <span className="truncate">{filters.endDate}</span>
               <ChevronDown className={`w-3.5 h-3.5 text-[#86868B] transition-transform ${endDateOpen ? 'rotate-180' : ''}`} />
             </button>
             
             {endDateOpen && (
               <div className="absolute top-full left-0 right-0 mt-2 bg-white/90 backdrop-blur-xl border border-black/5 rounded-[16px] shadow-2xl z-50 max-h-72 overflow-y-auto custom-scrollbar p-1.5 animate-in fade-in zoom-in-95 duration-200">
-                {yearMonthOptions.map(ym => {
-                  // 结束日期不能早于开始日期
-                  const isDisabled = ym < filters.startYearMonth;
+                {dateOptions.map(date => {
+                  const isDisabled = date < filters.startDate;
                   return (
                     <div 
-                      key={ym}
+                      key={date}
                       onClick={() => {
                         if (!isDisabled) {
-                          setFilters(prev => ({ ...prev, endYearMonth: ym }));
+                          setFilters(prev => ({ ...prev, endDate: date }));
                           setEndDateOpen(false);
                         }
                       }}
                       className={`px-3 py-2.5 text-[12px] flex items-center justify-between rounded-[8px] transition-colors mb-0.5 last:mb-0 ${
                         isDisabled 
                           ? 'text-[#86868B] cursor-not-allowed opacity-50' 
-                          : filters.endYearMonth === ym 
+                          : filters.endDate === date 
                             ? 'bg-[#007AFF] text-white font-bold cursor-pointer' 
                             : 'text-[#1D1D1F] hover:bg-black/5 cursor-pointer'
                       }`}
                     >
-                      <span>{ym}</span>
-                      {filters.endYearMonth === ym && !isDisabled && <Check className="w-3.5 h-3.5 flex-shrink-0 ml-2" />}
+                      <span>{date}</span>
+                      {filters.endDate === date && !isDisabled && <Check className="w-3.5 h-3.5 flex-shrink-0 ml-2" />}
                     </div>
                   );
                 })}
@@ -301,14 +356,9 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
               ) : (() => {
                 // 从实际数据中提取出现的 HS Code（前两位）
                 const actualHsCodes = new Set<string>();
-                monthlyFlows.forEach(flow => {
-                  if (flow.hsCodes) {
-                    const codes = flow.hsCodes.split(',').map(code => code.trim());
-                    codes.forEach(code => {
-                      if (code.length >= 2) {
-                        actualHsCodes.add(code.slice(0, 2)); // 取前两位
-                      }
-                    });
+                shipments.forEach(shipment => {
+                  if (shipment.hsCode && shipment.hsCode.length >= 2) {
+                    actualHsCodes.add(shipment.hsCode.slice(0, 2)); // 取前两位
                   }
                 });
                 
@@ -331,7 +381,7 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
                     key={cat.hsCode}
                     onClick={(e) => {
                       e.stopPropagation();
-                      toggleHSCodeCategory(cat.hsCode); // 使用 hsCode（2位），而不是 categoryId
+                      toggleHSCodeCategory(cat.hsCode);
                     }}
                     className={`px-3 py-2.5 text-[12px] flex items-center justify-between cursor-pointer rounded-[8px] transition-colors mb-0.5 last:mb-0 ${filters.selectedHSCodeCategories.includes(cat.hsCode) ? 'bg-[#007AFF] text-white font-bold' : 'text-[#1D1D1F] hover:bg-black/5'}`}
                   >
@@ -344,6 +394,62 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
                   </div>
                 ));
               })()}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* HS Code 小类筛选 */}
+      <section className="space-y-2.5">
+        <label className="text-[11px] font-bold text-[#86868B] uppercase tracking-widest flex items-center gap-2.5">
+          <Package className="w-4 h-4" /> {t('filters.hsCodeSubcategories') || 'HS Code Subcategories'}
+        </label>
+        <div className="relative" ref={hsCodeSubcategoriesRef}>
+          <button 
+            onClick={() => setHsCodeSubcategoriesOpen(!hsCodeSubcategoriesOpen)}
+            disabled={filters.selectedHSCodeCategories.length === 0}
+            className={`w-full bg-[#F5F5F7] border border-black/5 rounded-[12px] px-3 py-2.5 flex items-center justify-between text-[12px] font-semibold transition-all shadow-sm ${
+              filters.selectedHSCodeCategories.length === 0
+                ? 'opacity-50 cursor-not-allowed'
+                : 'text-[#1D1D1F] hover:bg-[#EBEBEB] cursor-pointer'
+            }`}
+          >
+            <span className="truncate">
+              {filters.selectedHSCodeCategories.length === 0
+                ? t('filters.selectCategoryFirst') || 'Please select category first'
+                : filters.selectedHSCodeSubcategories.length === 0
+                  ? t('filters.selectAll')
+                  : `${filters.selectedHSCodeSubcategories.length} ${t('filters.selected')}`}
+            </span>
+            <ChevronDown className={`w-3.5 h-3.5 text-[#86868B] transition-transform ${hsCodeSubcategoriesOpen ? 'rotate-180' : ''}`} />
+          </button>
+          
+          {hsCodeSubcategoriesOpen && filters.selectedHSCodeCategories.length > 0 && (
+            <div className="absolute top-full left-0 right-0 mt-2 bg-white/90 backdrop-blur-xl border border-black/5 rounded-[16px] shadow-2xl z-50 max-h-72 overflow-y-auto custom-scrollbar p-1.5 animate-in fade-in zoom-in-95 duration-200">
+              {availableSubcategories.length === 0 ? (
+                <div className="px-3 py-2 text-[12px] text-[#86868B]">{t('filters.noSubcategories') || 'No subcategories found'}</div>
+              ) : (
+                availableSubcategories.map(suffix => (
+                  <div 
+                    key={suffix}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleHSCodeSubcategory(suffix);
+                    }}
+                    className={`px-3 py-2.5 text-[12px] flex items-center justify-between cursor-pointer rounded-[8px] transition-colors mb-0.5 last:mb-0 ${filters.selectedHSCodeSubcategories.includes(suffix) ? 'bg-[#007AFF] text-white font-bold' : 'text-[#1D1D1F] hover:bg-black/5'}`}
+                  >
+                    <span className="font-semibold flex-1">
+                      {suffix}
+                      {filters.selectedHSCodeCategories.length === 1 && (
+                        <span className="ml-2 text-[10px] opacity-70">
+                          ({filters.selectedHSCodeCategories[0]}{suffix})
+                        </span>
+                      )}
+                    </span>
+                    {filters.selectedHSCodeSubcategories.includes(suffix) && <Check className="w-3.5 h-3.5 flex-shrink-0 ml-2" />}
+                  </div>
+                ))
+              )}
             </div>
           )}
         </div>
@@ -371,7 +477,7 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
             <div className="absolute top-full left-0 right-0 mt-2 bg-white/90 backdrop-blur-xl border border-black/5 rounded-[16px] shadow-2xl z-50 max-h-72 overflow-y-auto custom-scrollbar p-1.5 animate-in fade-in zoom-in-95 duration-200">
               {companies.length === 0 ? (
                 <div className="px-3 py-2 text-[12px] text-[#86868B]">
-                  {monthlyFlows.length === 0 ? t('filters.loading') : t('filters.noCompanies')}
+                  {shipments.length === 0 ? t('filters.loading') : t('filters.noCompanies')}
                 </div>
               ) : (
                 companies.map(companyName => (

@@ -4,8 +4,8 @@ import SupplyMap from './components/SupplyMap';
 import StatsPanel from './components/StatsPanel';
 import SidebarFilters from './components/SidebarFilters';
 import AIAssistant from './components/AIAssistant';
-import { Transaction, Filters, HSCodeCategory, CountryLocation, Location, MonthlyCompanyFlow } from './types';
-import { monthlyCompanyFlowsAPI, hsCodeCategoriesAPI, countryLocationsAPI, chatAPI, ChatMessage } from './services/api';
+import { Transaction, Filters, HSCodeCategory, CountryLocation, Location, Shipment } from './types';
+import { shipmentsAPI, hsCodeCategoriesAPI, countryLocationsAPI, chatAPI, ChatMessage } from './services/api';
 import { Globe, BarChart3, Map as MapIcon, Package, TrendingUp, Users, ChevronRight } from 'lucide-react';
 import { useLanguage } from './contexts/LanguageContext';
 import { getHSCodeColorCached } from './utils/hsCodeColors';
@@ -15,18 +15,19 @@ const App: React.FC = () => {
   const [activeView, setActiveView] = useState<'map' | 'stats'>('map');
   
   const now = new Date();
-  const startYearMonth = '2003-01';
-  const endYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const startDate = '2003-01-01';
+  const endDate = now.toISOString().split('T')[0]; // YYYY-MM-DD
 
   const [filters, setFilters] = useState<Filters>({
-    startYearMonth,
-    endYearMonth,
+    startDate,
+    endDate,
     selectedCountries: [],
     selectedHSCodeCategories: [],
+    selectedHSCodeSubcategories: [],
     selectedCompanies: []
   });
 
-  const [monthlyFlows, setMonthlyFlows] = useState<MonthlyCompanyFlow[]>([]);
+  const [shipments, setShipments] = useState<Shipment[]>([]);
   const [hsCodeCategories, setHsCodeCategories] = useState<HSCodeCategory[]>([]);
   const [countries, setCountries] = useState<CountryLocation[]>([]);
   const [companies, setCompanies] = useState<string[]>([]);
@@ -80,8 +81,8 @@ const App: React.FC = () => {
     loadInitialData();
   }, []);
 
-  // 加载聚合数据
-  const loadMonthlyFlows = useCallback(async (filtersToUse: Filters, mode: 'preview' | 'final') => {
+  // 加载原始交易数据
+  const loadShipments = useCallback(async (filtersToUse: Filters, mode: 'preview' | 'final') => {
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -96,9 +97,9 @@ const App: React.FC = () => {
         }, 100);
       }
 
-      console.log(`Loading monthly flows (${mode}) with filters:`, filtersToUse);
+      console.log(`Loading shipments (${mode}) with filters:`, filtersToUse);
       const startTime = performance.now();
-      const flows = await monthlyCompanyFlowsAPI.getAll(filtersToUse);
+      const data = await shipmentsAPI.getAll(filtersToUse);
       const duration = performance.now() - startTime;
 
       if (controller.signal.aborted) {
@@ -110,38 +111,49 @@ const App: React.FC = () => {
         window.clearTimeout(loadingTimer);
       }
 
-      console.log(`Monthly flows loaded (${mode}) in ${duration.toFixed(0)}ms:`, flows.length);
-      setMonthlyFlows(flows);
+      console.log(`Shipments loaded (${mode}) in ${duration.toFixed(0)}ms:`, data.length);
+      setShipments(data);
       
       // 提取唯一的公司名称
       const uniqueCompanies = new Set<string>();
-      flows.forEach(f => {
-        uniqueCompanies.add(f.exporterName);
-        uniqueCompanies.add(f.importerName);
+      data.forEach(s => {
+        uniqueCompanies.add(s.exporterName);
+        uniqueCompanies.add(s.importerName);
       });
       setCompanies(Array.from(uniqueCompanies).sort());
       
       // 更新统计
       if (mode === 'final') {
         const uniqueCountries = new Set<string>();
-        flows.forEach(f => {
-          uniqueCountries.add(f.originCountry);
-          uniqueCountries.add(f.destinationCountry);
+        data.forEach(s => {
+          uniqueCountries.add(s.countryOfOrigin);
+          uniqueCountries.add(s.destinationCountry);
         });
-        // 计算实际显示的shipments数量（不是transaction_count的总和）
-        // Transaction Flow 应该显示实际显示的shipments数量
+        
+        // 按公司对聚合，计算唯一公司对数量
+        const companyPairs = new Set<string>();
+        data.forEach(s => {
+          const pair = `${s.exporterName}-${s.importerName}`;
+          companyPairs.add(pair);
+        });
+        
+        // 计算唯一品类数量（HS Code 前2位）
+        const uniqueCategories = new Set<string>();
+        data.forEach(s => {
+          if (s.hsCode && s.hsCode.length >= 2) {
+            uniqueCategories.add(s.hsCode.slice(0, 2));
+          }
+        });
+        
         setStats({
-          transactions: flows.length, // 显示实际shipments数量，而不是transaction_count总和
+          transactions: companyPairs.size, // 显示公司对数量
           suppliers: uniqueCountries.size,
-          categories: new Set(flows.map(f => {
-            const firstHsCode = f.hsCodes?.split(',')[0]?.trim()?.slice(0, 2) || '';
-            return firstHsCode;
-          }).filter(code => code)).size
+          categories: uniqueCategories.size
         });
       }
     } catch (e: any) {
       if (e?.name === 'AbortError') return;
-      console.error('Failed to load monthly flows:', e);
+      console.error('Failed to load shipments:', e);
       if (mode === 'final') {
         alert('无法加载数据。错误: ' + (e as Error).message);
       }
@@ -155,13 +167,13 @@ const App: React.FC = () => {
   // 调度器：任何 filters 变化 => 立刻 preview + 延迟 final
   const scheduleFetch = useCallback((nextFilters: Filters, reason: 'drag' | 'click') => {
     setIsInteracting(true);
-    loadMonthlyFlows(nextFilters, 'preview');
+    loadShipments(nextFilters, 'preview');
     if (finalTimerRef.current) window.clearTimeout(finalTimerRef.current);
     finalTimerRef.current = window.setTimeout(() => {
       setIsInteracting(false);
-      loadMonthlyFlows(filtersRef.current, 'final');
+      loadShipments(filtersRef.current, 'final');
     }, reason === 'drag' ? 180 : 120);
-  }, [loadMonthlyFlows]);
+  }, [loadShipments]);
 
   // 暴露拖动状态控制函数给子组件
   const setDragging = useCallback((dragging: boolean) => {
@@ -207,65 +219,83 @@ const App: React.FC = () => {
     return country?.countryCode || countryName; // 如果找不到，返回原名称（作为后备）
   }, [countries]);
 
-  // 将 MonthlyCompanyFlow 转换为 Shipment 格式（用于地图组件）
-  // 每个品类一条独立的线，所以需要按 HS Code 大类拆分
-  const shipments = useMemo(() => {
-    const result: any[] = [];
+  // 将原始 shipments 按公司对聚合，转换为地图组件格式
+  // 每个公司对（exporter + importer）合并成一条线
+  const shipmentsForMap = useMemo(() => {
+    // 按公司对聚合
+    const companyPairGroups = new Map<string, {
+      exporterName: string;
+      importerName: string;
+      originId: string;
+      destinationId: string;
+      shipments: Shipment[];
+      totalValue: number;
+      totalQuantity: number;
+      hsCodes: Set<string>;
+    }>();
     
-    monthlyFlows.forEach(flow => {
-      // 从 HS Code 获取品类（处理空格和格式）
-      const hsCodesArray = flow.hsCodes?.split(',').map(code => code.trim()) || [];
+    shipments.forEach(shipment => {
+      const pairKey = `${shipment.exporterName}-${shipment.importerName}`;
+      const originCountryCode = getCountryCode(shipment.countryOfOrigin);
+      const destinationCountryCode = getCountryCode(shipment.destinationCountry);
       
-      // 按 HS Code 大类分组（前2位）
-      const hsCodeGroups = new Map<string, string[]>(); // category -> [hs codes]
-      hsCodesArray.forEach(code => {
-        const categoryCode = code.slice(0, 2);
-        if (!hsCodeGroups.has(categoryCode)) {
-          hsCodeGroups.set(categoryCode, []);
-        }
-        hsCodeGroups.get(categoryCode)!.push(code);
-      });
-      
-      // 将国家名称转换为国家代码
-      const originCountryCode = getCountryCode(flow.originCountry);
-      const destinationCountryCode = getCountryCode(flow.destinationCountry);
-      
-      // 为每个品类创建一个 shipment
-      hsCodeGroups.forEach((hsCodes, categoryCode) => {
-        const hsCategory = hsCodeCategories.find(cat => cat.hsCode === categoryCode);
-        
-        // 根据HS Code生成唯一颜色（96个大类，96种颜色）
-        const categoryColor = getHSCodeColorCached(categoryCode);
-        
-        // 计算该品类在这个flow中的价值比例（简单平均分配）
-        const categoryValueRatio = hsCodes.length / hsCodesArray.length;
-        
-        result.push({
-          id: `${flow.yearMonth}-${flow.exporterName}-${flow.importerName}-${categoryCode}`,
-          originId: originCountryCode, // 使用国家代码而不是名称
-          destinationId: destinationCountryCode, // 使用国家代码而不是名称
-          exporterCompanyName: flow.exporterName,
-          importerCompanyName: flow.importerName,
-          material: hsCodes.join(','), // 只包含该品类的 HS Codes
-          category: hsCategory?.chapterName || 'Unknown', // 使用 HS Code 分类表中的章节名称
-          categoryColor,
-          quantity: flow.totalQuantity * categoryValueRatio, // 按比例分配数量
-          value: (flow.totalValueUsd / 1000000) * categoryValueRatio, // 按比例分配价值（百万美元）
-          status: 'completed',
-          timestamp: flow.firstTransactionDate
+      if (!companyPairGroups.has(pairKey)) {
+        companyPairGroups.set(pairKey, {
+          exporterName: shipment.exporterName,
+          importerName: shipment.importerName,
+          originId: originCountryCode,
+          destinationId: destinationCountryCode,
+          shipments: [],
+          totalValue: 0,
+          totalQuantity: 0,
+          hsCodes: new Set()
         });
-      });
+      }
+      
+      const group = companyPairGroups.get(pairKey)!;
+      group.shipments.push(shipment);
+      group.totalValue += shipment.totalValueUsd || 0;
+      group.totalQuantity += shipment.quantity || 0;
+      if (shipment.hsCode) {
+        group.hsCodes.add(shipment.hsCode);
+      }
     });
     
-    return result;
-  }, [monthlyFlows, hsCodeCategories, getCountryCode]);
+    // 转换为地图组件格式
+    return Array.from(companyPairGroups.values()).map((group, index) => {
+      // 获取所有品类（HS Code 前2位）
+      const categoryCodes = Array.from(group.hsCodes).map(code => code.slice(0, 2));
+      const uniqueCategories = Array.from(new Set(categoryCodes));
+      
+      // 使用第一个品类作为主要品类（用于颜色）
+      const mainCategoryCode = uniqueCategories[0] || '';
+      const hsCategory = hsCodeCategories.find(cat => cat.hsCode === mainCategoryCode);
+      const categoryColor = getHSCodeColorCached(mainCategoryCode);
+      
+      return {
+        id: `pair-${index}-${group.exporterName}-${group.importerName}`,
+        originId: group.originId,
+        destinationId: group.destinationId,
+        exporterCompanyName: group.exporterName,
+        importerCompanyName: group.importerName,
+        material: Array.from(group.hsCodes).join(','),
+        category: hsCategory?.chapterName || 'Unknown',
+        categoryColor,
+        quantity: group.totalQuantity,
+        value: group.totalValue / 1000000, // 转换为百万美元
+        status: 'completed',
+        timestamp: group.shipments[0]?.date || ''
+      };
+    });
+  }, [shipments, hsCodeCategories, getCountryCode]);
 
   // 调试信息
   useEffect(() => {
-    console.log('Shipments for map:', shipments.length, shipments);
+    console.log('Shipments (raw):', shipments.length, shipments);
+    console.log('Shipments for map:', shipmentsForMap.length, shipmentsForMap);
     console.log('Countries for map:', countries.length, countries);
     console.log('HS Code Categories:', hsCodeCategories.length, hsCodeCategories);
-  }, [shipments, countries, hsCodeCategories]);
+  }, [shipments, shipmentsForMap, countries, hsCodeCategories]);
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F5F5F7] text-[#1D1D1F]">
@@ -324,7 +354,7 @@ const App: React.FC = () => {
              hsCodeCategories={hsCodeCategories}
              countries={countries}
              companies={companies}
-             monthlyFlows={monthlyFlows}
+             shipments={shipments}
            />
            
            <div className="mt-auto pt-8 border-t border-black/5 space-y-4">
@@ -372,7 +402,7 @@ const App: React.FC = () => {
                     </div>
                   )}
                   <SupplyMap 
-                    shipments={shipments}
+                    shipments={shipmentsForMap}
                     transactions={[]}
                     selectedCountries={filters.selectedCountries}
                     countries={countries}

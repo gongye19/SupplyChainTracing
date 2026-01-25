@@ -329,70 +329,41 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
       }
 
     // 绘制路径和粒子（preview 模式限制粒子数量）
-      if (shipments.length > 0) {
-      // 按公司对和品类聚合交易（相同出口商、进口商和品类的交易合并）
-      // 每个品类一条独立的线
-      const routeGroups = new Map<string, {
-        exporterCompanyId?: string;
-        importerCompanyId?: string;
-        originId: string;
-        destinationId: string;
-        originCountry: string;
-        destinationCountry: string;
-        shipments: typeof shipments;
-        count: number;
-        totalValue: number;
-        mainCategory: string;
-        mainColor: string;
-      }>();
-
-      shipments.forEach(shipment => {
-        // 按公司对和品类分组，每个品类一条独立的线
-        const routeKey = `${shipment.exporterCompanyId || shipment.originId}-${shipment.importerCompanyId || shipment.destinationId}-${shipment.category}`;
+    if (shipments.length > 0) {
+      // shipments 已经是按公司对聚合的，每个公司对一条线
+      // 直接使用 shipments 作为 routeGroups
+      const routeGroups = shipments.map(shipment => {
+        // 获取国家名称
+        const originCountry = countries.find(c => c.countryCode === shipment.originId)?.countryName || shipment.originId;
+        const destinationCountry = countries.find(c => c.countryCode === shipment.destinationId)?.countryName || shipment.destinationId;
         
-        if (!routeGroups.has(routeKey)) {
-          // 优先使用交易数据中的品类颜色，然后尝试从品类列表匹配，最后使用默认颜色
-          const category = categories.find(c => c.displayName === shipment.category || c.name === shipment.category || c.id === shipment.category);
-          const color = (shipment as any).categoryColor || category?.color || categoryColors[shipment.category] || '#8E8E93';
-          
-          // 获取国家名称
-          const originCountry = countries.find(c => c.countryCode === shipment.originId)?.countryName || shipment.originId;
-          const destinationCountry = countries.find(c => c.countryCode === shipment.destinationId)?.countryName || shipment.destinationId;
-          
-          routeGroups.set(routeKey, {
-            exporterCompanyId: shipment.exporterCompanyId,
-            importerCompanyId: shipment.importerCompanyId,
-            originId: shipment.originId,
-            destinationId: shipment.destinationId,
-            originCountry,
-            destinationCountry,
-            shipments: [shipment],
-            count: 1,
-            totalValue: shipment.value,
-            mainCategory: shipment.category,
-            mainColor: color
-          });
-        } else {
-          const group = routeGroups.get(routeKey)!;
-          group.shipments.push(shipment);
-          group.count += 1;
-          group.totalValue += shipment.value;
-          // 品类已经确定（因为按品类分组），不需要更新
-        }
+        return {
+          exporterCompanyId: shipment.exporterCompanyId,
+          importerCompanyId: shipment.importerCompanyId,
+          originId: shipment.originId,
+          destinationId: shipment.destinationId,
+          originCountry,
+          destinationCountry,
+          shipments: [shipment],
+          count: 1, // 每个公司对算一条线
+          totalValue: shipment.value,
+          mainCategory: shipment.category,
+          mainColor: (shipment as any).categoryColor || '#8E8E93'
+        };
       });
 
-      // 按交易数量计算路径粗细
-      const countExtent = d3.extent(Array.from(routeGroups.values()), d => d.count) as [number, number];
-        const strokeScale = d3.scaleSqrt()
-        .domain(countExtent[0] !== undefined ? countExtent : [1, 10])
-        .range([1.2, 6]); // 根据交易数量，范围 1.2-6
+      // 按交易价值计算路径粗细
+      const valueExtent = d3.extent(routeGroups, d => d.totalValue) as [number, number];
+      const strokeScale = d3.scaleSqrt()
+        .domain(valueExtent[0] !== undefined ? valueExtent : [1, 100])
+        .range([1.2, 6]); // 根据交易价值，范围 1.2-6
 
       // preview 模式：只显示前 100 条路径，不画粒子
       // final 模式：显示所有路径，画粒子（但限制粒子数量）
-      const routeGroupsArray = Array.from(routeGroups.values())
-        .sort((a, b) => b.count - a.count); // 按交易数量降序
+      const routeGroupsArray = routeGroups
+        .sort((a, b) => b.totalValue - a.totalValue); // 按交易价值降序
       const maxPaths = isPreview ? 100 : routeGroupsArray.length;
-      const maxParticles = isPreview ? 0 : Math.min(50, shipments.length); // 最多 50 个粒子
+      const maxParticles = isPreview ? 0 : Math.min(50, routeGroupsArray.length); // 最多 50 个粒子
 
       // 获取翻译文本（在循环外部）
       const materialNameLabel = t('map.materialName');
@@ -439,7 +410,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
           const lineData = `M${sourcePos[0]},${sourcePos[1]} Q${midX},${midY} ${targetPos[0]},${targetPos[1]}`;
           
         const color = routeGroup.mainColor;
-        const thickness = strokeScale(routeGroup.count); // 根据交易数量计算粗细
+        const thickness = strokeScale(routeGroup.totalValue); // 根据交易价值计算粗细
 
         const arc = gFlows.append('path')
             .attr('d', lineData)
@@ -471,6 +442,9 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
             const category = categories.find(c => c.displayName === routeGroup.mainCategory);
             const categoryDisplayName = category?.displayName || routeGroup.mainCategory;
             
+            // 计算实际交易数量（从原始shipments数据中统计）
+            const actualTransactionCount = routeGroup.shipments.length;
+            
             tooltipRef.current.html(`
               <div class="space-y-3">
                 <div class="flex items-center justify-between gap-4 pb-2 border-b border-black/5">
@@ -490,7 +464,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
                 </div>
                 <div class="flex justify-between items-center">
                   <span class="text-[#86868B] text-[10px] font-bold uppercase">${transactionCountLabel}</span>
-                  <span class="text-[#1D1D1F] font-bold">${routeGroup.count}</span>
+                  <span class="text-[#1D1D1F] font-bold">${actualTransactionCount}</span>
                 </div>
                 <div class="flex justify-between items-center">
                   <span class="text-[#86868B] text-[10px] font-bold uppercase">${totalValueLabel}</span>
@@ -520,10 +494,10 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
         });
 
         // 只在 final 模式且未超过粒子限制时画粒子
-        // 粒子数量根据交易数量，但限制总数
+        // 粒子数量根据交易价值，但限制总数
         if (!isPreview && routeIndex < maxParticles) {
-          // 每个路径组的粒子数量 = min(交易数量, 5)
-          const particleCountForRoute = Math.min(routeGroup.count, 5);
+          // 每个路径组的粒子数量 = min(价值/10M, 5)
+          const particleCountForRoute = Math.min(Math.max(1, Math.floor(routeGroup.totalValue / 10)), 5);
           
           for (let p = 0; p < particleCountForRoute; p++) {
           const particleBaseRadius = Math.max(1.8, thickness / 1.8);

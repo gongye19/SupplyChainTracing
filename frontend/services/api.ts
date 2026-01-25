@@ -1,4 +1,4 @@
-import { Category, Transaction, Company, CompanyWithLocation, Location, Filters, MonthlyCompanyFlow, HSCodeCategory } from '../types';
+import { Category, Transaction, Company, CompanyWithLocation, Location, Filters, MonthlyCompanyFlow, HSCodeCategory, Shipment } from '../types';
 
 // 前端在浏览器中运行，所以使用localhost（通过Vite代理或直接连接）
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
@@ -121,6 +121,52 @@ export const monthlyCompanyFlowsAPI = {
       totalQuantity: parseFloat(item.total_quantity) || 0,
       firstTransactionDate: item.first_transaction_date,
       lastTransactionDate: item.last_transaction_date,
+    }));
+  },
+};
+
+// Shipments API（原始交易数据）
+export const shipmentsAPI = {
+  getAll: async (filters?: Partial<Filters>): Promise<Shipment[]> => {
+    const params = new URLSearchParams();
+    if (filters?.startDate) params.append('start_date', filters.startDate);
+    if (filters?.endDate) params.append('end_date', filters.endDate);
+    if (filters?.selectedCountries?.length) {
+      filters.selectedCountries.forEach(name => params.append('country', name));
+    }
+    if (filters?.selectedCompanies?.length) {
+      filters.selectedCompanies.forEach(name => params.append('company', name));
+    }
+    if (filters?.selectedHSCodeCategories?.length) {
+      filters.selectedHSCodeCategories.forEach(prefix => params.append('hs_code_prefix', prefix));
+    }
+    if (filters?.selectedHSCodeSubcategories?.length) {
+      filters.selectedHSCodeSubcategories.forEach(suffix => params.append('hs_code_suffix', suffix));
+    }
+    // 限制返回数量
+    params.append('limit', '50000');
+
+    const data = await fetchAPI<any[]>(`/api/shipments?${params.toString()}`);
+    return data.map((item: any) => ({
+      date: item.date,
+      importerName: item.importer_name,
+      exporterName: item.exporter_name,
+      hsCode: item.hs_code,
+      productEnglish: item.product_english,
+      productDescription: item.product_description,
+      weightKg: item.weight_kg,
+      quantity: item.quantity,
+      quantityUnit: item.quantity_unit,
+      totalValueUsd: item.total_value_usd,
+      unitPricePerKg: item.unit_price_per_kg,
+      unitPricePerItem: item.unit_price_per_item,
+      countryOfOrigin: item.country_of_origin,
+      destinationCountry: item.destination_country,
+      portOfDeparture: item.port_of_departure,
+      portOfArrival: item.port_of_arrival,
+      importExport: item.import_export,
+      transportMode: item.transport_mode,
+      tradeTerm: item.trade_term,
     }));
   },
 };
