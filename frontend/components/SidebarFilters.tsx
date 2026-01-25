@@ -115,14 +115,15 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
 
   const toggleHSCodeCategory = (hsCode: string) => {
     setFilters(prev => {
-      const newCategories = prev.selectedHSCodeCategories.includes(hsCode)
-        ? prev.selectedHSCodeCategories.filter(c => c !== hsCode)
-        : [...prev.selectedHSCodeCategories, hsCode];
+      // 支持多选：如果已选中则移除，否则添加到数组
+      const isCurrentlySelected = prev.selectedHSCodeCategories.includes(hsCode);
+      const newCategories = isCurrentlySelected
+        ? prev.selectedHSCodeCategories.filter(c => c !== hsCode) // 移除
+        : [...prev.selectedHSCodeCategories, hsCode]; // 添加（支持多选）
       
       // 如果移除大类，同时清除该大类下的小类选择
-      const removedCategory = prev.selectedHSCodeCategories.includes(hsCode);
       let newSubcategories = prev.selectedHSCodeSubcategories;
-      if (removedCategory) {
+      if (isCurrentlySelected) {
         // 检查哪些小类属于被移除的大类
         const subcategoriesToRemove = new Set<string>();
         shipments.forEach(s => {
