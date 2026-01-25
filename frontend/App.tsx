@@ -81,6 +81,30 @@ const App: React.FC = () => {
     loadInitialData();
   }, []);
 
+  // 国家名称到国家代码的映射函数
+  const getCountryCode = useCallback((countryName: string): string => {
+    if (!countryName) return '';
+    
+    // 特殊映射（处理数据中的特殊情况）
+    const specialMappings: Record<string, string> = {
+      'Dubai': 'AE',
+      'United Arab Emirates': 'AE',
+      'UAE': 'AE',
+    };
+    
+    if (specialMappings[countryName]) {
+      return specialMappings[countryName];
+    }
+    
+    // 从 countries 列表中查找匹配的国家
+    const country = countries.find(c => 
+      c.countryName.toLowerCase() === countryName.toLowerCase() ||
+      c.countryName === countryName
+    );
+    
+    return country?.countryCode || countryName; // 如果找不到，返回原名称（作为后备）
+  }, [countries]);
+
   // 加载原始交易数据
   const loadShipments = useCallback(async (filtersToUse: Filters, mode: 'preview' | 'final') => {
     abortRef.current?.abort();
@@ -138,11 +162,14 @@ const App: React.FC = () => {
           uniqueCountries.add(s.destinationCountry);
         });
         
-        // 按公司对聚合，计算唯一公司对数量
-        const companyPairs = new Set<string>();
+        // 按国家对聚合，计算唯一国家对数量（用于 Transaction Flow）
+        const countryPairs = new Set<string>();
         data.forEach(s => {
-          const pair = `${s.exporterName}-${s.importerName}`;
-          companyPairs.add(pair);
+          // 使用国家代码作为键（顺序固定：原产国-目的地国家）
+          const originCode = getCountryCode(s.countryOfOrigin);
+          const destCode = getCountryCode(s.destinationCountry);
+          const pair = `${originCode}-${destCode}`;
+          countryPairs.add(pair);
         });
         
         // 计算唯一品类数量（HS Code 前2位）
@@ -154,9 +181,9 @@ const App: React.FC = () => {
         });
         
         setStats({
-          transactions: companyPairs.size, // 显示公司对数量
-          suppliers: uniqueCountries.size,
-          categories: uniqueCategories.size
+          transactions: countryPairs.size, // 显示国家对数量（应该画的线数）
+          suppliers: uniqueCountries.size, // 国家数量（Nodes）
+          categories: uniqueCategories.size // HS Code 大类数量（Categories）
         });
       }
     } catch (e: any) {
@@ -170,7 +197,7 @@ const App: React.FC = () => {
         setFilterLoading(false);
       }
     }
-  }, []);
+  }, [getCountryCode]);
 
   // 调度器：任何 filters 变化 => 立刻 preview + 延迟 final
   const scheduleFetch = useCallback((nextFilters: Filters, reason: 'drag' | 'click') => {
@@ -202,30 +229,6 @@ const App: React.FC = () => {
       if (finalTimerRef.current) window.clearTimeout(finalTimerRef.current);
     };
   }, [filters, hsCodeCategories.length, countries.length, scheduleFetch]);
-
-  // 国家名称到国家代码的映射函数
-  const getCountryCode = useCallback((countryName: string): string => {
-    if (!countryName) return '';
-    
-    // 特殊映射（处理数据中的特殊情况）
-    const specialMappings: Record<string, string> = {
-      'Dubai': 'AE',
-      'United Arab Emirates': 'AE',
-      'UAE': 'AE',
-    };
-    
-    if (specialMappings[countryName]) {
-      return specialMappings[countryName];
-    }
-    
-    // 从 countries 列表中查找匹配的国家
-    const country = countries.find(c => 
-      c.countryName.toLowerCase() === countryName.toLowerCase() ||
-      c.countryName === countryName
-    );
-    
-    return country?.countryCode || countryName; // 如果找不到，返回原名称（作为后备）
-  }, [countries]);
 
   // 将原始 shipments 按国家对聚合，转换为地图组件格式
   // 每个国家对（原产国 → 目的地国家）合并成一条线，顺序不能相反
