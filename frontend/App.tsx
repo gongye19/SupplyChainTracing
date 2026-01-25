@@ -53,10 +53,12 @@ const App: React.FC = () => {
     const loadInitialData = async () => {
       try {
         setInitialLoading(true);
-        console.log('Loading HS Code categories, countries...');
-        const [hsCodeCatsData, locationsData] = await Promise.all([
+        console.log('Loading HS Code categories, countries, companies...');
+        const [hsCodeCatsData, locationsData, allShipmentsData] = await Promise.all([
           hsCodeCategoriesAPI.getAll(),
-          countryLocationsAPI.getAll()
+          countryLocationsAPI.getAll(),
+          // 获取所有公司（不带任何筛选，只获取公司列表）
+          shipmentsAPI.getAll({ startDate: '2003-01-01', endDate: '2099-12-31' })
         ]);
         console.log('HS Code Categories loaded:', hsCodeCatsData);
         console.log('Countries loaded:', locationsData);
@@ -71,6 +73,15 @@ const App: React.FC = () => {
           continent: loc.continent
         }));
         setCountries(countriesData);
+        
+        // 从所有数据中提取公司列表（保持不变，不受筛选影响）
+        const allCompanies = new Set<string>();
+        allShipmentsData.forEach(s => {
+          allCompanies.add(s.exporterName);
+          allCompanies.add(s.importerName);
+        });
+        setCompanies(Array.from(allCompanies).sort());
+        console.log('All companies loaded:', Array.from(allCompanies).sort());
       } catch (error) {
         console.error('Failed to load initial data:', error);
         alert(t('app.loadDataError') + (error as Error).message);
@@ -146,13 +157,9 @@ const App: React.FC = () => {
       }
       setShipments(data);
       
-      // 提取唯一的公司名称
-      const uniqueCompanies = new Set<string>();
-      data.forEach(s => {
-        uniqueCompanies.add(s.exporterName);
-        uniqueCompanies.add(s.importerName);
-      });
-      setCompanies(Array.from(uniqueCompanies).sort());
+      // 注意：不再从筛选结果中更新公司列表
+      // 公司列表在初始加载时已经设置，保持不变
+      // 这样筛选后公司列表不会减少
       
       // 更新统计
       if (mode === 'final') {
