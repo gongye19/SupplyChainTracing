@@ -129,8 +129,25 @@ export const monthlyCompanyFlowsAPI = {
 export const shipmentsAPI = {
   getAll: async (filters?: Partial<Filters>): Promise<Shipment[]> => {
     const params = new URLSearchParams();
-    if (filters?.startDate) params.append('start_date', filters.startDate);
-    if (filters?.endDate) params.append('end_date', filters.endDate);
+    // 将 YYYY-MM 格式转换为日期范围
+    if (filters?.startDate) {
+      // 如果是 YYYY-MM 格式，转换为该月第一天
+      if (filters.startDate.match(/^\d{4}-\d{2}$/)) {
+        params.append('start_date', `${filters.startDate}-01`);
+      } else {
+        params.append('start_date', filters.startDate);
+      }
+    }
+    if (filters?.endDate) {
+      // 如果是 YYYY-MM 格式，转换为该月最后一天
+      if (filters.endDate.match(/^\d{4}-\d{2}$/)) {
+        const [year, month] = filters.endDate.split('-').map(Number);
+        const lastDay = new Date(year, month, 0).getDate(); // 获取该月最后一天
+        params.append('end_date', `${filters.endDate}-${String(lastDay).padStart(2, '0')}`);
+      } else {
+        params.append('end_date', filters.endDate);
+      }
+    }
     if (filters?.selectedCountries?.length) {
       filters.selectedCountries.forEach(name => params.append('country', name));
     }

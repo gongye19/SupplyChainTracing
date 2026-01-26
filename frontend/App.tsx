@@ -15,8 +15,10 @@ const App: React.FC = () => {
   const [activeView, setActiveView] = useState<'map' | 'stats'>('map');
   
   const now = new Date();
-  const startDate = '2003-01-01';
-  const endDate = now.toISOString().split('T')[0]; // YYYY-MM-DD
+  const currentYear = now.getFullYear();
+  const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
+  const startDate = '2003-01';
+  const endDate = `${currentYear}-${currentMonth}`; // YYYY-MM
 
   const [filters, setFilters] = useState<Filters>({
     startDate,
@@ -58,7 +60,7 @@ const App: React.FC = () => {
           hsCodeCategoriesAPI.getAll(),
           countryLocationsAPI.getAll(),
           // 获取所有公司（不带任何筛选，只获取公司列表）
-          shipmentsAPI.getAll({ startDate: '2003-01-01', endDate: '2099-12-31' })
+          shipmentsAPI.getAll({ startDate: '2003-01', endDate: '2099-12' })
         ]);
         console.log('HS Code Categories loaded:', hsCodeCatsData);
         console.log('Countries loaded:', locationsData);

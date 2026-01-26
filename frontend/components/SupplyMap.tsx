@@ -175,6 +175,27 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
             .attr('r', scaledRadius)
             .attr('stroke-width', scaledStrokeWidth);
         });
+        
+        // 调整国家名称标签的字体大小和位置
+        gNodes.selectAll('.country-node').each(function() {
+          const baseFontSize = parseFloat(d3.select(this).select('text').attr('data-base-font-size') || '10');
+          const scaledFontSize = Math.max(8, Math.min(16, baseFontSize * scale)); // 限制在 8-16px 之间
+          const text = d3.select(this).select('text');
+          const rect = d3.select(this).select('rect');
+          
+          text.attr('font-size', `${scaledFontSize}px`);
+          
+          // 根据文本宽度调整背景
+          const textNode = text.node();
+          if (textNode) {
+            const bbox = textNode.getBBox();
+            rect.attr('width', Math.max(40, bbox.width + 12))
+              .attr('x', -(bbox.width + 12) / 2)
+              .attr('height', bbox.height + 8)
+              .attr('y', -(bbox.height + 8) / 2);
+            text.attr('y', bbox.height / 2);
+          }
+        });
       });
 
     const initialTransform = d3.zoomIdentity.translate(0, 0).scale(1);
@@ -363,13 +384,14 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
         });
       }
       
-      // 显示国家名称标签
+      // 显示国家名称标签（最后添加，确保在最上层）
       countryNodePositions.forEach((pos, countryCode) => {
         const country = countries.find(c => c.countryCode === countryCode);
         if (country) {
           const countryNode = gNodes.append('g')
             .attr('class', 'country-node')
-            .attr('transform', `translate(${pos[0]}, ${pos[1]})`);
+            .attr('transform', `translate(${pos[0]}, ${pos[1]})`)
+            .style('pointer-events', 'none'); // 不拦截鼠标事件
           
           // 添加文本背景（白色半透明圆角矩形）
           const textBg = countryNode.append('rect')
@@ -378,16 +400,18 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
             .attr('width', 40)
             .attr('height', 16)
             .attr('rx', 4)
-            .attr('fill', 'rgba(255, 255, 255, 0.9)')
-            .attr('stroke', 'rgba(0, 0, 0, 0.1)')
+            .attr('fill', 'rgba(255, 255, 255, 0.95)')
+            .attr('stroke', 'rgba(0, 0, 0, 0.15)')
             .attr('stroke-width', 0.5);
           
           // 添加国家名称文本
+          const baseFontSize = 10;
           const text = countryNode.append('text')
             .attr('x', 0)
             .attr('y', 4)
             .attr('text-anchor', 'middle')
-            .attr('font-size', '10px')
+            .attr('font-size', `${baseFontSize}px`)
+            .attr('data-base-font-size', baseFontSize) // 存储基础字体大小
             .attr('font-weight', '600')
             .attr('fill', '#1D1D1F')
             .text(country.countryName);
@@ -397,7 +421,10 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
           if (textNode) {
             const bbox = textNode.getBBox();
             textBg.attr('width', Math.max(40, bbox.width + 12))
-              .attr('x', -(bbox.width + 12) / 2);
+              .attr('x', -(bbox.width + 12) / 2)
+              .attr('height', bbox.height + 8)
+              .attr('y', -(bbox.height + 8) / 2);
+            text.attr('y', bbox.height / 2);
           }
         }
       });

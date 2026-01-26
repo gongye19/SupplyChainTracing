@@ -72,11 +72,14 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
     const options: string[] = [];
     const startDate = new Date('2003-01-01');
     const endDate = new Date();
-    const currentDate = new Date(startDate);
+    const currentDate = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+    const endMonth = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
     
-    while (currentDate <= endDate) {
-      options.push(currentDate.toISOString().split('T')[0]); // YYYY-MM-DD
-      currentDate.setDate(currentDate.getDate() + 1);
+    while (currentDate <= endMonth) {
+      const year = currentDate.getFullYear();
+      const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+      options.push(`${year}-${month}`); // YYYY-MM
+      currentDate.setMonth(currentDate.getMonth() + 1);
     }
     return options;
   };
@@ -174,9 +177,12 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
         <button 
           onClick={() => {
             const now = new Date();
+            const now = new Date();
+            const currentYear = now.getFullYear();
+            const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
             setFilters({ 
-              startDate: '2003-01-01',
-              endDate: now.toISOString().split('T')[0],
+              startDate: '2003-01',
+              endDate: `${currentYear}-${currentMonth}`,
               selectedCountries: [], 
               selectedHSCodeCategories: [],
               selectedHSCodeSubcategories: [],
@@ -215,6 +221,7 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
             {startDateOpen && (
               <div className="absolute top-full left-0 right-0 mt-2 bg-white/90 backdrop-blur-xl border border-black/5 rounded-[16px] shadow-2xl z-50 max-h-72 overflow-y-auto custom-scrollbar p-1.5 animate-in fade-in zoom-in-95 duration-200">
                 {dateOptions.map(date => {
+                  // 比较年月（YYYY-MM格式）
                   const isDisabled = date > filters.endDate;
                   return (
                     <div 
@@ -261,6 +268,7 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
             {endDateOpen && (
               <div className="absolute top-full left-0 right-0 mt-2 bg-white/90 backdrop-blur-xl border border-black/5 rounded-[16px] shadow-2xl z-50 max-h-72 overflow-y-auto custom-scrollbar p-1.5 animate-in fade-in zoom-in-95 duration-200">
                 {dateOptions.map(date => {
+                  // 比较年月（YYYY-MM格式）
                   const isDisabled = date < filters.startDate;
                   return (
                     <div 
