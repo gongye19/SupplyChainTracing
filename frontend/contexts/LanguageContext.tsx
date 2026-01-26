@@ -42,14 +42,12 @@ const translations: Record<Language, Record<string, string>> = {
     'filters.noSubcategories': 'No subcategories found',
     
     // Stats Panel
-    'stats.totalTransactions': 'Total Transactions',
     'stats.totalValue': 'Total Value',
     'stats.avgValue': 'Avg Value',
     'stats.topRoutes': 'Top Routes',
     'stats.categoryBreakdown': 'Category Breakdown',
     'stats.materialMix': 'Material Mix',
     'stats.transactionTrends': 'Transaction Trends',
-    'stats.noData': 'No category data',
     'stats.origin': 'Origin',
     'stats.destination': 'Destination',
     'stats.value': 'Value',
@@ -130,14 +128,12 @@ const translations: Record<Language, Record<string, string>> = {
     'filters.noSubcategories': '未找到小类',
     
     // Stats Panel
-    'stats.totalTransactions': '总交易数',
     'stats.totalValue': '总价值',
     'stats.avgValue': '平均价值',
     'stats.topRoutes': '热门路线',
     'stats.categoryBreakdown': '品类分布',
     'stats.materialMix': '物料构成',
     'stats.transactionTrends': '交易趋势',
-    'stats.noData': '暂无品类数据',
     'stats.origin': '起点',
     'stats.destination': '终点',
     'stats.value': '价值',
