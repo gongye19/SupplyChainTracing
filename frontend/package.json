@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prebuild": "node scripts/create-env-local.js",
     "build": "vite build",
     "preview": "vite preview"
   },
