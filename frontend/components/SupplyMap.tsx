@@ -223,6 +223,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
 
     // 创建公司节点位置映射
       const companyNodePositions = new Map<string, [number, number]>();
+      const countryNodePositions = new Map<string, [number, number]>(); // 存储国家节点位置
       
       // 只在有交易数据时才显示公司节点
       if (shipments.length > 0 && activeCompanies.length > 0) {
@@ -238,6 +239,11 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
       companiesByLocation.forEach((cityCompanies) => {
           const baseCompany = cityCompanies[0];
           const basePos = projection([baseCompany.longitude, baseCompany.latitude])!;
+          
+          // 记录国家节点位置（使用第一个公司的位置作为国家位置）
+          if (!countryNodePositions.has(baseCompany.countryCode)) {
+            countryNodePositions.set(baseCompany.countryCode, basePos);
+          }
           
           cityCompanies.forEach((company, index) => {
             const offset = cityCompanies.length > 1 ? {
@@ -329,6 +335,45 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
           });
         });
       }
+
+      // 为国家节点添加文本标签（显示国家名称）
+      countryNodePositions.forEach((pos, countryCode) => {
+        const country = countries.find(c => c.countryCode === countryCode);
+        if (country) {
+          const countryNode = gNodes.append('g')
+            .attr('class', 'country-node')
+            .attr('transform', `translate(${pos[0]}, ${pos[1]})`);
+          
+          // 添加文本背景（白色半透明圆角矩形）
+          const textBg = countryNode.append('rect')
+            .attr('x', -20)
+            .attr('y', -8)
+            .attr('width', 40)
+            .attr('height', 16)
+            .attr('rx', 4)
+            .attr('fill', 'rgba(255, 255, 255, 0.9)')
+            .attr('stroke', 'rgba(0, 0, 0, 0.1)')
+            .attr('stroke-width', 0.5);
+          
+          // 添加国家名称文本
+          const text = countryNode.append('text')
+            .attr('x', 0)
+            .attr('y', 4)
+            .attr('text-anchor', 'middle')
+            .attr('font-size', '10px')
+            .attr('font-weight', '600')
+            .attr('fill', '#1D1D1F')
+            .text(country.countryName);
+          
+          // 根据文本宽度调整背景宽度
+          const textNode = text.node();
+          if (textNode) {
+            const bbox = textNode.getBBox();
+            textBg.attr('width', Math.max(40, bbox.width + 12))
+              .attr('x', -(bbox.width + 12) / 2);
+          }
+        }
+      });
 
     // 绘制路径和粒子（preview 模式限制粒子数量）
     if (shipments.length > 0) {
