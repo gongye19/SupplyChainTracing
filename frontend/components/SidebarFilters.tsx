@@ -177,7 +177,6 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
         <button 
           onClick={() => {
             const now = new Date();
-            const now = new Date();
             const currentYear = now.getFullYear();
             const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
             setFilters({ 
