@@ -33,7 +33,7 @@ def clear_tables(engine):
         print("  ✓ 所有表已删除\n")
 
 def create_tables(engine):
-    """创建4个表"""
+    """创建3个表"""
     print("创建数据库表...")
     
     with engine.begin() as conn:
@@ -48,20 +48,6 @@ def create_tables(engine):
                 port_of_arrival VARCHAR(100), import_export VARCHAR(20),
                 transport_mode VARCHAR(50), trade_term VARCHAR(50),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-        """))
-        
-        conn.execute(text("""
-            CREATE TABLE IF NOT EXISTS monthly_company_flows (
-                year_month VARCHAR(7) NOT NULL, exporter_name VARCHAR(200) NOT NULL,
-                importer_name VARCHAR(200) NOT NULL, origin_country VARCHAR(100) NOT NULL,
-                destination_country VARCHAR(100) NOT NULL, hs_codes TEXT,
-                transport_mode VARCHAR(50), trade_term VARCHAR(50),
-                transaction_count INTEGER NOT NULL, total_value_usd NUMERIC(20, 2) NOT NULL,
-                total_weight_kg NUMERIC(15, 2), total_quantity NUMERIC(15, 2),
-                first_transaction_date DATE, last_transaction_date DATE,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                PRIMARY KEY (year_month, exporter_name, importer_name)
             );
         """))
         
@@ -84,18 +70,17 @@ def create_tables(engine):
         """))
         
         conn.execute(text("""
-            CREATE INDEX IF NOT EXISTS idx_monthly_flows_year_month ON monthly_company_flows(year_month);
-            CREATE INDEX IF NOT EXISTS idx_monthly_flows_exporter ON monthly_company_flows(exporter_name);
-            CREATE INDEX IF NOT EXISTS idx_monthly_flows_importer ON monthly_company_flows(importer_name);
-            CREATE INDEX IF NOT EXISTS idx_monthly_flows_origin_country ON monthly_company_flows(origin_country);
-            CREATE INDEX IF NOT EXISTS idx_monthly_flows_dest_country ON monthly_company_flows(destination_country);
+            CREATE INDEX IF NOT EXISTS idx_shipments_raw_date ON shipments_raw(date);
+            CREATE INDEX IF NOT EXISTS idx_shipments_raw_hs_code ON shipments_raw(hs_code);
+            CREATE INDEX IF NOT EXISTS idx_shipments_raw_country_origin ON shipments_raw(country_of_origin);
+            CREATE INDEX IF NOT EXISTS idx_shipments_raw_country_dest ON shipments_raw(destination_country);
             CREATE INDEX IF NOT EXISTS idx_country_locations_name ON country_locations(country_name);
         """))
     
     print("✓ 表结构创建完成\n")
 
-def import_table_from_csv(engine, table_name: str, csv_path: Path):
-    """从CSV文件导入数据到表"""
+def import_table_from_csv(engine, table_name: str, csv_path: Path, batch_size: int = 1000):
+    """从CSV文件导入数据到表（支持批量插入）"""
     if not csv_path.exists():
         print(f"  ⚠ 跳过: {csv_path.name} 不存在")
         return 0
@@ -143,29 +128,35 @@ def import_table_from_csv(engine, table_name: str, csv_path: Path):
     
     imported = 0
     
-    with engine.begin() as conn:
+    # 对于 shipments_raw，使用批量插入；其他表使用逐行插入（数据量小）
+    if table_name == 'shipments_raw':
+        # 批量插入
+        batch = []
         for row in rows:
             try:
-                # 构建值字典：对于 shipments_raw，使用映射；其他表直接使用
-                if table_name == 'shipments_raw':
-                    values = {db_fieldnames[i]: (row.get(csv_fieldnames[i], '') or None) 
-                             for i in range(len(csv_fieldnames))}
-                else:
+                values = {db_fieldnames[i]: (row.get(csv_fieldnames[i], '') or None) 
+                         for i in range(len(csv_fieldnames))}
+                batch.append(values)
+                
+                if len(batch) >= batch_size:
+                    imported += _batch_insert(engine, table_name, db_fieldnames, batch)
+                    batch = []
+            except Exception as e:
+                print(f"  ⚠ 处理记录失败: {e}")
+                continue
+        
+        # 插入剩余数据
+        if batch:
+            imported += _batch_insert(engine, table_name, db_fieldnames, batch)
+    else:
+        # 固定表（hs_code_categories, country_locations）使用逐行插入，支持 ON CONFLICT
+        with engine.begin() as conn:
+            for row in rows:
+                try:
                     values = {f: (row.get(f, '') or None) for f in csv_fieldnames}
-                
-                # 构建 SQL：列名用双引号包裹（处理可能的空格）
-                columns = ', '.join([f'"{f}"' for f in db_fieldnames])
-                placeholders = ', '.join([f':{f}' for f in db_fieldnames])
-                
-                if table_name == 'monthly_company_flows':
-                    update_clause = ', '.join([f'"{f}" = EXCLUDED."{f}"' for f in db_fieldnames if f != 'created_at'])
-                    sql = f"""
-                        INSERT INTO {table_name} ({columns})
-                        VALUES ({placeholders})
-                        ON CONFLICT (year_month, exporter_name, importer_name) 
-                        DO UPDATE SET {update_clause}
-                    """
-                elif table_name in ['hs_code_categories', 'country_locations']:
+                    columns = ', '.join([f'"{f}"' for f in db_fieldnames])
+                    placeholders = ', '.join([f':{f}' for f in db_fieldnames])
+                    
                     update_clause = ', '.join([f'"{f}" = EXCLUDED."{f}"' for f in db_fieldnames if f not in ['created_at', db_fieldnames[0]]])
                     sql = f"""
                         INSERT INTO {table_name} ({columns})
@@ -173,17 +164,54 @@ def import_table_from_csv(engine, table_name: str, csv_path: Path):
                         ON CONFLICT ({db_fieldnames[0]}) 
                         DO UPDATE SET {update_clause}, updated_at = CURRENT_TIMESTAMP
                     """
-                else:
-                    sql = f'INSERT INTO {table_name} ({columns}) VALUES ({placeholders})'
-                
-                conn.execute(text(sql), values)
-                imported += 1
-            except Exception as e:
-                print(f"  ⚠ 导入记录失败: {e}")
-                continue
+                    
+                    conn.execute(text(sql), values)
+                    imported += 1
+                except Exception as e:
+                    print(f"  ⚠ 导入记录失败: {e}")
+                    continue
     
     print(f"  ✓ 成功导入 {imported} 条记录")
     return imported
+
+def _batch_insert(engine, table_name: str, db_fieldnames: list, batch: list):
+    """批量插入数据（用于 shipments_raw）"""
+    if not batch:
+        return 0
+    
+    columns = ', '.join([f'"{f}"' for f in db_fieldnames])
+    
+    # 构建批量插入 SQL：多个 VALUES 子句
+    values_clauses = []
+    all_params = {}
+    
+    for idx, values in enumerate(batch):
+        placeholders = ', '.join([f':{f}_{idx}' for f in db_fieldnames])
+        values_clauses.append(f'({placeholders})')
+        for f in db_fieldnames:
+            all_params[f'{f}_{idx}'] = values.get(f)
+    
+    sql = f'INSERT INTO {table_name} ({columns}) VALUES {", ".join(values_clauses)}'
+    
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(sql), all_params)
+        return len(batch)
+    except Exception as e:
+        print(f"  ⚠ 批量插入失败，改为逐行插入: {e}")
+        # 如果批量插入失败，尝试逐行插入
+        imported = 0
+        placeholders = ', '.join([f':{f}' for f in db_fieldnames])
+        sql_single = f'INSERT INTO {table_name} ({columns}) VALUES ({placeholders})'
+        with engine.begin() as conn:
+            for values in batch:
+                try:
+                    conn.execute(text(sql_single), values)
+                    imported += 1
+                except Exception as e2:
+                    print(f"  ⚠ 单行插入失败: {e2}")
+                    continue
+        return imported
 
 if __name__ == "__main__":
     script_dir = Path(__file__).parent
@@ -221,12 +249,21 @@ if __name__ == "__main__":
     print("开始导入数据...\n")
     
     total_imported = 0
-    for table_name, csv_file in [
-        ('shipments_raw', 'shipments_raw.csv'),
-        ('monthly_company_flows', 'monthly_company_flows.csv'),
-        ('hs_code_categories', 'hs_code_categories.csv'),
-        ('country_locations', 'country_locations.csv'),
-    ]:
+    
+    if clear_first:
+        # --clear 模式：导入所有3个表
+        tables_to_import = [
+            ('shipments_raw', 'shipments_raw.csv'),
+            ('hs_code_categories', 'hs_code_categories.csv'),
+            ('country_locations', 'country_locations.csv'),
+        ]
+    else:
+        # 普通模式：只导入 shipments_raw（增量导入）
+        tables_to_import = [
+            ('shipments_raw', 'shipments_raw.csv'),
+        ]
+    
+    for table_name, csv_file in tables_to_import:
         print(f"表: {table_name}")
         count = import_table_from_csv(engine, table_name, processed_tables_dir / csv_file)
         total_imported += count
@@ -238,6 +275,6 @@ if __name__ == "__main__":
     
     print("各表记录数:")
     with engine.connect() as conn:
-        for table in ['shipments_raw', 'monthly_company_flows', 'hs_code_categories', 'country_locations']:
+        for table in ['shipments_raw', 'hs_code_categories', 'country_locations']:
             result = conn.execute(text(f"SELECT COUNT(*) FROM {table}"))
             print(f"  {table}: {result.scalar()} 条")

@@ -337,6 +337,33 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
       }
 
       // 为国家节点添加文本标签（显示国家名称）
+      // 从 shipments 中提取所有出现的国家代码
+      const activeCountryCodes = new Set<string>();
+      shipments.forEach(s => {
+        // 从 shipments 中提取国家代码
+        if (s.originId) activeCountryCodes.add(s.originId);
+        if (s.destinationId) activeCountryCodes.add(s.destinationId);
+      });
+      
+      // 如果 countryNodePositions 为空，基于 countries 数据创建位置
+      if (countryNodePositions.size === 0 && activeCountryCodes.size > 0) {
+        activeCountryCodes.forEach(countryCode => {
+          const country = countries.find(c => c.countryCode === countryCode);
+          if (country) {
+            // 使用 CountryLocation 的经纬度字段（capitalLat, capitalLng）
+            const lat = (country as any).capitalLat || (country as any).latitude;
+            const lng = (country as any).capitalLng || (country as any).longitude;
+            if (lat && lng) {
+              const pos = projection([lng, lat]);
+              if (pos) {
+                countryNodePositions.set(countryCode, pos);
+              }
+            }
+          }
+        });
+      }
+      
+      // 显示国家名称标签
       countryNodePositions.forEach((pos, countryCode) => {
         const country = countries.find(c => c.countryCode === countryCode);
         if (country) {

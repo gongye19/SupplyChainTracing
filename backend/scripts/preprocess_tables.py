@@ -299,7 +299,7 @@ def get_country_info(country_name: str) -> dict:
     }
 
 def preprocess_tables(input_csv: str, output_dir: str):
-    """预处理数据，生成4个表"""
+    """预处理数据，生成3个表"""
     print("=" * 60)
     print("数据预处理脚本")
     print("=" * 60)
@@ -325,85 +325,8 @@ def preprocess_tables(input_csv: str, output_dir: str):
         raw_rows = list(reader)
     print(f"✓ 读取到 {len(raw_rows)} 条记录\n")
     
-    # 表2: monthly_company_flows.csv (聚合表)
-    print("生成表2: monthly_company_flows.csv")
-    aggregated = defaultdict(lambda: {
-        'year_month': '', 'exporter_name': '', 'importer_name': '',
-        'origin_country': set(), 'destination_country': set(),
-        'hs_codes': set(), 'transport_modes': set(), 'trade_terms': set(),
-        'transaction_count': 0, 'total_value_usd': 0.0,
-        'total_weight_kg': 0.0, 'total_quantity': 0.0, 'dates': []
-    })
-    
-    for row in raw_rows:
-        date_str = row.get('Date', '').strip()
-        exporter = row.get('Exporter Name', '').strip()
-        importer = row.get('Importer Name', '').strip()
-        if not date_str or not exporter or not importer:
-            continue
-        
-        year_month = get_month_key(date_str)
-        if not year_month:
-            continue
-        
-        company_pair = tuple(sorted([exporter.lower(), importer.lower()]))
-        key = (year_month, company_pair)
-        agg = aggregated[key]
-        
-        agg['year_month'] = year_month
-        agg['exporter_name'] = exporter
-        agg['importer_name'] = importer
-        
-        if row.get('Country of Origin'):
-            agg['origin_country'].add(row['Country of Origin'].strip())
-        if row.get('Destination Country'):
-            agg['destination_country'].add(row['Destination Country'].strip())
-        if row.get('HS Code'):
-            agg['hs_codes'].add(row['HS Code'].strip())
-        if row.get('Transport Mode'):
-            agg['transport_modes'].add(row['Transport Mode'].strip())
-        if row.get('Trade Term (Incoterm)'):
-            agg['trade_terms'].add(row['Trade Term (Incoterm)'].strip())
-        
-        try:
-            agg['transaction_count'] += 1
-            agg['total_value_usd'] += float(row.get('Total Value (USD)', 0) or 0)
-            agg['total_weight_kg'] += float(row.get('Weight (kg)', 0) or 0)
-            agg['total_quantity'] += float(row.get('Quantity', 0) or 0)
-            agg['dates'].append(date_str)
-        except:
-            pass
-    
-    monthly_flows = []
-    for key, agg in sorted(aggregated.items()):
-        monthly_flows.append({
-            'year_month': agg['year_month'],
-            'exporter_name': agg['exporter_name'],
-            'importer_name': agg['importer_name'],
-            'origin_country': sorted(agg['origin_country'])[0] if agg['origin_country'] else '',
-            'destination_country': sorted(agg['destination_country'])[0] if agg['destination_country'] else '',
-            'hs_codes': ','.join(sorted(agg['hs_codes'])),
-            'transport_mode': sorted(agg['transport_modes'])[0] if agg['transport_modes'] else '',
-            'trade_term': sorted(agg['trade_terms'])[0] if agg['trade_terms'] else '',
-            'transaction_count': str(agg['transaction_count']),
-            'total_value_usd': f"{agg['total_value_usd']:.2f}",
-            'total_weight_kg': f"{agg['total_weight_kg']:.2f}",
-            'total_quantity': f"{agg['total_quantity']:.2f}",
-            'first_transaction_date': sorted(agg['dates'])[0] if agg['dates'] else '',
-            'last_transaction_date': sorted(agg['dates'])[-1] if agg['dates'] else '',
-        })
-    
-    with open(output_path / "monthly_company_flows.csv", 'w', encoding='utf-8', newline='') as f:
-        fieldnames = ['year_month', 'exporter_name', 'importer_name', 'origin_country', 'destination_country',
-                     'hs_codes', 'transport_mode', 'trade_term', 'transaction_count', 'total_value_usd',
-                     'total_weight_kg', 'total_quantity', 'first_transaction_date', 'last_transaction_date']
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(monthly_flows)
-    print(f"✓ {len(monthly_flows)} 条记录\n")
-    
-    # 表3: hs_code_categories.csv - 使用完整的 HS 2022 标准分类表（96个章节）
-    print("生成表3: hs_code_categories.csv (完整 HS 2022 标准)")
+    # 表2: hs_code_categories.csv - 使用完整的 HS 2022 标准分类表（96个章节）
+    print("生成表2: hs_code_categories.csv (完整 HS 2022 标准)")
     hs_code_categories = []
     for chapter in sorted(HS_CODE_CHAPTERS.keys()):
         hs_code_categories.append({
@@ -417,8 +340,8 @@ def preprocess_tables(input_csv: str, output_dir: str):
         writer.writerows(hs_code_categories)
     print(f"✓ {len(hs_code_categories)} 条记录（完整 HS 2022 标准）\n")
     
-    # 表4: country_locations.csv - 使用完整的 ISO 3166 国家列表
-    print("生成表4: country_locations.csv (完整 ISO 3166 标准)")
+    # 表3: country_locations.csv - 使用完整的 ISO 3166 国家列表
+    print("生成表3: country_locations.csv (完整 ISO 3166 标准)")
     
     # 从原始数据中提取出现的国家名称（用于验证）
     countries_in_data = set()
@@ -480,7 +403,7 @@ if __name__ == "__main__":
         input_csv = sys.argv[1]
         output_dir = sys.argv[2]
     else:
-        input_csv = str(project_root / "data" / "Factset_Extended_Shipment_Data_sample_100.csv")
+        input_csv = str(project_root / "data" / "Factset_Extended_Shipment_Data_sample_1000.csv")
         output_dir = str(project_root / "processed_tables")
     
     preprocess_tables(input_csv, output_dir)
