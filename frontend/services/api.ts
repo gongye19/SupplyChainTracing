@@ -199,13 +199,16 @@ export const hsCodeCategoriesAPI = {
   },
 };
 
-// 国家位置API（使用 country_locations 表）
-export const countryLocationsAPI = {
-  getAll: async (): Promise<Location[]> => {
-    const data = await fetchAPI<any[]>(`/api/country-locations`);
+// 港口位置API（使用 port_locations 表）
+export const portLocationsAPI = {
+  getAll: async (countryCode?: string): Promise<Location[]> => {
+    const url = countryCode 
+      ? `/api/port-locations?country_code=${countryCode}`
+      : `/api/port-locations`;
+    const data = await fetchAPI<any[]>(url);
     return data.map((item: any) => ({
-      id: item.country_code,
-      type: 'country' as const,
+      id: `${item.port_name}_${item.country_code}`,
+      type: 'city' as const,
       countryCode: item.country_code,
       countryName: item.country_name,
       latitude: parseFloat(item.latitude),
@@ -213,6 +216,33 @@ export const countryLocationsAPI = {
       region: item.region,
       continent: item.continent,
     }));
+  },
+};
+
+// 国家位置API（从 port_locations 表中提取唯一的国家信息）
+export const countryLocationsAPI = {
+  getAll: async (): Promise<Location[]> => {
+    // 获取所有港口位置，然后提取唯一的国家信息
+    const portData = await portLocationsAPI.getAll();
+    
+    // 使用 Map 去重，以 countryCode 为键
+    const countryMap = new Map<string, Location>();
+    portData.forEach(port => {
+      if (!countryMap.has(port.countryCode)) {
+        countryMap.set(port.countryCode, {
+          id: port.countryCode,
+          type: 'country' as const,
+          countryCode: port.countryCode,
+          countryName: port.countryName,
+          latitude: port.latitude,
+          longitude: port.longitude,
+          region: port.region,
+          continent: port.continent,
+        });
+      }
+    });
+    
+    return Array.from(countryMap.values());
   },
 };
 

@@ -298,6 +298,125 @@ def get_country_info(country_name: str) -> dict:
         "continent": "Unknown"
     }
 
+# 港口位置映射（基于前端 portLocations.ts）
+PORT_LOCATIONS = {
+    # 中国港口
+    'Shanghai': {'name': 'Shanghai', 'country': 'China', 'latitude': 31.2304, 'longitude': 121.4737},
+    'Hong Kong': {'name': 'Hong Kong', 'country': 'China', 'latitude': 22.3193, 'longitude': 114.1694},
+    'Shenzhen': {'name': 'Shenzhen', 'country': 'China', 'latitude': 22.5431, 'longitude': 114.0579},
+    'Ningbo': {'name': 'Ningbo', 'country': 'China', 'latitude': 29.8683, 'longitude': 121.5440},
+    'Qingdao': {'name': 'Qingdao', 'country': 'China', 'latitude': 36.0671, 'longitude': 120.3826},
+    'Tianjin': {'name': 'Tianjin', 'country': 'China', 'latitude': 39.3434, 'longitude': 117.3616},
+    'Guangzhou': {'name': 'Guangzhou', 'country': 'China', 'latitude': 23.1291, 'longitude': 113.2644},
+    
+    # 美国港口
+    'Los Angeles': {'name': 'Los Angeles', 'country': 'United States', 'latitude': 33.7490, 'longitude': -118.2648},
+    'New York': {'name': 'New York', 'country': 'United States', 'latitude': 40.7128, 'longitude': -74.0060},
+    'Long Beach': {'name': 'Long Beach', 'country': 'United States', 'latitude': 33.7701, 'longitude': -118.1937},
+    'Savannah': {'name': 'Savannah', 'country': 'United States', 'latitude': 32.0809, 'longitude': -81.0912},
+    'Seattle': {'name': 'Seattle', 'country': 'United States', 'latitude': 47.6062, 'longitude': -122.3321},
+    'Houston': {'name': 'Houston', 'country': 'United States', 'latitude': 29.7604, 'longitude': -95.3698},
+    
+    # 欧洲港口
+    'Rotterdam': {'name': 'Rotterdam', 'country': 'Netherlands', 'latitude': 51.9225, 'longitude': 4.4792},
+    'Hamburg': {'name': 'Hamburg', 'country': 'Germany', 'latitude': 53.5511, 'longitude': 9.9937},
+    'Antwerp': {'name': 'Antwerp', 'country': 'Belgium', 'latitude': 51.2194, 'longitude': 4.4025},
+    'Le Havre': {'name': 'Le Havre', 'country': 'France', 'latitude': 49.4944, 'longitude': 0.1079},
+    'London': {'name': 'London', 'country': 'United Kingdom', 'latitude': 51.5074, 'longitude': -0.1278},
+    'Genoa': {'name': 'Genoa', 'country': 'Italy', 'latitude': 44.4056, 'longitude': 8.9463},
+    'Barcelona': {'name': 'Barcelona', 'country': 'Spain', 'latitude': 41.3851, 'longitude': 2.1734},
+    
+    # 亚洲港口
+    'Singapore': {'name': 'Singapore', 'country': 'Singapore', 'latitude': 1.2897, 'longitude': 103.8501},
+    'Busan': {'name': 'Busan', 'country': 'South Korea', 'latitude': 35.1796, 'longitude': 129.0756},
+    'Tokyo': {'name': 'Tokyo', 'country': 'Japan', 'latitude': 35.6762, 'longitude': 139.6503},
+    'Yokohama': {'name': 'Yokohama', 'country': 'Japan', 'latitude': 35.4437, 'longitude': 139.6380},
+    'Osaka': {'name': 'Osaka', 'country': 'Japan', 'latitude': 34.6937, 'longitude': 135.5023},
+    'Manila': {'name': 'Manila', 'country': 'Philippines', 'latitude': 14.5995, 'longitude': 120.9842},
+    'Bangkok': {'name': 'Bangkok', 'country': 'Thailand', 'latitude': 13.7563, 'longitude': 100.5018},
+    'Ho Chi Minh': {'name': 'Ho Chi Minh', 'country': 'Vietnam', 'latitude': 10.8231, 'longitude': 106.6297},
+    'Chittagong': {'name': 'Chittagong', 'country': 'Bangladesh', 'latitude': 22.3569, 'longitude': 91.7832},
+    'Jakarta': {'name': 'Jakarta', 'country': 'Indonesia', 'latitude': -6.2088, 'longitude': 106.8456},
+    'Jebel Ali': {'name': 'Jebel Ali', 'country': 'United Arab Emirates', 'latitude': 25.0275, 'longitude': 55.0750},
+    'Dubai': {'name': 'Dubai', 'country': 'United Arab Emirates', 'latitude': 25.2048, 'longitude': 55.2708},
+    'Port Klang': {'name': 'Port Klang', 'country': 'Malaysia', 'latitude': 3.0000, 'longitude': 101.4000},
+    'Karachi': {'name': 'Karachi', 'country': 'Pakistan', 'latitude': 24.8607, 'longitude': 67.0011},
+    'Mumbai': {'name': 'Mumbai', 'country': 'India', 'latitude': 19.0760, 'longitude': 72.8777},
+    'Istanbul': {'name': 'Istanbul', 'country': 'Turkey', 'latitude': 41.0082, 'longitude': 28.9784},
+    'Alexandria': {'name': 'Alexandria', 'country': 'Egypt', 'latitude': 31.2001, 'longitude': 29.9187},
+    
+    # 其他港口
+    'Veracruz': {'name': 'Veracruz', 'country': 'Mexico', 'latitude': 19.1738, 'longitude': -96.1342},
+    'Santos': {'name': 'Santos', 'country': 'Brazil', 'latitude': -23.9608, 'longitude': -46.3336},
+    'Sydney': {'name': 'Sydney', 'country': 'Australia', 'latitude': -33.8688, 'longitude': 151.2093},
+    'Melbourne': {'name': 'Melbourne', 'country': 'Australia', 'latitude': -37.8136, 'longitude': 144.9631},
+}
+
+def get_port_info(port_name: str, country_name: str = None) -> dict:
+    """获取港口位置信息"""
+    if not port_name or not port_name.strip():
+        return None
+    
+    port_name_clean = port_name.strip()
+    
+    # 尝试精确匹配
+    if port_name_clean in PORT_LOCATIONS:
+        port = PORT_LOCATIONS[port_name_clean]
+        country_info = get_country_info(port['country'])
+        return {
+            'port_name': port['name'],
+            'country_code': country_info['code'],
+            'country_name': country_info['name'],
+            'latitude': port['latitude'],
+            'longitude': port['longitude'],
+            'region': country_info['region'],
+            'continent': country_info['continent'],
+        }
+    
+    # 尝试不区分大小写匹配
+    port_key = None
+    for key in PORT_LOCATIONS.keys():
+        if key.lower() == port_name_clean.lower():
+            port_key = key
+            break
+    
+    if port_key:
+        port = PORT_LOCATIONS[port_key]
+        country_info = get_country_info(port['country'])
+        return {
+            'port_name': port['name'],
+            'country_code': country_info['code'],
+            'country_name': country_info['name'],
+            'latitude': port['latitude'],
+            'longitude': port['longitude'],
+            'region': country_info['region'],
+            'continent': country_info['continent'],
+        }
+    
+    # 如果找不到港口，使用国家位置作为回退
+    if country_name:
+        country_info = get_country_info(country_name)
+        return {
+            'port_name': port_name_clean,
+            'country_code': country_info['code'],
+            'country_name': country_info['name'],
+            'latitude': country_info['lat'],
+            'longitude': country_info['lng'],
+            'region': country_info['region'],
+            'continent': country_info['continent'],
+        }
+    
+    # 最后回退
+    return {
+        'port_name': port_name_clean,
+        'country_code': 'XX',
+        'country_name': 'Unknown',
+        'latitude': 0.0,
+        'longitude': 0.0,
+        'region': 'Unknown',
+        'continent': 'Unknown',
+    }
+
 def preprocess_tables(input_csv: str, output_dir: str):
     """预处理数据，生成3个表"""
     print("=" * 60)
@@ -340,56 +459,54 @@ def preprocess_tables(input_csv: str, output_dir: str):
         writer.writerows(hs_code_categories)
     print(f"✓ {len(hs_code_categories)} 条记录（完整 HS 2022 标准）\n")
     
-    # 表3: country_locations.csv - 使用完整的 ISO 3166 国家列表
-    print("生成表3: country_locations.csv (完整 ISO 3166 标准)")
+    # 表3: port_locations.csv - 从原始数据中提取港口位置
+    print("生成表3: port_locations.csv (从原始数据提取港口)")
     
-    # 从原始数据中提取出现的国家名称（用于验证）
-    countries_in_data = set()
+    # 从原始数据中提取所有唯一的港口（Port of Departure 和 Port of Arrival）
+    ports_in_data = {}  # key: (port_name, country_name) -> port_info
+    
     for row in raw_rows:
-        if row.get('Country of Origin'):
-            countries_in_data.add(row['Country of Origin'].strip())
-        if row.get('Destination Country'):
-            countries_in_data.add(row['Destination Country'].strip())
-    
-    # 生成完整的国家位置表（使用字典去重，以 country_code 为键）
-    country_locations_dict = {}
-    
-    # 先添加标准 ISO 3166 国家列表
-    for code, info in ISO_3166_COUNTRIES.items():
-        country_locations_dict[code] = {
-            'country_code': code,
-            'country_name': info['name'],
-            'latitude': f"{info['lat']:.7f}",
-            'longitude': f"{info['lng']:.7f}",
-            'region': info['region'],
-            'continent': info['continent'],
-        }
-    
-    # 处理数据中出现的国家（如果不在标准列表中，则添加）
-    for country_name in countries_in_data:
-        info = get_country_info(country_name)
-        code = info['code']
+        # 处理出发港口
+        port_departure = row.get('Port of Departure', '').strip()
+        country_origin = row.get('Country of Origin', '').strip()
+        if port_departure:
+            key = (port_departure, country_origin)
+            if key not in ports_in_data:
+                port_info = get_port_info(port_departure, country_origin)
+                if port_info:
+                    ports_in_data[key] = port_info
         
-        # 如果该代码不在标准列表中，则添加
-        if code not in country_locations_dict:
-            country_locations_dict[code] = {
-                'country_code': code,
-                'country_name': info['name'],
-                'latitude': f"{info['lat']:.7f}",
-                'longitude': f"{info['lng']:.7f}",
-                'region': info['region'],
-                'continent': info['continent'],
-            }
-        # 如果已在列表中，保持标准名称不变
+        # 处理到达港口
+        port_arrival = row.get('Port of Arrival', '').strip()
+        country_dest = row.get('Destination Country', '').strip()
+        if port_arrival:
+            key = (port_arrival, country_dest)
+            if key not in ports_in_data:
+                port_info = get_port_info(port_arrival, country_dest)
+                if port_info:
+                    ports_in_data[key] = port_info
     
-    # 转换为列表并按国家代码排序
-    country_locations = sorted(country_locations_dict.values(), key=lambda x: x['country_code'])
+    # 转换为列表并按港口名称排序
+    port_locations = []
+    for port_info in ports_in_data.values():
+        port_locations.append({
+            'port_name': port_info['port_name'],
+            'country_code': port_info['country_code'],
+            'country_name': port_info['country_name'],
+            'latitude': f"{port_info['latitude']:.7f}",
+            'longitude': f"{port_info['longitude']:.7f}",
+            'region': port_info['region'],
+            'continent': port_info['continent'],
+        })
     
-    with open(output_path / "country_locations.csv", 'w', encoding='utf-8', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=['country_code', 'country_name', 'latitude', 'longitude', 'region', 'continent'])
+    # 按港口名称排序
+    port_locations = sorted(port_locations, key=lambda x: (x['country_name'], x['port_name']))
+    
+    with open(output_path / "port_locations.csv", 'w', encoding='utf-8', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=['port_name', 'country_code', 'country_name', 'latitude', 'longitude', 'region', 'continent'])
         writer.writeheader()
-        writer.writerows(country_locations)
-    print(f"✓ {len(country_locations)} 条记录（完整 ISO 3166 标准 + 数据中的国家）\n")
+        writer.writerows(port_locations)
+    print(f"✓ {len(port_locations)} 条记录（从数据中提取的港口）\n")
     
     print("=" * 60)
     print("预处理完成!")

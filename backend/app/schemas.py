@@ -213,7 +213,20 @@ class Shipment(BaseModel):
     class Config:
         from_attributes = True
 
-# Country Location Schemas
+# Port Location Schemas
+class PortLocation(BaseModel):
+    port_name: str
+    country_code: str
+    country_name: str
+    latitude: float
+    longitude: float
+    region: Optional[str] = None
+    continent: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
+# Country Location Schemas (保留用于兼容性，但建议使用 PortLocation)
 class CountryLocation(BaseModel):
     country_code: str
     country_name: str

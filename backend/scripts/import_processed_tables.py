@@ -60,12 +60,17 @@ def create_tables(engine):
         """))
         
         conn.execute(text("""
-            CREATE TABLE IF NOT EXISTS country_locations (
-                country_code VARCHAR(3) PRIMARY KEY, country_name VARCHAR(100) NOT NULL UNIQUE,
-                latitude NUMERIC(10, 7) NOT NULL, longitude NUMERIC(10, 7) NOT NULL,
-                region VARCHAR(50), continent VARCHAR(50),
+            CREATE TABLE IF NOT EXISTS port_locations (
+                port_name VARCHAR(100) NOT NULL,
+                country_code VARCHAR(3) NOT NULL,
+                country_name VARCHAR(100) NOT NULL,
+                latitude NUMERIC(10, 7) NOT NULL,
+                longitude NUMERIC(10, 7) NOT NULL,
+                region VARCHAR(50),
+                continent VARCHAR(50),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (port_name, country_code)
             );
         """))
         
@@ -74,7 +79,8 @@ def create_tables(engine):
             CREATE INDEX IF NOT EXISTS idx_shipments_raw_hs_code ON shipments_raw(hs_code);
             CREATE INDEX IF NOT EXISTS idx_shipments_raw_country_origin ON shipments_raw(country_of_origin);
             CREATE INDEX IF NOT EXISTS idx_shipments_raw_country_dest ON shipments_raw(destination_country);
-            CREATE INDEX IF NOT EXISTS idx_country_locations_name ON country_locations(country_name);
+            CREATE INDEX IF NOT EXISTS idx_port_locations_name ON port_locations(port_name);
+            CREATE INDEX IF NOT EXISTS idx_port_locations_country ON port_locations(country_code);
         """))
     
     print("✓ 表结构创建完成\n")
@@ -149,7 +155,7 @@ def import_table_from_csv(engine, table_name: str, csv_path: Path, batch_size: i
         if batch:
             imported += _batch_insert(engine, table_name, db_fieldnames, batch)
     else:
-        # 固定表（hs_code_categories, country_locations）使用逐行插入，支持 ON CONFLICT
+        # 固定表（hs_code_categories, port_locations）使用逐行插入，支持 ON CONFLICT
         with engine.begin() as conn:
             for row in rows:
                 try:
@@ -157,11 +163,17 @@ def import_table_from_csv(engine, table_name: str, csv_path: Path, batch_size: i
                     columns = ', '.join([f'"{f}"' for f in db_fieldnames])
                     placeholders = ', '.join([f':{f}' for f in db_fieldnames])
                     
-                    update_clause = ', '.join([f'"{f}" = EXCLUDED."{f}"' for f in db_fieldnames if f not in ['created_at', db_fieldnames[0]]])
+                    # 对于 port_locations，主键是 (port_name, country_code)
+                    if table_name == 'port_locations':
+                        conflict_target = f'({db_fieldnames[0]}, {db_fieldnames[1]})'
+                    else:
+                        conflict_target = f'({db_fieldnames[0]})'
+                    
+                    update_clause = ', '.join([f'"{f}" = EXCLUDED."{f}"' for f in db_fieldnames if f not in ['created_at', db_fieldnames[0]] + ([db_fieldnames[1]] if table_name == 'port_locations' else [])])
                     sql = f"""
                         INSERT INTO {table_name} ({columns})
                         VALUES ({placeholders})
-                        ON CONFLICT ({db_fieldnames[0]}) 
+                        ON CONFLICT {conflict_target}
                         DO UPDATE SET {update_clause}, updated_at = CURRENT_TIMESTAMP
                     """
                     
@@ -255,7 +267,7 @@ if __name__ == "__main__":
         tables_to_import = [
             ('shipments_raw', 'shipments_raw.csv'),
             ('hs_code_categories', 'hs_code_categories.csv'),
-            ('country_locations', 'country_locations.csv'),
+            ('port_locations', 'port_locations.csv'),
         ]
     else:
         # 普通模式：只导入 shipments_raw（增量导入）
@@ -275,6 +287,6 @@ if __name__ == "__main__":
     
     print("各表记录数:")
     with engine.connect() as conn:
-        for table in ['shipments_raw', 'hs_code_categories', 'country_locations']:
+        for table in ['shipments_raw', 'hs_code_categories', 'port_locations']:
             result = conn.execute(text(f"SELECT COUNT(*) FROM {table}"))
             print(f"  {table}: {result.scalar()} 条")

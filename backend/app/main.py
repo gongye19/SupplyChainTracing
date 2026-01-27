@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 import os
 import re
 
-from .routes import categories, transactions, companies, locations, chat, monthly_company_flows, hs_code_categories, country_locations, shipments
+from .routes import categories, transactions, companies, locations, chat, monthly_company_flows, hs_code_categories, country_locations as port_locations_route, country_locations_compat, shipments
 from .database import get_db
 
 app = FastAPI(title="Supply Chain API", version="1.0.0")
@@ -158,7 +158,9 @@ app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 app.include_router(monthly_company_flows.router, prefix="/api/monthly-company-flows", tags=["monthly-company-flows"])
 app.include_router(shipments.router, prefix="/api/shipments", tags=["shipments"])
 app.include_router(hs_code_categories.router, prefix="/api/hs-code-categories", tags=["hs-code-categories"])
-app.include_router(country_locations.router, prefix="/api/country-locations", tags=["country-locations"])
+app.include_router(port_locations_route.router, prefix="/api/port-locations", tags=["port-locations"])
+# 向后兼容：保留 country-locations 路由（从 port_locations 表提取国家信息）
+app.include_router(country_locations_compat.router, prefix="/api/country-locations", tags=["country-locations"])
 
 @app.get("/")
 def root():
@@ -202,7 +204,7 @@ def debug_db(db: Session = Depends(get_db)):
             SELECT table_name 
             FROM information_schema.tables 
             WHERE table_schema = 'public' 
-            AND table_name IN ('monthly_company_flows', 'hs_code_categories', 'country_locations', 'shipments_raw')
+            AND table_name IN ('monthly_company_flows', 'hs_code_categories', 'port_locations', 'shipments_raw')
             ORDER BY table_name
         """))
         tables = [row[0] for row in result.fetchall()]
