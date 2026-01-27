@@ -132,6 +132,12 @@ export interface Shipment {
   id: string;
   originId: string;
   destinationId: string;
+  portOfDeparture?: string; // 出发港口
+  portOfArrival?: string; // 到达港口
+  countryOfOrigin?: string; // 原产国名称
+  destinationCountry?: string; // 目的地国家名称
+  exporterCompanyName?: string;
+  importerCompanyName?: string;
   material: string;
   category: string;
   quantity: number;

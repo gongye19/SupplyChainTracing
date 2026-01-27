@@ -177,8 +177,8 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
             .attr('stroke-width', scaledStrokeWidth);
         });
         
-        // 调整港口/国家名称标签的字体大小和位置
-        gNodes.selectAll('.port-node, .country-node').each(function() {
+        // 调整港口名称标签的字体大小和位置
+        gNodes.selectAll('.port-node').each(function() {
           const baseFontSize = parseFloat(d3.select(this).select('text').attr('data-base-font-size') || '10');
           // 根据缩放级别动态调整字体大小，范围从 8px 到 20px
           const scaledFontSize = Math.max(8, Math.min(20, baseFontSize * Math.sqrt(scale))); // 使用sqrt使变化更平滑
@@ -244,300 +244,158 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
     gNodes.selectAll('*').remove();
     gFlows.selectAll('*').remove();
 
-    // 创建节点位置映射
-      const companyNodePositions = new Map<string, [number, number]>();
-      const portNodePositions = new Map<string, [number, number]>(); // 存储港口节点位置（使用 "portName_countryCode" 作为键）
-      const countryNodePositions = new Map<string, [number, number]>(); // 存储国家节点位置（作为回退）
-      
-      // 只在有交易数据时才显示公司节点
-      if (shipments.length > 0 && activeCompanies.length > 0) {
-        const companiesByLocation = new Map<string, CompanyWithLocation[]>();
-        activeCompanies.forEach(company => {
-          const key = `${company.countryCode}_${company.city}_${company.latitude}_${company.longitude}`;
-          if (!companiesByLocation.has(key)) {
-            companiesByLocation.set(key, []);
-          }
-          companiesByLocation.get(key)!.push(company);
-        });
-
-      companiesByLocation.forEach((cityCompanies) => {
-          const baseCompany = cityCompanies[0];
-          const basePos = projection([baseCompany.longitude, baseCompany.latitude])!;
+    // 创建节点位置映射 - 只使用港口节点
+    const portNodePositions = new Map<string, [number, number]>(); // 存储港口节点位置（使用 "portName_countryCode" 作为键）
+    const portPositionsMap = new Map<string, { pos: [number, number]; portName: string; countryCode: string; countryName: string }>();
+    
+    // 从 shipments 中提取港口信息并创建港口节点位置
+    shipments.forEach(shipment => {
+      // 处理出发港口
+      if (shipment.portOfDeparture && shipment.originId) {
+        const portKey = `${shipment.portOfDeparture}_${shipment.originId}`;
+        if (!portPositionsMap.has(portKey)) {
+          const country = countries.find(c => c.countryCode === shipment.originId);
+          const countryLocation = country ? {
+            latitude: (country as any).capitalLat || (country as any).latitude || 0,
+            longitude: (country as any).capitalLng || (country as any).longitude || 0
+          } : undefined;
           
-          // 记录国家节点位置（使用第一个公司的位置作为国家位置）
-          if (!countryNodePositions.has(baseCompany.countryCode)) {
-            countryNodePositions.set(baseCompany.countryCode, basePos);
-          }
+          const portLoc = getPortLocation(
+            shipment.portOfDeparture,
+            shipment.countryOfOrigin || '',
+            countryLocation
+          );
           
-          cityCompanies.forEach((company, index) => {
-            const offset = cityCompanies.length > 1 ? {
-            x: (index - (cityCompanies.length - 1) / 2) * 1.5,
-              y: (index - (cityCompanies.length - 1) / 2) * 1.5
-            } : { x: 0, y: 0 };
-            
-            const nodePos: [number, number] = [basePos[0] + offset.x, basePos[1] + offset.y];
-            companyNodePositions.set(company.id, nodePos);
-            
-          const companyNode = gNodes.append('g')
-              .attr('class', 'company-node')
-            .datum(company)
-              .attr('transform', `translate(${nodePos[0]}, ${nodePos[1]})`);
-
-            const baseRadius = 2.2;
-            const baseStrokeWidth = 1.2;
-          const nodeFillColor = '#007AFF';
-            const isSelected = selectedCountries.includes(company.countryCode);
-            
-          companyNode.append('circle')
-              .attr('cx', 0)
-              .attr('cy', 0)
-              .attr('r', baseRadius)
-            .attr('data-base-radius', baseRadius)
-            .attr('data-base-stroke-width', baseStrokeWidth)
-            .attr('data-fill-color', nodeFillColor)
-            .attr('fill', nodeFillColor)
-              .attr('stroke', '#007AFF')
-              .attr('stroke-width', baseStrokeWidth)
-            .style('fill', nodeFillColor)
-            .style('filter', isSelected ? 'drop-shadow(0 0 6px rgba(0, 122, 255, 0.4))' : 'none');
-
-          companyNode.on('mouseover', function(event, d) {
-              const storedBaseRadius = parseFloat(d3.select(this).select('circle').attr('data-base-radius') || '2.2');
-            const svgNode = svgRef.current;
-            const currentScale = svgNode ? d3.zoomTransform(svgNode)?.k || 1 : 1;
-              const currentRadius = Math.max(0.5, storedBaseRadius / currentScale);
-              d3.select(this).select('circle').transition().duration(200).attr('r', currentRadius * 1.5);
-              
-            const companyType = (d as CompanyWithLocation).type || '未知';
-            const companyData = d as CompanyWithLocation;
-            // 翻译公司类型
-            const companyTypeText = companyType === 'importer' ? t('map.companyType.importer') : 
-                                   companyType === 'exporter' ? t('map.companyType.exporter') : 
-                                   companyType === 'both' ? t('map.companyType.both') : companyType;
-            const locationLabel = t('map.location');
-            const unknownCompany = t('map.unknownCompany');
-            const unknown = t('map.unknown');
-            const companiesAtLocationText = language === 'zh' 
-              ? `此位置有 ${cityCompanies.length} 家公司`
-              : `${cityCompanies.length} ${t('map.companiesAtLocation')}`;
-              let tooltipHTML = `
-                <div style="display: flex; flex-direction: column; gap: 8px;">
-                  <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
-                  <span style="font-weight: bold; font-size: 14px; color: #1D1D1F;">${companyData.name || unknownCompany}</span>
-                    <span style="font-size: 10px; font-weight: bold; color: #86868B; text-transform: uppercase; letter-spacing: 0.05em;">${companyTypeText}</span>
-                  </div>
-                  <div style="height: 0.5px; background: rgba(0,0,0,0.05);"></div>
-                  <div style="display: flex; flex-direction: column; gap: 2px;">
-                    <span style="color: #86868B; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em;">${locationLabel}</span>
-                  <span style="color: #1D1D1F; font-size: 12px; font-weight: 600;">${companyData.city || unknown}, ${companyData.countryName || companyData.countryCode || unknown}</span>
-                  </div>
-                  ${cityCompanies.length > 1 ? `
-                    <div style="color: #86868B; font-size: 10px; font-style: italic;">
-                      ${companiesAtLocationText}
-                    </div>
-                  ` : ''}
-                </div>
-              `;
-              
-            if (tooltipRef.current) {
-              tooltipRef.current.html(tooltipHTML)
-                .style('visibility', 'visible')
-                .style('top', (event.pageY - 10) + 'px')
-                .style('left', (event.pageX + 20) + 'px');
-            }
-            })
-            .on('mouseout', function() {
-              const storedBaseRadius = parseFloat(d3.select(this).select('circle').attr('data-base-radius') || '2.2');
-            const svgNode = svgRef.current;
-            const currentScale = svgNode ? d3.zoomTransform(svgNode)?.k || 1 : 1;
-              const scaledRadius = Math.max(0.5, storedBaseRadius / currentScale);
-              d3.select(this).select('circle').transition().duration(200).attr('r', scaledRadius);
-            if (tooltipRef.current) {
-              tooltipRef.current.style('visibility', 'hidden');
-            }
+          const pos = projection([portLoc.longitude, portLoc.latitude]);
+          if (pos) {
+            portPositionsMap.set(portKey, {
+              pos,
+              portName: shipment.portOfDeparture,
+              countryCode: shipment.originId,
+              countryName: country?.countryName || shipment.countryOfOrigin || ''
             });
-          });
-        });
-      }
-
-      // 从 shipments 中提取港口信息并创建港口节点位置
-      const portPositionsMap = new Map<string, { pos: [number, number]; portName: string; countryCode: string; isPort: boolean }>();
-      
-      shipments.forEach(shipment => {
-        // 处理出发港口
-        if (shipment.portOfDeparture && shipment.originId) {
-          const portKey = `${shipment.portOfDeparture}_${shipment.originId}`;
-          if (!portPositionsMap.has(portKey)) {
-            const country = countries.find(c => c.countryCode === shipment.originId);
-            const countryLocation = country ? {
-              latitude: (country as any).capitalLat || (country as any).latitude || 0,
-              longitude: (country as any).capitalLng || (country as any).longitude || 0
-            } : undefined;
-            
-            const portLoc = getPortLocation(
-              shipment.portOfDeparture,
-              shipment.countryOfOrigin || '',
-              countryLocation
-            );
-            
-            const pos = projection([portLoc.longitude, portLoc.latitude]);
-            if (pos) {
-              portPositionsMap.set(portKey, {
-                pos,
-                portName: shipment.portOfDeparture,
-                countryCode: shipment.originId,
-                isPort: portLoc.isPort
-              });
-            }
+            portNodePositions.set(portKey, pos);
           }
         }
-        
-        // 处理到达港口
-        if (shipment.portOfArrival && shipment.destinationId) {
-          const portKey = `${shipment.portOfArrival}_${shipment.destinationId}`;
-          if (!portPositionsMap.has(portKey)) {
-            const country = countries.find(c => c.countryCode === shipment.destinationId);
-            const countryLocation = country ? {
-              latitude: (country as any).capitalLat || (country as any).latitude || 0,
-              longitude: (country as any).capitalLng || (country as any).longitude || 0
-            } : undefined;
-            
-            const portLoc = getPortLocation(
-              shipment.portOfArrival,
-              shipment.destinationCountry || '',
-              countryLocation
-            );
-            
-            const pos = projection([portLoc.longitude, portLoc.latitude]);
-            if (pos) {
-              portPositionsMap.set(portKey, {
-                pos,
-                portName: shipment.portOfArrival,
-                countryCode: shipment.destinationId,
-                isPort: portLoc.isPort
-              });
-            }
-          }
-        }
-      });
-      
-      // 将港口位置添加到 portNodePositions
-      portPositionsMap.forEach((portInfo, portKey) => {
-        portNodePositions.set(portKey, portInfo.pos);
-      });
-      
-      // 为国家节点添加文本标签（显示国家名称）- 作为回退
-      const activeCountryCodes = new Set<string>();
-      shipments.forEach(s => {
-        if (s.originId) activeCountryCodes.add(s.originId);
-        if (s.destinationId) activeCountryCodes.add(s.destinationId);
-      });
-      
-      // 如果 countryNodePositions 为空，基于 countries 数据创建位置（作为回退）
-      if (countryNodePositions.size === 0 && activeCountryCodes.size > 0) {
-        activeCountryCodes.forEach(countryCode => {
-          const country = countries.find(c => c.countryCode === countryCode);
-          if (country) {
-            const lat = (country as any).capitalLat || (country as any).latitude;
-            const lng = (country as any).capitalLng || (country as any).longitude;
-            if (lat && lng) {
-              const pos = projection([lng, lat]);
-              if (pos) {
-                countryNodePositions.set(countryCode, pos);
-              }
-            }
-          }
-        });
       }
       
-      // 显示港口/国家名称标签（最后添加，确保在最上层）
-      // 优先显示港口标签
-      portPositionsMap.forEach((portInfo, portKey) => {
-        const country = countries.find(c => c.countryCode === portInfo.countryCode);
-        const displayName = portInfo.isPort ? `${portInfo.portName}, ${country?.countryName || portInfo.countryCode}` : (country?.countryName || portInfo.countryCode);
-        
-        const portNode = gNodes.append('g')
-          .attr('class', 'port-node')
-          .attr('transform', `translate(${portInfo.pos[0]}, ${portInfo.pos[1]})`)
-          .style('pointer-events', 'none');
-        
-        const textBg = portNode.append('rect')
-          .attr('x', -20)
-          .attr('y', -8)
-          .attr('width', 40)
-          .attr('height', 16)
-          .attr('rx', 4)
-          .attr('fill', 'rgba(255, 255, 255, 0.95)')
-          .attr('stroke', 'rgba(0, 0, 0, 0.15)')
-          .attr('stroke-width', 0.5);
-        
-        const baseFontSize = 10;
-        const text = portNode.append('text')
-          .attr('x', 0)
-          .attr('y', 4)
-          .attr('text-anchor', 'middle')
-          .attr('font-size', `${baseFontSize}px`)
-          .attr('data-base-font-size', baseFontSize)
-          .attr('font-weight', '600')
-          .attr('fill', '#1D1D1F')
-          .text(displayName);
-        
-        const textNode = text.node();
-        if (textNode) {
-          const bbox = textNode.getBBox();
-          textBg.attr('width', Math.max(40, bbox.width + 12))
-            .attr('x', -(bbox.width + 12) / 2)
-            .attr('height', bbox.height + 8)
-            .attr('y', -(bbox.height + 8) / 2);
-          text.attr('y', bbox.height / 2);
-        }
-      });
-      
-      // 显示国家名称标签（仅在没有港口位置时显示）
-      countryNodePositions.forEach((pos, countryCode) => {
-        // 如果这个国家已经有港口节点，跳过
-        const hasPort = Array.from(portPositionsMap.values()).some(p => p.countryCode === countryCode);
-        if (hasPort) return;
-        
-        const country = countries.find(c => c.countryCode === countryCode);
-        if (country) {
-          const countryNode = gNodes.append('g')
-            .attr('class', 'country-node')
-            .attr('transform', `translate(${pos[0]}, ${pos[1]})`)
-            .style('pointer-events', 'none');
+      // 处理到达港口
+      if (shipment.portOfArrival && shipment.destinationId) {
+        const portKey = `${shipment.portOfArrival}_${shipment.destinationId}`;
+        if (!portPositionsMap.has(portKey)) {
+          const country = countries.find(c => c.countryCode === shipment.destinationId);
+          const countryLocation = country ? {
+            latitude: (country as any).capitalLat || (country as any).latitude || 0,
+            longitude: (country as any).capitalLng || (country as any).longitude || 0
+          } : undefined;
           
-          const textBg = countryNode.append('rect')
-            .attr('x', -20)
-            .attr('y', -8)
-            .attr('width', 40)
-            .attr('height', 16)
-            .attr('rx', 4)
-            .attr('fill', 'rgba(255, 255, 255, 0.95)')
-            .attr('stroke', 'rgba(0, 0, 0, 0.15)')
-            .attr('stroke-width', 0.5);
+          const portLoc = getPortLocation(
+            shipment.portOfArrival,
+            shipment.destinationCountry || '',
+            countryLocation
+          );
           
-          const baseFontSize = 10;
-          const text = countryNode.append('text')
-            .attr('x', 0)
-            .attr('y', 4)
-            .attr('text-anchor', 'middle')
-            .attr('font-size', `${baseFontSize}px`)
-            .attr('data-base-font-size', baseFontSize)
-            .attr('font-weight', '600')
-            .attr('fill', '#1D1D1F')
-            .text(country.countryName);
-          
-          const textNode = text.node();
-          if (textNode) {
-            const bbox = textNode.getBBox();
-            textBg.attr('width', Math.max(40, bbox.width + 12))
-              .attr('x', -(bbox.width + 12) / 2)
-              .attr('height', bbox.height + 8)
-              .attr('y', -(bbox.height + 8) / 2);
-            text.attr('y', bbox.height / 2);
+          const pos = projection([portLoc.longitude, portLoc.latitude]);
+          if (pos) {
+            portPositionsMap.set(portKey, {
+              pos,
+              portName: shipment.portOfArrival,
+              countryCode: shipment.destinationId,
+              countryName: country?.countryName || shipment.destinationCountry || ''
+            });
+            portNodePositions.set(portKey, pos);
           }
         }
+      }
+    });
+    
+    // 显示港口节点（带标签和图标）
+    portPositionsMap.forEach((portInfo, portKey) => {
+      const portNode = gNodes.append('g')
+        .attr('class', 'port-node')
+        .attr('transform', `translate(${portInfo.pos[0]}, ${portInfo.pos[1]})`)
+        .style('pointer-events', 'all')
+        .style('cursor', 'pointer');
+      
+      // 港口图标（圆形）
+      const baseRadius = 3;
+      portNode.append('circle')
+        .attr('cx', 0)
+        .attr('cy', 0)
+        .attr('r', baseRadius)
+        .attr('data-base-radius', baseRadius)
+        .attr('fill', '#007AFF')
+        .attr('stroke', '#FFFFFF')
+        .attr('stroke-width', 1.5)
+        .style('filter', 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2))');
+      
+      // 港口标签
+      const displayName = `${portInfo.portName}, ${portInfo.countryName}`;
+      const textBg = portNode.append('rect')
+        .attr('x', -20)
+        .attr('y', 8)
+        .attr('width', 40)
+        .attr('height', 16)
+        .attr('rx', 4)
+        .attr('fill', 'rgba(255, 255, 255, 0.95)')
+        .attr('stroke', 'rgba(0, 0, 0, 0.15)')
+        .attr('stroke-width', 0.5);
+      
+      const baseFontSize = 10;
+      const text = portNode.append('text')
+        .attr('x', 0)
+        .attr('y', 20)
+        .attr('text-anchor', 'middle')
+        .attr('font-size', `${baseFontSize}px`)
+        .attr('data-base-font-size', baseFontSize)
+        .attr('font-weight', '600')
+        .attr('fill', '#1D1D1F')
+        .text(displayName);
+      
+      const textNode = text.node();
+      if (textNode) {
+        const bbox = textNode.getBBox();
+        textBg.attr('width', Math.max(40, bbox.width + 12))
+          .attr('x', -(bbox.width + 12) / 2)
+          .attr('height', bbox.height + 8)
+          .attr('y', 8);
+        text.attr('y', 8 + bbox.height / 2 + 4);
+      }
+      
+      // 鼠标悬停效果
+      portNode.on('mouseover', function(event) {
+        const svgNode = svgRef.current;
+        const currentScale = svgNode ? d3.zoomTransform(svgNode)?.k || 1 : 1;
+        const scaledRadius = Math.max(0.5, baseRadius / currentScale);
+        d3.select(this).select('circle')
+          .transition().duration(200)
+          .attr('r', scaledRadius * 1.5);
+        
+        if (tooltipRef.current) {
+          const tooltipHTML = `
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <div style="font-weight: bold; font-size: 14px; color: #1D1D1F;">${portInfo.portName}</div>
+              <div style="color: #86868B; font-size: 12px;">${portInfo.countryName}</div>
+            </div>
+          `;
+          tooltipRef.current.html(tooltipHTML)
+            .style('visibility', 'visible')
+            .style('top', (event.pageY - 10) + 'px')
+            .style('left', (event.pageX + 20) + 'px');
+        }
+      })
+      .on('mouseout', function() {
+        const svgNode = svgRef.current;
+        const currentScale = svgNode ? d3.zoomTransform(svgNode)?.k || 1 : 1;
+        const scaledRadius = Math.max(0.5, baseRadius / currentScale);
+        d3.select(this).select('circle')
+          .transition().duration(200)
+          .attr('r', scaledRadius);
+        if (tooltipRef.current) {
+          tooltipRef.current.style('visibility', 'hidden');
+        }
       });
+    });
 
     // 绘制路径和粒子（preview 模式限制粒子数量）
     if (shipments.length > 0) {
@@ -592,92 +450,41 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
           ? companies.find(c => c.id === routeGroup.importerCompanyId)
           : null;
 
-        // 优先使用港口位置，如果没有则使用公司位置，最后使用国家位置
+        // 强制使用港口位置（如果没有港口信息则跳过该交易）
         let sourcePos: [number, number] | null = null;
         let targetPos: [number, number] | null = null;
         let origin: { lng: number; lat: number; name: string; country: string } | null = null;
         let dest: { lng: number; lat: number; name: string; country: string } | null = null;
         
-        // 获取出发位置（优先：港口 > 公司 > 国家）
+        // 获取出发港口位置（必须）
         if (firstShipment.portOfDeparture && firstShipment.originId) {
           const portKey = `${firstShipment.portOfDeparture}_${firstShipment.originId}`;
           if (portNodePositions.has(portKey)) {
             sourcePos = portNodePositions.get(portKey)!;
-            const country = countries.find(c => c.countryCode === firstShipment.originId);
+            const portInfo = portPositionsMap.get(portKey);
             origin = {
               lng: 0, lat: 0, // 位置已通过 sourcePos 确定
               name: firstShipment.portOfDeparture,
-              country: country?.countryName || firstShipment.countryOfOrigin || ''
+              country: portInfo?.countryName || firstShipment.countryOfOrigin || ''
             };
           }
         }
         
-        if (!sourcePos && originCompany && companyNodePositions.has(originCompany.id)) {
-          sourcePos = companyNodePositions.get(originCompany.id)!;
-          origin = {
-            lng: originCompany.longitude,
-            lat: originCompany.latitude,
-            name: originCompany.name,
-            country: originCompany.countryName
-          };
-        }
-        
-        if (!sourcePos) {
-          const country = countries.find(c => c.countryCode === routeGroup.originId);
-          if (country) {
-            const lat = (country as any).capitalLat || (country as any).latitude;
-            const lng = (country as any).capitalLng || (country as any).longitude;
-            if (lat && lng) {
-              sourcePos = projection([lng, lat])!;
-              origin = {
-                lng, lat,
-                name: country.countryName,
-                country: country.countryName
-              };
-            }
-          }
-        }
-        
-        // 获取到达位置（优先：港口 > 公司 > 国家）
+        // 获取到达港口位置（必须）
         if (firstShipment.portOfArrival && firstShipment.destinationId) {
           const portKey = `${firstShipment.portOfArrival}_${firstShipment.destinationId}`;
           if (portNodePositions.has(portKey)) {
             targetPos = portNodePositions.get(portKey)!;
-            const country = countries.find(c => c.countryCode === firstShipment.destinationId);
+            const portInfo = portPositionsMap.get(portKey);
             dest = {
               lng: 0, lat: 0, // 位置已通过 targetPos 确定
               name: firstShipment.portOfArrival,
-              country: country?.countryName || firstShipment.destinationCountry || ''
+              country: portInfo?.countryName || firstShipment.destinationCountry || ''
             };
           }
         }
-        
-        if (!targetPos && destCompany && companyNodePositions.has(destCompany.id)) {
-          targetPos = companyNodePositions.get(destCompany.id)!;
-          dest = {
-            lng: destCompany.longitude,
-            lat: destCompany.latitude,
-            name: destCompany.name,
-            country: destCompany.countryName
-          };
-        }
-        
-        if (!targetPos) {
-          const country = countries.find(c => c.countryCode === routeGroup.destinationId);
-          if (country) {
-            const lat = (country as any).capitalLat || (country as any).latitude;
-            const lng = (country as any).capitalLng || (country as any).longitude;
-            if (lat && lng) {
-              targetPos = projection([lng, lat])!;
-              dest = {
-                lng, lat,
-                name: country.countryName,
-                country: country.countryName
-              };
-            }
-          }
-        }
 
+        // 如果缺少港口位置，跳过该交易
         if (!sourcePos || !targetPos || !origin || !dest) return;
           
           const midX = (sourcePos[0] + targetPos[0]) / 2;
