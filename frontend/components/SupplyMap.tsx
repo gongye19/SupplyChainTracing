@@ -141,9 +141,13 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
     const zoom = d3.zoom<SVGSVGElement, unknown>()
       .scaleExtent([1, 15])
       .on('zoom', (event) => {
+        // 对整个 g 组应用 transform（包括地图、节点、路径）
         g.attr('transform', event.transform);
         
         const scale = event.transform.k;
+        
+        // 由于整个 g 组被 transform 缩放，节点和路径也会被缩放
+        // 我们需要反向调整它们的大小，使其在屏幕上保持固定大小
         
         // 调整节点大小
         gNodes.selectAll('.company-node circle').each(function() {
