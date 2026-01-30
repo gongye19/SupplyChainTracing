@@ -177,25 +177,39 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
             .attr('stroke-width', scaledStrokeWidth);
         });
         
-        // 调整港口名称标签的字体大小和位置
+        // 调整港口图标和标签的大小
         gNodes.selectAll('.port-node').each(function() {
-          const baseFontSize = parseFloat(d3.select(this).select('text').attr('data-base-font-size') || '10');
-          // 根据缩放级别动态调整字体大小，范围从 8px 到 20px
-          const scaledFontSize = Math.max(8, Math.min(20, baseFontSize * Math.sqrt(scale))); // 使用sqrt使变化更平滑
+          // 调整港口图标（圆形）大小 - 放大时缩小
+          const circle = d3.select(this).select('circle');
+          if (!circle.empty()) {
+            const baseRadius = parseFloat(circle.attr('data-base-radius') || '3');
+            const baseStrokeWidth = parseFloat(circle.attr('data-stroke-width') || '1.5');
+            const scaledRadius = Math.max(0.5, baseRadius / scale);
+            const scaledStrokeWidth = Math.max(0.3, baseStrokeWidth / scale);
+            circle
+              .attr('r', scaledRadius)
+              .attr('stroke-width', scaledStrokeWidth);
+          }
+          
+          // 调整港口标签字体大小
           const text = d3.select(this).select('text');
-          const rect = d3.select(this).select('rect');
-          
-          text.attr('font-size', `${scaledFontSize}px`);
-          
-          // 根据文本宽度调整背景
-          const textNode = text.node();
-          if (textNode) {
-            const bbox = textNode.getBBox();
-            rect.attr('width', Math.max(40, bbox.width + 12))
-              .attr('x', -(bbox.width + 12) / 2)
-              .attr('height', bbox.height + 8)
-              .attr('y', -(bbox.height + 8) / 2);
-            text.attr('y', bbox.height / 2);
+          if (!text.empty()) {
+            const baseFontSize = parseFloat(text.attr('data-base-font-size') || '10');
+            // 根据缩放级别动态调整字体大小，范围从 8px 到 20px
+            const scaledFontSize = Math.max(8, Math.min(20, baseFontSize * Math.sqrt(scale))); // 使用sqrt使变化更平滑
+            text.attr('font-size', `${scaledFontSize}px`);
+            
+            // 根据文本宽度调整背景
+            const rect = d3.select(this).select('rect');
+            const textNode = text.node();
+            if (textNode && !rect.empty()) {
+              const bbox = textNode.getBBox();
+              rect.attr('width', Math.max(40, bbox.width + 12))
+                .attr('x', -(bbox.width + 12) / 2)
+                .attr('height', bbox.height + 8)
+                .attr('y', -(bbox.height + 8) / 2);
+              text.attr('y', bbox.height / 2);
+            }
           }
         });
       });
@@ -310,6 +324,10 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
     });
     
     // 显示港口节点（带标签和图标）
+    // 获取当前缩放级别
+    const svgNode = svgRef.current;
+    const currentScale = svgNode ? d3.zoomTransform(svgNode)?.k || 1 : 1;
+    
     portPositionsMap.forEach((portInfo, portKey) => {
       const portNode = gNodes.append('g')
         .attr('class', 'port-node')
@@ -319,14 +337,18 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
       
       // 港口图标（圆形）
       const baseRadius = 3;
+      const baseStrokeWidth = 1.5;
+      const scaledRadius = Math.max(0.5, baseRadius / currentScale);
+      const scaledStrokeWidth = Math.max(0.3, baseStrokeWidth / currentScale);
       portNode.append('circle')
         .attr('cx', 0)
         .attr('cy', 0)
-        .attr('r', baseRadius)
+        .attr('r', scaledRadius)
         .attr('data-base-radius', baseRadius)
+        .attr('data-stroke-width', baseStrokeWidth)
         .attr('fill', '#007AFF')
         .attr('stroke', '#FFFFFF')
-        .attr('stroke-width', 1.5)
+        .attr('stroke-width', scaledStrokeWidth)
         .style('filter', 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2))');
       
       // 港口标签
