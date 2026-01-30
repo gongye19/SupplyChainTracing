@@ -189,11 +189,14 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
             const baseRadius = parseFloat(circle.attr('data-base-radius') || '3');
             const baseStrokeWidth = parseFloat(circle.attr('data-stroke-width') || '1.5');
             // 拉近（scale增大）时图标缩小，拉远（scale减小）时图标放大
+            // 由于整个 g 组被 transform 放大了 scale 倍，我们需要将图标缩小 scale 倍来补偿
             const scaledRadius = Math.max(0.5, baseRadius / scale);
             const scaledStrokeWidth = Math.max(0.3, baseStrokeWidth / scale);
+            // 强制设置，确保生效
             circle
               .attr('r', scaledRadius)
-              .attr('stroke-width', scaledStrokeWidth);
+              .attr('stroke-width', scaledStrokeWidth)
+              .style('r', null); // 清除可能的 style 设置
           }
           
           // 调整港口标签字体大小
