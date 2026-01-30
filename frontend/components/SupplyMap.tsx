@@ -182,22 +182,24 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
         });
         
         // 调整港口图标大小
-        gNodes.selectAll('.port-node').each(function() {
-          // 调整港口图标（圆形）大小 - 拉近时缩小，拉远时放大（保持屏幕视觉大小稳定）
-          const circle = d3.select(this).select('circle');
-          if (!circle.empty()) {
-            const baseRadius = parseFloat(circle.attr('data-base-radius') || '3');
-            const baseStrokeWidth = parseFloat(circle.attr('data-stroke-width') || '1.5');
-            // 拉近（scale增大）时图标缩小，拉远（scale减小）时图标放大
-            // 由于整个 g 组被 transform 放大了 scale 倍，我们需要将图标缩小 scale 倍来补偿
-            const scaledRadius = Math.max(0.5, baseRadius / scale);
-            const scaledStrokeWidth = Math.max(0.3, baseStrokeWidth / scale);
-            // 强制设置，确保生效
-            circle
-              .attr('r', scaledRadius)
-              .attr('stroke-width', scaledStrokeWidth)
-              .style('r', null); // 清除可能的 style 设置
-          }
+        gNodes.selectAll('.port-node .port-icon').each(function() {
+          // 调整港口图标（锚点）大小 - 拉近时缩小，拉远时放大（保持屏幕视觉大小稳定）
+          const iconGroup = d3.select(this);
+          const baseSize = parseFloat(iconGroup.attr('data-base-size') || '5');
+          const baseStrokeWidth = parseFloat(iconGroup.attr('data-stroke-width') || '1.2');
+          // 拉近（scale增大）时图标缩小，拉远（scale减小）时图标放大
+          // 由于整个 g 组被 transform 放大了 scale 倍，我们需要将图标缩小 scale 倍来补偿
+          const scaledSize = Math.max(0.5, baseSize / scale);
+          const scaledStrokeWidth = Math.max(0.3, baseStrokeWidth / scale);
+          // 使用 transform scale 来缩放整个图标组
+          iconGroup.attr('transform', `scale(${scaledSize / baseSize})`);
+          // 调整 stroke-width（需要反向补偿，因为 transform scale 也会缩放 stroke）
+          // circle 的 stroke-width
+          iconGroup.select('circle')
+            .attr('stroke-width', scaledStrokeWidth);
+          // path 的 stroke-width
+          iconGroup.select('path')
+            .attr('stroke-width', scaledStrokeWidth * 0.8);
         });
         
         // 调整港口标签 - 使用反向 transform 保持固定屏幕尺寸
@@ -330,61 +332,98 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
         .style('pointer-events', 'all')
         .style('cursor', 'pointer');
       
-      // 港口图标（圆形）
-      const baseRadius = 3;
-      const baseStrokeWidth = 1.5;
-      // 拉近（scale增大）时图标缩小，拉远（scale减小）时图标放大
-      const scaledRadius = Math.max(0.5, baseRadius / currentScale);
-      const scaledStrokeWidth = Math.max(0.3, baseStrokeWidth / currentScale);
-      portNode.append('circle')
-        .attr('cx', 0)
-        .attr('cy', 0)
-        .attr('r', scaledRadius)
-        .attr('data-base-radius', baseRadius)
-        .attr('data-stroke-width', baseStrokeWidth)
-        .attr('fill', '#007AFF')
-        .attr('stroke', '#FFFFFF')
-        .attr('stroke-width', scaledStrokeWidth)
-        .style('filter', 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2))');
-      
       // 港口标签 - 使用独立的 label 组，通过反向 transform 保持固定大小
+      // 先创建标签，确保文字在最上方（图标在 y=0，标签在 y 负值区域）
       const displayName = `${portInfo.portName}, ${portInfo.countryName}`;
       const label = portNode.append('g')
         .attr('class', 'port-label');
       
       const baseFontSize = 10;
+      // 先创建文字，获取 bbox 后再调整位置
       const text = label.append('text')
         .attr('x', 0)
-        .attr('y', 20)
+        .attr('y', 0) // 临时位置，稍后调整
         .attr('text-anchor', 'middle')
         .attr('font-size', `${baseFontSize}px`)
         .attr('font-weight', '600')
-        .attr('fill', '#1D1D1F')
+        .attr('fill', '#000000') // 确保是黑色
         .text(displayName);
       
       const textNode = text.node();
       if (textNode) {
         const bbox = textNode.getBBox();
-        const textBg = label.append('rect')
-          .attr('x', -(bbox.width + 12) / 2)
-          .attr('y', 8)
-          .attr('width', Math.max(40, bbox.width + 12))
-          .attr('height', bbox.height + 8)
+        const padding = 6;
+        const bgHeight = bbox.height + padding * 2;
+        const bgWidth = Math.max(40, bbox.width + padding * 2);
+        const iconOffset = 8; // 图标到标签的距离
+        
+        // 背景矩形（在文字下方，确保文字在上层）
+        const textBg = label.insert('rect', 'text')
+          .attr('x', -bgWidth / 2)
+          .attr('y', -iconOffset - bgHeight) // 在图标上方
+          .attr('width', bgWidth)
+          .attr('height', bgHeight)
           .attr('rx', 4)
           .attr('fill', 'rgba(255, 255, 255, 0.95)')
           .attr('stroke', 'rgba(0, 0, 0, 0.15)')
           .attr('stroke-width', 0.5);
-        text.attr('y', 8 + bbox.height / 2 + 4);
+        
+        // 调整文字位置，使其在背景中央
+        text.attr('y', -iconOffset - bgHeight / 2 + bbox.height / 3); // 垂直居中
       }
+      
+      // 港口图标（锚点图标）- 在标签下方
+      const iconSize = 5; // 图标基础大小
+      const baseStrokeWidth = 1.2;
+      const scaledSize = Math.max(0.5, iconSize / currentScale);
+      const scaledStrokeWidth = Math.max(0.3, baseStrokeWidth / currentScale);
+      
+      // 创建锚点图标组
+      const iconGroup = portNode.append('g')
+        .attr('class', 'port-icon')
+        .attr('data-base-size', iconSize)
+        .attr('data-stroke-width', baseStrokeWidth);
+      
+      // 更美观的锚点图标：圆形底座 + 锚点形状
+      // 圆形底座
+      iconGroup.append('circle')
+        .attr('cx', 0)
+        .attr('cy', 0)
+        .attr('r', scaledSize * 0.6)
+        .attr('fill', '#007AFF')
+        .attr('stroke', '#FFFFFF')
+        .attr('stroke-width', scaledStrokeWidth);
+      
+      // 锚点形状（简化版，更现代）
+      const anchorPath = `M 0,-${scaledSize * 0.4}
+        C -${scaledSize * 0.25},-${scaledSize * 0.2} -${scaledSize * 0.25},${scaledSize * 0.2} 0,${scaledSize * 0.4}
+        C ${scaledSize * 0.25},${scaledSize * 0.2} ${scaledSize * 0.25},-${scaledSize * 0.2} 0,-${scaledSize * 0.4}
+        M 0,${scaledSize * 0.4}
+        L 0,${scaledSize * 0.8}
+        M -${scaledSize * 0.15},${scaledSize * 0.7}
+        L ${scaledSize * 0.15},${scaledSize * 0.7}`;
+      
+      iconGroup.append('path')
+        .attr('d', anchorPath)
+        .attr('fill', 'none')
+        .attr('stroke', '#FFFFFF')
+        .attr('stroke-width', scaledStrokeWidth * 0.8)
+        .attr('stroke-linejoin', 'round')
+        .attr('stroke-linecap', 'round');
+      
+      // 添加阴影效果
+      iconGroup.style('filter', 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25))');
       
       // 鼠标悬停效果
       portNode.on('mouseover', function(event) {
         const svgNode = svgRef.current;
         const currentScale = svgNode ? d3.zoomTransform(svgNode)?.k || 1 : 1;
-        const scaledRadius = Math.max(0.5, baseRadius / currentScale);
-        d3.select(this).select('circle')
-          .transition().duration(200)
-          .attr('r', scaledRadius * 1.5);
+        const scaledSize = Math.max(0.5, iconSize / currentScale);
+        const iconGroup = d3.select(this).select('.port-icon');
+        if (!iconGroup.empty()) {
+          iconGroup.transition().duration(200)
+            .attr('transform', `scale(${(scaledSize * 1.5) / iconSize})`);
+        }
         
         if (tooltipRef.current) {
           const tooltipHTML = `
@@ -402,10 +441,12 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
       .on('mouseout', function() {
         const svgNode = svgRef.current;
         const currentScale = svgNode ? d3.zoomTransform(svgNode)?.k || 1 : 1;
-        const scaledRadius = Math.max(0.5, baseRadius / currentScale);
-        d3.select(this).select('circle')
-          .transition().duration(200)
-          .attr('r', scaledRadius);
+        const scaledSize = Math.max(0.5, iconSize / currentScale);
+        const iconGroup = d3.select(this).select('.port-icon');
+        if (!iconGroup.empty()) {
+          iconGroup.transition().duration(200)
+            .attr('transform', `scale(${scaledSize / iconSize})`);
+        }
         if (tooltipRef.current) {
           tooltipRef.current.style('visibility', 'hidden');
         }
