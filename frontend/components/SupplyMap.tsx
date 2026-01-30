@@ -181,7 +181,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
             .attr('stroke-width', scaledStrokeWidth);
         });
         
-        // 调整港口图标和标签的大小
+        // 调整港口图标大小
         gNodes.selectAll('.port-node').each(function() {
           // 调整港口图标（圆形）大小 - 拉近时缩小，拉远时放大（保持屏幕视觉大小稳定）
           const circle = d3.select(this).select('circle');
@@ -198,28 +198,15 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
               .attr('stroke-width', scaledStrokeWidth)
               .style('r', null); // 清除可能的 style 设置
           }
-          
-          // 调整港口标签字体大小
-          const text = d3.select(this).select('text');
-          if (!text.empty()) {
-            const baseFontSize = parseFloat(text.attr('data-base-font-size') || '10');
-            // 根据缩放级别动态调整字体大小，范围从 8px 到 20px
-            const scaledFontSize = Math.max(8, Math.min(20, baseFontSize * Math.sqrt(scale))); // 使用sqrt使变化更平滑
-            text.attr('font-size', `${scaledFontSize}px`);
-            
-            // 根据文本宽度调整背景
-            const rect = d3.select(this).select('rect');
-            const textNode = text.node();
-            if (textNode && !rect.empty()) {
-              const bbox = textNode.getBBox();
-              rect.attr('width', Math.max(40, bbox.width + 12))
-                .attr('x', -(bbox.width + 12) / 2)
-                .attr('height', bbox.height + 8)
-                .attr('y', -(bbox.height + 8) / 2);
-              text.attr('y', bbox.height / 2);
-            }
-          }
         });
+        
+        // 调整港口标签 - 使用反向 transform 保持固定屏幕尺寸
+        gNodes.selectAll<SVGGElement, any>('.port-node .port-label')
+          .attr('transform', `scale(${1 / scale})`);
+        
+        // 调整标签背景的 stroke-width（反向补偿）
+        gNodes.selectAll('.port-node .port-label rect')
+          .attr('stroke-width', 0.5 / scale);
       });
 
     const initialTransform = d3.zoomIdentity.translate(0, 0).scale(1);
@@ -360,25 +347,17 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
         .attr('stroke-width', scaledStrokeWidth)
         .style('filter', 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2))');
       
-      // 港口标签
+      // 港口标签 - 使用独立的 label 组，通过反向 transform 保持固定大小
       const displayName = `${portInfo.portName}, ${portInfo.countryName}`;
-      const textBg = portNode.append('rect')
-        .attr('x', -20)
-        .attr('y', 8)
-        .attr('width', 40)
-        .attr('height', 16)
-        .attr('rx', 4)
-        .attr('fill', 'rgba(255, 255, 255, 0.95)')
-        .attr('stroke', 'rgba(0, 0, 0, 0.15)')
-        .attr('stroke-width', 0.5);
+      const label = portNode.append('g')
+        .attr('class', 'port-label');
       
       const baseFontSize = 10;
-      const text = portNode.append('text')
+      const text = label.append('text')
         .attr('x', 0)
         .attr('y', 20)
         .attr('text-anchor', 'middle')
         .attr('font-size', `${baseFontSize}px`)
-        .attr('data-base-font-size', baseFontSize)
         .attr('font-weight', '600')
         .attr('fill', '#1D1D1F')
         .text(displayName);
@@ -386,10 +365,15 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
       const textNode = text.node();
       if (textNode) {
         const bbox = textNode.getBBox();
-        textBg.attr('width', Math.max(40, bbox.width + 12))
+        const textBg = label.append('rect')
           .attr('x', -(bbox.width + 12) / 2)
+          .attr('y', 8)
+          .attr('width', Math.max(40, bbox.width + 12))
           .attr('height', bbox.height + 8)
-          .attr('y', 8);
+          .attr('rx', 4)
+          .attr('fill', 'rgba(255, 255, 255, 0.95)')
+          .attr('stroke', 'rgba(0, 0, 0, 0.15)')
+          .attr('stroke-width', 0.5);
         text.attr('y', 8 + bbox.height / 2 + 4);
       }
       
