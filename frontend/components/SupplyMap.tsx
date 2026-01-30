@@ -179,14 +179,14 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
         
         // 调整港口图标和标签的大小
         gNodes.selectAll('.port-node').each(function() {
-          // 调整港口图标（圆形）大小 - 与地图保持相同比例
+          // 调整港口图标（圆形）大小 - 拉近时缩小，拉远时放大（保持屏幕视觉大小稳定）
           const circle = d3.select(this).select('circle');
           if (!circle.empty()) {
             const baseRadius = parseFloat(circle.attr('data-base-radius') || '3');
             const baseStrokeWidth = parseFloat(circle.attr('data-stroke-width') || '1.5');
-            // 图标应该随着地图一起缩放，保持相对大小不变
-            const scaledRadius = baseRadius * scale;
-            const scaledStrokeWidth = baseStrokeWidth * scale;
+            // 拉近（scale增大）时图标缩小，拉远（scale减小）时图标放大
+            const scaledRadius = Math.max(0.5, baseRadius / scale);
+            const scaledStrokeWidth = Math.max(0.3, baseStrokeWidth / scale);
             circle
               .attr('r', scaledRadius)
               .attr('stroke-width', scaledStrokeWidth);
@@ -339,9 +339,9 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
       // 港口图标（圆形）
       const baseRadius = 3;
       const baseStrokeWidth = 1.5;
-      // 图标应该随着地图一起缩放，保持相对大小不变
-      const scaledRadius = baseRadius * currentScale;
-      const scaledStrokeWidth = baseStrokeWidth * currentScale;
+      // 拉近（scale增大）时图标缩小，拉远（scale减小）时图标放大
+      const scaledRadius = Math.max(0.5, baseRadius / currentScale);
+      const scaledStrokeWidth = Math.max(0.3, baseStrokeWidth / currentScale);
       portNode.append('circle')
         .attr('cx', 0)
         .attr('cy', 0)
@@ -390,7 +390,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
       portNode.on('mouseover', function(event) {
         const svgNode = svgRef.current;
         const currentScale = svgNode ? d3.zoomTransform(svgNode)?.k || 1 : 1;
-        const scaledRadius = baseRadius * currentScale;
+        const scaledRadius = Math.max(0.5, baseRadius / currentScale);
         d3.select(this).select('circle')
           .transition().duration(200)
           .attr('r', scaledRadius * 1.5);
@@ -411,7 +411,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
       .on('mouseout', function() {
         const svgNode = svgRef.current;
         const currentScale = svgNode ? d3.zoomTransform(svgNode)?.k || 1 : 1;
-        const scaledRadius = baseRadius * currentScale;
+        const scaledRadius = Math.max(0.5, baseRadius / currentScale);
         d3.select(this).select('circle')
           .transition().duration(200)
           .attr('r', scaledRadius);
@@ -449,7 +449,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
       const valueExtent = d3.extent(routeGroups, d => d.totalValue) as [number, number];
       const strokeScale = d3.scaleSqrt()
         .domain(valueExtent[0] !== undefined ? valueExtent : [1, 100])
-        .range([0.8, 3.5]); // 根据交易价值，范围 0.8-3.5（改细）
+        .range([0.5, 2.5]); // 根据交易价值，范围 0.5-2.5（更细）
 
       // preview 模式：只显示前 100 条路径，不画粒子
       // final 模式：显示所有路径，画粒子（但限制粒子数量）
