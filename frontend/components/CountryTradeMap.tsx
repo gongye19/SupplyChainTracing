@@ -360,14 +360,10 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
           .attr('stroke-width', 0) // 初始为0，通过动画显示
           .attr('stroke-linecap', 'round')
           .attr('opacity', 0)
-          .attr('class', 'flow-path')
-          .transition()
-          .duration(500)
-          .delay(Math.random() * 300) // 随机延迟，产生动态效果
-          .attr('stroke-width', baseStrokeWidth)
-          .attr('opacity', 0.4);
+          .attr('class', 'flow-path');
         
-        path.on('mouseover', function() {
+        // 先绑定事件，再执行动画
+        path.on('mouseover', function(event: MouseEvent) {
           d3.select(this)
             .transition()
             .duration(200)
@@ -400,6 +396,13 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
             tooltip.style('visibility', 'hidden');
           }
         });
+        
+        // 在事件绑定后执行动画
+        path.transition()
+          .duration(500)
+          .delay(Math.random() * 300) // 随机延迟，产生动态效果
+          .attr('stroke-width', baseStrokeWidth)
+          .attr('opacity', 0.4);
       });
     }
 
