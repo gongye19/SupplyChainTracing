@@ -323,12 +323,14 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
         }
       });
 
-      // 计算路径粗细
+      // 计算路径粗细（根据交易量动态调整）
       const flows = Array.from(flowMap.values());
+      if (flows.length === 0) return;
+      
       const valueExtent = d3.extent(flows, d => d.value) as [number, number];
       const strokeScale = d3.scaleSqrt()
         .domain(valueExtent[0] !== undefined ? valueExtent : [1, 100])
-        .range([0.5, 3]);
+        .range([1, 5]); // 增加线条粗细范围，使差异更明显
 
       // 清空现有流向
       gFlows.selectAll('path.flow-path').remove();
@@ -350,17 +352,27 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
         const midY = (sourcePos[1] + targetPos[1]) / 2 - 50;
         const lineData = `M${sourcePos[0]},${sourcePos[1]} Q${midX},${midY} ${targetPos[0]},${targetPos[1]}`;
         
+        const baseStrokeWidth = strokeScale(flow.value);
         const path = gFlows.append('path')
           .attr('d', lineData)
           .attr('fill', 'none')
           .attr('stroke', '#007AFF')
-          .attr('stroke-width', strokeScale(flow.value))
+          .attr('stroke-width', 0) // 初始为0，通过动画显示
           .attr('stroke-linecap', 'round')
-          .attr('opacity', 0.4)
-          .attr('class', 'flow-path');
+          .attr('opacity', 0)
+          .attr('class', 'flow-path')
+          .transition()
+          .duration(500)
+          .delay(Math.random() * 300) // 随机延迟，产生动态效果
+          .attr('stroke-width', baseStrokeWidth)
+          .attr('opacity', 0.4);
         
         path.on('mouseover', function() {
-          d3.select(this).attr('opacity', 0.8).attr('stroke-width', strokeScale(flow.value) * 1.5);
+          d3.select(this)
+            .transition()
+            .duration(200)
+            .attr('opacity', 0.8)
+            .attr('stroke-width', baseStrokeWidth * 1.5);
           if (tooltip) {
             tooltip
               .style('visibility', 'visible')
@@ -379,7 +391,11 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
           }
         })
         .on('mouseout', function() {
-          d3.select(this).attr('opacity', 0.4).attr('stroke-width', strokeScale(flow.value));
+          d3.select(this)
+            .transition()
+            .duration(200)
+            .attr('opacity', 0.4)
+            .attr('stroke-width', baseStrokeWidth);
           if (tooltip) {
             tooltip.style('visibility', 'hidden');
           }

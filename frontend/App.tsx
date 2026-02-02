@@ -460,18 +460,23 @@ const App: React.FC = () => {
              </button>
            </div>
 
-           <div className="h-[0.5px] bg-black/5"></div>
+          {activeView !== 'country-trade' && (
+            <>
+              <div className="h-[0.5px] bg-black/5"></div>
 
-           <SidebarFilters 
-             filters={filters} 
-             setFilters={setFilters}
-             hsCodeCategories={hsCodeCategories}
-             countries={countries}
-             companies={companies}
-             shipments={shipments}
-           />
-           
-           <div className="mt-auto pt-8 border-t border-black/5 space-y-4">
+              <SidebarFilters 
+                filters={filters} 
+                setFilters={setFilters}
+                hsCodeCategories={hsCodeCategories}
+                countries={countries}
+                companies={companies}
+                shipments={shipments}
+              />
+            </>
+          )}
+          
+          {activeView !== 'country-trade' && (
+            <div className="mt-auto pt-8 border-t border-black/5 space-y-4">
              <div className="bg-[#F5F5F7] p-4 rounded-[20px] space-y-3 border border-black/5">
                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5 text-[#86868B]">
@@ -496,6 +501,7 @@ const App: React.FC = () => {
                </div>
              </div>
            </div>
+          )}
         </aside>
 
         {/* Main Content Area */}

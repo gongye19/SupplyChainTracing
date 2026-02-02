@@ -99,7 +99,7 @@ const translations: Record<Language, Record<string, string>> = {
     'common.stats': 'Statistics',
     
     // Country Trade Stats
-    'countryTrade.title': 'Country Trade Statistics',
+    'countryTrade.title': 'Country Trade',
     'countryTrade.subtitle': 'Monthly trade data analysis by HS code and country',
     'countryTrade.hsCodeFilter': 'HS Code Filter',
     'countryTrade.selectAll': 'Select All',
@@ -211,7 +211,7 @@ const translations: Record<Language, Record<string, string>> = {
     'common.stats': '统计',
     
     // Country Trade Stats
-    'countryTrade.title': '国家贸易统计',
+    'countryTrade.title': '国家贸易',
     'countryTrade.subtitle': '按HS编码和国家的月度贸易数据分析',
     'countryTrade.hsCodeFilter': 'HS编码筛选',
     'countryTrade.selectAll': '全选',
