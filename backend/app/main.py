@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 import os
 import re
 
-from .routes import categories, transactions, companies, locations, chat, monthly_company_flows, hs_code_categories, country_locations as port_locations_route, country_locations_compat, shipments
+from .routes import categories, transactions, companies, locations, chat, monthly_company_flows, hs_code_categories, country_locations as port_locations_route, country_locations_compat, shipments, country_trade_stats
 from .database import get_db
 
 app = FastAPI(title="Supply Chain API", version="1.0.0")
@@ -161,6 +161,7 @@ app.include_router(hs_code_categories.router, prefix="/api/hs-code-categories", 
 app.include_router(port_locations_route.router, prefix="/api/port-locations", tags=["port-locations"])
 # 向后兼容：保留 country-locations 路由（从 port_locations 表提取国家信息）
 app.include_router(country_locations_compat.router, prefix="/api/country-locations", tags=["country-locations"])
+app.include_router(country_trade_stats.router, prefix="/api/country-trade-stats", tags=["country-trade-stats"])
 
 @app.get("/")
 def root():

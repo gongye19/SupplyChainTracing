@@ -1,4 +1,4 @@
-import { Category, Transaction, Company, CompanyWithLocation, Location, Filters, MonthlyCompanyFlow, HSCodeCategory, Shipment } from '../types';
+import { Category, Transaction, Company, CompanyWithLocation, Location, Filters, MonthlyCompanyFlow, HSCodeCategory, Shipment, CountryMonthlyTradeStat, CountryTradeStatSummary, CountryTradeTrend, TopCountry, CountryTradeFilters } from '../types';
 
 // 前端在浏览器中运行，所以使用localhost（通过Vite代理或直接连接）
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
@@ -613,6 +613,155 @@ export const chatAPI = {
       console.error('Error in sendMessage:', error);
       onError(error instanceof Error ? error.message : 'Unknown error');
     }
+  },
+};
+
+// 国家贸易统计API
+export const countryTradeStatsAPI = {
+  getAll: async (filters?: CountryTradeFilters): Promise<CountryMonthlyTradeStat[]> => {
+    const params = new URLSearchParams();
+    if (filters?.hsCode?.length) {
+      filters.hsCode.forEach(code => params.append('hs_code', code));
+    }
+    if (filters?.year) {
+      params.append('year', filters.year.toString());
+    }
+    if (filters?.month) {
+      params.append('month', filters.month.toString());
+    }
+    if (filters?.country?.length) {
+      filters.country.forEach(c => params.append('country', c));
+    }
+    if (filters?.industry) {
+      params.append('industry', filters.industry);
+    }
+    if (filters?.startYearMonth) {
+      params.append('start_year_month', filters.startYearMonth);
+    }
+    if (filters?.endYearMonth) {
+      params.append('end_year_month', filters.endYearMonth);
+    }
+    params.append('limit', '10000');
+
+    const data = await fetchAPI<any[]>(`/api/country-trade-stats?${params.toString()}`);
+    return data.map((item: any) => ({
+      hsCode: item.hs_code,
+      year: item.year,
+      month: item.month,
+      countryCode: item.country_code,
+      industry: item.industry,
+      weight: item.weight ? parseFloat(item.weight) : undefined,
+      quantity: item.quantity ? parseFloat(item.quantity) : undefined,
+      sumOfUsd: parseFloat(item.sum_of_usd) || 0,
+      weightAvgPrice: item.weight_avg_price ? parseFloat(item.weight_avg_price) : undefined,
+      quantityAvgPrice: item.quantity_avg_price ? parseFloat(item.quantity_avg_price) : undefined,
+      tradeCount: parseInt(item.trade_count) || 0,
+      amountSharePct: parseFloat(item.amount_share_pct) || 0,
+    }));
+  },
+
+  getSummary: async (filters?: CountryTradeFilters): Promise<CountryTradeStatSummary> => {
+    const params = new URLSearchParams();
+    if (filters?.hsCode?.length) {
+      filters.hsCode.forEach(code => params.append('hs_code', code));
+    }
+    if (filters?.year) {
+      params.append('year', filters.year.toString());
+    }
+    if (filters?.month) {
+      params.append('month', filters.month.toString());
+    }
+    if (filters?.country?.length) {
+      filters.country.forEach(c => params.append('country', c));
+    }
+    if (filters?.industry) {
+      params.append('industry', filters.industry);
+    }
+    if (filters?.startYearMonth) {
+      params.append('start_year_month', filters.startYearMonth);
+    }
+    if (filters?.endYearMonth) {
+      params.append('end_year_month', filters.endYearMonth);
+    }
+
+    const data = await fetchAPI<any>(`/api/country-trade-stats/summary?${params.toString()}`);
+    return {
+      totalCountries: parseInt(data.total_countries) || 0,
+      totalTradeValue: parseFloat(data.total_trade_value) || 0,
+      totalWeight: data.total_weight ? parseFloat(data.total_weight) : undefined,
+      totalQuantity: data.total_quantity ? parseFloat(data.total_quantity) : undefined,
+      totalTradeCount: parseInt(data.total_trade_count) || 0,
+      avgSharePct: parseFloat(data.avg_share_pct) || 0,
+    };
+  },
+
+  getTrends: async (filters?: {
+    hsCode?: string;
+    country?: string;
+    industry?: string;
+    startYearMonth?: string;
+    endYearMonth?: string;
+  }): Promise<CountryTradeTrend[]> => {
+    const params = new URLSearchParams();
+    if (filters?.hsCode) {
+      params.append('hs_code', filters.hsCode);
+    }
+    if (filters?.country) {
+      params.append('country', filters.country);
+    }
+    if (filters?.industry) {
+      params.append('industry', filters.industry);
+    }
+    if (filters?.startYearMonth) {
+      params.append('start_year_month', filters.startYearMonth);
+    }
+    if (filters?.endYearMonth) {
+      params.append('end_year_month', filters.endYearMonth);
+    }
+
+    const data = await fetchAPI<any[]>(`/api/country-trade-stats/trends?${params.toString()}`);
+    return data.map((item: any) => ({
+      yearMonth: item.year_month,
+      sumOfUsd: parseFloat(item.sum_of_usd) || 0,
+      weight: item.weight ? parseFloat(item.weight) : undefined,
+      quantity: item.quantity ? parseFloat(item.quantity) : undefined,
+      tradeCount: parseInt(item.trade_count) || 0,
+    }));
+  },
+
+  getTopCountries: async (
+    filters?: {
+      hsCode?: string;
+      year?: number;
+      month?: number;
+      industry?: string;
+      limit?: number;
+    }
+  ): Promise<TopCountry[]> => {
+    const params = new URLSearchParams();
+    if (filters?.hsCode) {
+      params.append('hs_code', filters.hsCode);
+    }
+    if (filters?.year) {
+      params.append('year', filters.year.toString());
+    }
+    if (filters?.month) {
+      params.append('month', filters.month.toString());
+    }
+    if (filters?.industry) {
+      params.append('industry', filters.industry);
+    }
+    params.append('limit', (filters?.limit || 10).toString());
+
+    const data = await fetchAPI<any[]>(`/api/country-trade-stats/top-countries?${params.toString()}`);
+    return data.map((item: any) => ({
+      countryCode: item.country_code,
+      sumOfUsd: parseFloat(item.sum_of_usd) || 0,
+      weight: item.weight ? parseFloat(item.weight) : undefined,
+      quantity: item.quantity ? parseFloat(item.quantity) : undefined,
+      tradeCount: parseInt(item.trade_count) || 0,
+      amountSharePct: parseFloat(item.amount_share_pct) || 0,
+    }));
   },
 };
 

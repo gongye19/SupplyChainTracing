@@ -90,3 +90,24 @@ class Transaction(Base):
     exporter_company = relationship("Company", foreign_keys=[exporter_company_id], back_populates="exported_transactions")
     importer_company = relationship("Company", foreign_keys=[importer_company_id], back_populates="imported_transactions")
 
+class CountryMonthlyTradeStat(Base):
+    __tablename__ = "country_monthly_trade_stats"
+    
+    id = Column(String(100), primary_key=True)
+    hs_code = Column(String(6), nullable=False)
+    year = Column(Integer, nullable=False)
+    month = Column(Integer, nullable=False)
+    country_code = Column(String(3), nullable=False)
+    industry = Column(String(50))
+    
+    weight = Column(Numeric(20, 2))
+    quantity = Column(Numeric(20, 2))
+    sum_of_usd = Column(Numeric(20, 2))
+    weight_avg_price = Column(Numeric(15, 4))
+    quantity_avg_price = Column(Numeric(15, 4))
+    trade_count = Column(Integer)
+    amount_share_pct = Column(Numeric(10, 8))
+    
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
+

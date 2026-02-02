@@ -4,15 +4,18 @@ import SupplyMap from './components/SupplyMap';
 import StatsPanel from './components/StatsPanel';
 import SidebarFilters from './components/SidebarFilters';
 import AIAssistant from './components/AIAssistant';
-import { Transaction, Filters, HSCodeCategory, CountryLocation, Location, Shipment } from './types';
-import { shipmentsAPI, hsCodeCategoriesAPI, countryLocationsAPI, chatAPI, ChatMessage } from './services/api';
+import CountryTradeMap from './components/CountryTradeMap';
+import CountryTradeStatsPanel from './components/CountryTradeStatsPanel';
+import HSCodeSelector from './components/HSCodeSelector';
+import { Transaction, Filters, HSCodeCategory, CountryLocation, Location, Shipment, CountryMonthlyTradeStat, CountryTradeStatSummary, CountryTradeTrend, TopCountry, CountryTradeFilters } from './types';
+import { shipmentsAPI, hsCodeCategoriesAPI, countryLocationsAPI, chatAPI, ChatMessage, countryTradeStatsAPI } from './services/api';
 import { Globe, BarChart3, Map as MapIcon, Package, TrendingUp, Users, ChevronRight } from 'lucide-react';
 import { useLanguage } from './contexts/LanguageContext';
 import { getHSCodeColorCached } from './utils/hsCodeColors';
 
 const App: React.FC = () => {
   const { language, setLanguage, t } = useLanguage();
-  const [activeView, setActiveView] = useState<'map' | 'stats'>('map');
+  const [activeView, setActiveView] = useState<'map' | 'stats' | 'country-trade'>('map');
   
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -41,6 +44,17 @@ const App: React.FC = () => {
     suppliers: 0,
     categories: 0
   });
+
+  // 国家贸易统计相关状态
+  const [countryTradeStats, setCountryTradeStats] = useState<CountryMonthlyTradeStat[]>([]);
+  const [countryTradeSummary, setCountryTradeSummary] = useState<CountryTradeStatSummary | null>(null);
+  const [countryTradeTrends, setCountryTradeTrends] = useState<CountryTradeTrend[]>([]);
+  const [topCountries, setTopCountries] = useState<TopCountry[]>([]);
+  const [countryTradeFilters, setCountryTradeFilters] = useState<CountryTradeFilters>({
+    hsCode: [],
+    industry: 'SemiConductor',
+  });
+  const [countryTradeLoading, setCountryTradeLoading] = useState(false);
   
   // Refs for preview/final scheduling
   const filtersRef = useRef(filters);
@@ -93,6 +107,42 @@ const App: React.FC = () => {
     };
     loadInitialData();
   }, []);
+
+  // 加载国家贸易统计数据
+  useEffect(() => {
+    if (activeView !== 'country-trade') return;
+
+    const loadCountryTradeData = async () => {
+      try {
+        setCountryTradeLoading(true);
+        const [statsData, summaryData, trendsData, topCountriesData] = await Promise.all([
+          countryTradeStatsAPI.getAll(countryTradeFilters),
+          countryTradeStatsAPI.getSummary(countryTradeFilters),
+          countryTradeStatsAPI.getTrends({
+            hsCode: countryTradeFilters.hsCode?.[0],
+            industry: countryTradeFilters.industry,
+            startYearMonth: countryTradeFilters.startYearMonth,
+            endYearMonth: countryTradeFilters.endYearMonth,
+          }),
+          countryTradeStatsAPI.getTopCountries({
+            hsCode: countryTradeFilters.hsCode?.[0],
+            industry: countryTradeFilters.industry,
+            limit: 10,
+          }),
+        ]);
+        setCountryTradeStats(statsData);
+        setCountryTradeSummary(summaryData);
+        setCountryTradeTrends(trendsData);
+        setTopCountries(topCountriesData);
+      } catch (error) {
+        console.error('Failed to load country trade data:', error);
+      } finally {
+        setCountryTradeLoading(false);
+      }
+    };
+
+    loadCountryTradeData();
+  }, [activeView, countryTradeFilters]);
 
   // 国家名称到国家代码的映射函数
   const getCountryCode = useCallback((countryName: string): string => {
@@ -388,6 +438,16 @@ const App: React.FC = () => {
                </div>
                {activeView === 'stats' && <ChevronRight className="w-3.5 h-3.5" />}
              </button>
+             <button 
+               onClick={() => setActiveView('country-trade')}
+               className={`flex items-center justify-between px-4 py-3 rounded-[12px] transition-all text-[14px] font-semibold ${activeView === 'country-trade' ? 'bg-[#007AFF] text-white shadow-lg shadow-blue-500/20' : 'text-[#86868B] hover:bg-black/5'}`}
+             >
+               <div className="flex items-center gap-3">
+                 <Globe className="w-4 h-4" />
+                 国家贸易统计
+               </div>
+               {activeView === 'country-trade' && <ChevronRight className="w-3.5 h-3.5" />}
+             </button>
            </div>
 
            <div className="h-[0.5px] bg-black/5"></div>
@@ -458,7 +518,7 @@ const App: React.FC = () => {
                 </>
               )}
             </div>
-          ) : (
+          ) : activeView === 'stats' ? (
             <div className="h-full overflow-y-auto custom-scrollbar pr-4">
               <div className="mb-10">
                 <h2 className="text-[32px] font-bold tracking-tight text-[#1D1D1F]">{t('app.networkInsights')}</h2>
@@ -470,6 +530,75 @@ const App: React.FC = () => {
                 </div>
               ) : (
                 <StatsPanel transactions={[]} />
+              )}
+            </div>
+          ) : (
+            <div className="h-full flex flex-col gap-6 overflow-y-auto custom-scrollbar pr-4">
+              <div className="mb-4">
+                <h2 className="text-[32px] font-bold tracking-tight text-[#1D1D1F]">国家贸易统计</h2>
+                <p className="text-[#86868B] text-[16px] font-medium mt-1">按HS编码和国家的月度贸易数据分析</p>
+              </div>
+
+              {/* 筛选器 */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-1">
+                  <HSCodeSelector
+                    selectedHSCodes={countryTradeFilters.hsCode || []}
+                    onHSCodeChange={(hsCodes) => setCountryTradeFilters({ ...countryTradeFilters, hsCode: hsCodes })}
+                  />
+                </div>
+                <div className="lg:col-span-2 bg-white border border-black/5 rounded-[20px] p-6 shadow-sm">
+                  <h3 className="text-[16px] font-bold text-[#1D1D1F] mb-4">时间范围</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[12px] text-[#86868B] mb-2 block">起始年月</label>
+                      <input
+                        type="month"
+                        value={countryTradeFilters.startYearMonth || '2021-01'}
+                        onChange={(e) => setCountryTradeFilters({ ...countryTradeFilters, startYearMonth: e.target.value })}
+                        className="w-full px-3 py-2 border border-black/10 rounded-lg text-[14px] focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[12px] text-[#86868B] mb-2 block">结束年月</label>
+                      <input
+                        type="month"
+                        value={countryTradeFilters.endYearMonth || '2025-12'}
+                        onChange={(e) => setCountryTradeFilters({ ...countryTradeFilters, endYearMonth: e.target.value })}
+                        className="w-full px-3 py-2 border border-black/10 rounded-lg text-[14px] focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 地图和统计面板 */}
+              {countryTradeLoading ? (
+                <div className="flex items-center justify-center h-[600px]">
+                  <div className="text-[#86868B]">加载中...</div>
+                </div>
+              ) : (
+                <>
+                  <div className="bg-white border border-black/5 rounded-[28px] p-6 shadow-sm h-[600px]">
+                    <h3 className="text-[18px] font-bold text-[#1D1D1F] mb-4">国家贸易地图</h3>
+                    <div className="h-[550px]">
+                      <CountryTradeMap
+                        stats={countryTradeStats}
+                        countries={countries}
+                        selectedHSCodes={countryTradeFilters.hsCode}
+                      />
+                    </div>
+                  </div>
+
+                  {countryTradeSummary && (
+                    <CountryTradeStatsPanel
+                      stats={countryTradeStats}
+                      summary={countryTradeSummary}
+                      trends={countryTradeTrends}
+                      topCountries={topCountries}
+                    />
+                  )}
+                </>
               )}
             </div>
           )}

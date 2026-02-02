@@ -155,3 +155,59 @@ export interface CountryLocation {
   region?: string;
   continent?: string;
 }
+
+// 国家月度贸易统计
+export interface CountryMonthlyTradeStat {
+  hsCode: string;
+  year: number;
+  month: number;
+  countryCode: string;
+  industry?: string;
+  weight?: number;
+  quantity?: number;
+  sumOfUsd: number;
+  weightAvgPrice?: number;
+  quantityAvgPrice?: number;
+  tradeCount: number;
+  amountSharePct: number;
+}
+
+// 国家贸易统计汇总
+export interface CountryTradeStatSummary {
+  totalCountries: number;
+  totalTradeValue: number;
+  totalWeight?: number;
+  totalQuantity?: number;
+  totalTradeCount: number;
+  avgSharePct: number;
+}
+
+// 国家贸易趋势
+export interface CountryTradeTrend {
+  yearMonth: string; // YYYY-MM
+  sumOfUsd: number;
+  weight?: number;
+  quantity?: number;
+  tradeCount: number;
+}
+
+// Top国家
+export interface TopCountry {
+  countryCode: string;
+  sumOfUsd: number;
+  weight?: number;
+  quantity?: number;
+  tradeCount: number;
+  amountSharePct: number;
+}
+
+// 国家贸易统计筛选条件
+export interface CountryTradeFilters {
+  hsCode?: string[];
+  year?: number;
+  month?: number;
+  country?: string[];
+  industry?: string;
+  startYearMonth?: string; // YYYY-MM
+  endYearMonth?: string; // YYYY-MM
+}

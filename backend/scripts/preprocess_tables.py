@@ -520,7 +520,7 @@ if __name__ == "__main__":
         input_csv = sys.argv[1]
         output_dir = sys.argv[2]
     else:
-        input_csv = str(project_root / "data" / "Factset_Extended_Shipment_Data_sample_1000.csv")
+        input_csv = str(project_root / "data" / "Factset_Extended_Shipment_Data_latest_10000.csv")
         output_dir = str(project_root / "processed_tables")
     
     preprocess_tables(input_csv, output_dir)

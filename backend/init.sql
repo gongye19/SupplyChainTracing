@@ -122,3 +122,35 @@ INSERT INTO locations (id, type, country_code, country_name, city, latitude, lon
 ('NL_Amsterdam', 'city', 'NL', 'Netherlands', 'Amsterdam', 52.3676, 4.9041, 'Western Europe', 'Europe')
 ON CONFLICT (country_code, city) DO NOTHING;
 
+-- 创建国家月度贸易统计表
+CREATE TABLE IF NOT EXISTS country_monthly_trade_stats (
+    id VARCHAR(100) PRIMARY KEY,
+    hs_code VARCHAR(6) NOT NULL,
+    year INTEGER NOT NULL,
+    month INTEGER NOT NULL,
+    country_code VARCHAR(3) NOT NULL,
+    industry VARCHAR(50),
+    
+    -- 统计数据
+    weight DECIMAL(20, 2),
+    quantity DECIMAL(20, 2),
+    sum_of_usd DECIMAL(20, 2),
+    weight_avg_price DECIMAL(15, 4),
+    quantity_avg_price DECIMAL(15, 4),
+    trade_count INTEGER,
+    amount_share_pct DECIMAL(10, 8),
+    
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    CONSTRAINT uq_hs_year_month_country UNIQUE (hs_code, year, month, country_code)
+);
+
+-- 创建索引
+CREATE INDEX IF NOT EXISTS idx_cmts_hs_code ON country_monthly_trade_stats(hs_code);
+CREATE INDEX IF NOT EXISTS idx_cmts_year_month ON country_monthly_trade_stats(year, month);
+CREATE INDEX IF NOT EXISTS idx_cmts_country ON country_monthly_trade_stats(country_code);
+CREATE INDEX IF NOT EXISTS idx_cmts_industry ON country_monthly_trade_stats(industry);
+CREATE INDEX IF NOT EXISTS idx_cmts_hs_year ON country_monthly_trade_stats(hs_code, year);
+CREATE INDEX IF NOT EXISTS idx_cmts_year_month_country ON country_monthly_trade_stats(year, month, country_code);
+

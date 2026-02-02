@@ -238,3 +238,44 @@ class CountryLocation(BaseModel):
     class Config:
         from_attributes = True
 
+# Country Monthly Trade Stat Schemas
+class CountryMonthlyTradeStat(BaseModel):
+    hs_code: str
+    year: int
+    month: int
+    country_code: str
+    industry: Optional[str] = None
+    weight: Optional[float] = None
+    quantity: Optional[float] = None
+    sum_of_usd: float
+    weight_avg_price: Optional[float] = None
+    quantity_avg_price: Optional[float] = None
+    trade_count: int
+    amount_share_pct: float
+    
+    class Config:
+        from_attributes = True
+
+class CountryTradeStatSummary(BaseModel):
+    total_countries: int
+    total_trade_value: float
+    total_weight: Optional[float] = None
+    total_quantity: Optional[float] = None
+    total_trade_count: int
+    avg_share_pct: float
+
+class CountryTradeTrend(BaseModel):
+    year_month: str  # YYYY-MM
+    sum_of_usd: float
+    weight: Optional[float] = None
+    quantity: Optional[float] = None
+    trade_count: int
+
+class TopCountry(BaseModel):
+    country_code: str
+    sum_of_usd: float
+    weight: Optional[float] = None
+    quantity: Optional[float] = None
+    trade_count: int
+    amount_share_pct: float
+
