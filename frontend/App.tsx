@@ -139,6 +139,14 @@ const App: React.FC = () => {
           }),
           shipmentsAPI.getAll(shipmentsFilters),
         ]);
+        console.log('Country trade data loaded:', {
+          stats: statsData.length,
+          summary: summaryData,
+          trends: trendsData.length,
+          topCountries: topCountriesData.length,
+          shipments: shipmentsData.length,
+        });
+        
         setCountryTradeStats(statsData);
         setCountryTradeSummary(summaryData);
         setCountryTradeTrends(trendsData);
@@ -146,13 +154,21 @@ const App: React.FC = () => {
         setShipments(shipmentsData); // 更新 shipments 用于显示流向
       } catch (error) {
         console.error('Failed to load country trade data:', error);
+        // 显示错误信息给用户
+        alert(`加载国家贸易数据失败: ${error instanceof Error ? error.message : String(error)}\n\n请检查：\n1. 数据库是否已导入数据\n2. 后端服务是否正常运行\n3. 网络连接是否正常`);
       } finally {
         setCountryTradeLoading(false);
       }
     };
 
+    // 确保 countries 数据已加载
+    if (countries.length === 0) {
+      console.warn('Countries data not loaded yet, waiting...');
+      return;
+    }
+
     loadCountryTradeData();
-  }, [activeView, countryTradeFilters]);
+  }, [activeView, countryTradeFilters, countries.length]);
 
   // 国家名称到国家代码的映射函数
   const getCountryCode = useCallback((countryName: string): string => {
@@ -593,6 +609,18 @@ const App: React.FC = () => {
                 <div className="flex items-center justify-center h-[600px]">
                   <div className="text-[#86868B]">{t('countryTrade.loading')}</div>
                 </div>
+              ) : countryTradeSummary === null ? (
+                <div className="flex flex-col items-center justify-center h-[600px] text-center">
+                  <div className="text-[#86868B] mb-4">
+                    {t('countryTrade.noData')}
+                  </div>
+                  <div className="text-[12px] text-[#86868B] max-w-md">
+                    可能的原因：<br />
+                    1. 数据库尚未导入国家贸易统计数据<br />
+                    2. 当前筛选条件无匹配数据<br />
+                    3. 后端服务连接失败
+                  </div>
+                </div>
               ) : (
                 <>
                   <div className="bg-white border border-black/5 rounded-[28px] p-6 shadow-sm h-[600px]">
@@ -607,14 +635,12 @@ const App: React.FC = () => {
                     </div>
                   </div>
 
-                  {countryTradeSummary && (
-                    <CountryTradeStatsPanel
-                      stats={countryTradeStats}
-                      summary={countryTradeSummary}
-                      trends={countryTradeTrends}
-                      topCountries={topCountries}
-                    />
-                  )}
+                  <CountryTradeStatsPanel
+                    stats={countryTradeStats}
+                    summary={countryTradeSummary}
+                    trends={countryTradeTrends}
+                    topCountries={topCountries}
+                  />
                 </>
               )}
             </div>

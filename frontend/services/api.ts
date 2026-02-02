@@ -643,7 +643,9 @@ export const countryTradeStatsAPI = {
     }
     params.append('limit', '10000');
 
+    console.log('Fetching country trade stats with params:', params.toString());
     const data = await fetchAPI<any[]>(`/api/country-trade-stats?${params.toString()}`);
+    console.log('Received country trade stats:', data.length, 'records');
     return data.map((item: any) => ({
       hsCode: item.hs_code,
       year: item.year,
@@ -662,6 +664,7 @@ export const countryTradeStatsAPI = {
 
   getSummary: async (filters?: CountryTradeFilters): Promise<CountryTradeStatSummary> => {
     const params = new URLSearchParams();
+    console.log('Fetching country trade summary with filters:', filters);
     if (filters?.hsCode?.length) {
       filters.hsCode.forEach(code => params.append('hs_code', code));
     }
