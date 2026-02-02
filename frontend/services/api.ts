@@ -6,24 +6,34 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
 async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
   console.log('Fetching:', url);
+  console.log('API_BASE_URL:', API_BASE_URL);
   
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
-  });
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers,
+      },
+    });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('API Error:', response.status, response.statusText, errorText);
-    throw new Error(`API error (${response.status}): ${response.statusText}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('API Error:', response.status, response.statusText, errorText);
+      throw new Error(`API error (${response.status}): ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log('API Response:', endpoint, data);
+    return data;
+  } catch (error) {
+    // 处理网络错误
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      console.error('Network error:', error);
+      throw new Error(`无法连接到后端服务。请检查：\n1. 后端服务是否运行\n2. VITE_API_URL 环境变量是否正确设置\n当前 API URL: ${API_BASE_URL}`);
+    }
+    throw error;
   }
-
-  const data = await response.json();
-  console.log('API Response:', endpoint, data);
-  return data;
 }
 
 // 品类API
