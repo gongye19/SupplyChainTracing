@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, Legend } from 'recharts';
 import { TrendingUp, Globe, DollarSign, Package } from 'lucide-react';
 import { CountryMonthlyTradeStat, CountryTradeStatSummary, CountryTradeTrend, TopCountry } from '../types';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface CountryTradeStatsPanelProps {
   stats: CountryMonthlyTradeStat[];
@@ -18,6 +19,8 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
   trends,
   topCountries,
 }) => {
+  const { t } = useLanguage();
+  
   // 格式化货币
   const formatCurrency = (value: number) => {
     if (value >= 1000000000) {
@@ -55,7 +58,7 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white border border-black/5 p-6 rounded-[20px] shadow-sm">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[12px] font-medium text-[#86868B] uppercase">总贸易额</span>
+            <span className="text-[12px] font-medium text-[#86868B] uppercase">{t('countryTrade.totalTradeValue')}</span>
             <DollarSign className="w-5 h-5 text-[#007AFF]" />
           </div>
           <div className="text-[24px] font-bold text-[#1D1D1F]">
@@ -65,7 +68,7 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
 
         <div className="bg-white border border-black/5 p-6 rounded-[20px] shadow-sm">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[12px] font-medium text-[#86868B] uppercase">参与国家</span>
+            <span className="text-[12px] font-medium text-[#86868B] uppercase">{t('countryTrade.participatingCountries')}</span>
             <Globe className="w-5 h-5 text-[#34C759]" />
           </div>
           <div className="text-[24px] font-bold text-[#1D1D1F]">
@@ -75,7 +78,7 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
 
         <div className="bg-white border border-black/5 p-6 rounded-[20px] shadow-sm">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[12px] font-medium text-[#86868B] uppercase">交易次数</span>
+            <span className="text-[12px] font-medium text-[#86868B] uppercase">{t('countryTrade.transactionCount')}</span>
             <Package className="w-5 h-5 text-[#FF9500]" />
           </div>
           <div className="text-[24px] font-bold text-[#1D1D1F]">
@@ -85,7 +88,7 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
 
         <div className="bg-white border border-black/5 p-6 rounded-[20px] shadow-sm">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[12px] font-medium text-[#86868B] uppercase">平均市场份额</span>
+            <span className="text-[12px] font-medium text-[#86868B] uppercase">{t('countryTrade.avgMarketShare')}</span>
             <TrendingUp className="w-5 h-5 text-[#5856D6]" />
           </div>
           <div className="text-[24px] font-bold text-[#1D1D1F]">
@@ -99,7 +102,7 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-[18px] font-bold text-[#1D1D1F] flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-[#007AFF]" />
-            贸易趋势
+            {t('countryTrade.tradeTrends')}
           </h3>
         </div>
         <div className="h-[320px]">
@@ -151,7 +154,7 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
             </ResponsiveContainer>
           ) : (
             <div className="flex items-center justify-center h-full text-[#86868B]">
-              暂无数据
+              {t('countryTrade.noData')}
             </div>
           )}
         </div>
@@ -161,7 +164,7 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* 市场份额饼图 */}
         <div className="bg-white border border-black/5 p-8 rounded-[28px] shadow-sm">
-          <h3 className="text-[18px] font-bold text-[#1D1D1F] mb-6">市场份额分布</h3>
+          <h3 className="text-[18px] font-bold text-[#1D1D1F] mb-6">{t('countryTrade.marketShare')}</h3>
           <div className="h-[300px]">
             {marketShareData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
@@ -195,7 +198,7 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
 
         {/* Top国家柱状图 */}
         <div className="bg-white border border-black/5 p-8 rounded-[28px] shadow-sm">
-          <h3 className="text-[18px] font-bold text-[#1D1D1F] mb-6">Top 10 国家</h3>
+          <h3 className="text-[18px] font-bold text-[#1D1D1F] mb-6">{t('countryTrade.topCountries')}</h3>
           <div className="h-[300px]">
             {topCountriesData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">

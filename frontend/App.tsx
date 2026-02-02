@@ -115,7 +115,15 @@ const App: React.FC = () => {
     const loadCountryTradeData = async () => {
       try {
         setCountryTradeLoading(true);
-        const [statsData, summaryData, trendsData, topCountriesData] = await Promise.all([
+        
+        // 构建 shipments 筛选条件（用于显示流向）
+        const shipmentsFilters: Partial<Filters> = {
+          startDate: countryTradeFilters.startYearMonth ? `${countryTradeFilters.startYearMonth}-01` : undefined,
+          endDate: countryTradeFilters.endYearMonth ? `${countryTradeFilters.endYearMonth}-31` : undefined,
+          selectedHSCodeCategories: countryTradeFilters.hsCode?.map(code => code.substring(0, 2)) || [],
+        };
+        
+        const [statsData, summaryData, trendsData, topCountriesData, shipmentsData] = await Promise.all([
           countryTradeStatsAPI.getAll(countryTradeFilters),
           countryTradeStatsAPI.getSummary(countryTradeFilters),
           countryTradeStatsAPI.getTrends({
@@ -129,11 +137,13 @@ const App: React.FC = () => {
             industry: countryTradeFilters.industry,
             limit: 10,
           }),
+          shipmentsAPI.getAll(shipmentsFilters),
         ]);
         setCountryTradeStats(statsData);
         setCountryTradeSummary(summaryData);
         setCountryTradeTrends(trendsData);
         setTopCountries(topCountriesData);
+        setShipments(shipmentsData); // 更新 shipments 用于显示流向
       } catch (error) {
         console.error('Failed to load country trade data:', error);
       } finally {
@@ -444,7 +454,7 @@ const App: React.FC = () => {
              >
                <div className="flex items-center gap-3">
                  <Globe className="w-4 h-4" />
-                 国家贸易统计
+                 {t('countryTrade.title')}
                </div>
                {activeView === 'country-trade' && <ChevronRight className="w-3.5 h-3.5" />}
              </button>
@@ -535,8 +545,8 @@ const App: React.FC = () => {
           ) : (
             <div className="h-full flex flex-col gap-6 overflow-y-auto custom-scrollbar pr-4">
               <div className="mb-4">
-                <h2 className="text-[32px] font-bold tracking-tight text-[#1D1D1F]">国家贸易统计</h2>
-                <p className="text-[#86868B] text-[16px] font-medium mt-1">按HS编码和国家的月度贸易数据分析</p>
+                <h2 className="text-[32px] font-bold tracking-tight text-[#1D1D1F]">{t('countryTrade.title')}</h2>
+                <p className="text-[#86868B] text-[16px] font-medium mt-1">{t('countryTrade.subtitle')}</p>
               </div>
 
               {/* 筛选器 */}
@@ -548,10 +558,10 @@ const App: React.FC = () => {
                   />
                 </div>
                 <div className="lg:col-span-2 bg-white border border-black/5 rounded-[20px] p-6 shadow-sm">
-                  <h3 className="text-[16px] font-bold text-[#1D1D1F] mb-4">时间范围</h3>
+                  <h3 className="text-[16px] font-bold text-[#1D1D1F] mb-4">{t('countryTrade.timeRange')}</h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="text-[12px] text-[#86868B] mb-2 block">起始年月</label>
+                      <label className="text-[12px] text-[#86868B] mb-2 block">{t('countryTrade.startMonth')}</label>
                       <input
                         type="month"
                         value={countryTradeFilters.startYearMonth || '2021-01'}
@@ -560,7 +570,7 @@ const App: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <label className="text-[12px] text-[#86868B] mb-2 block">结束年月</label>
+                      <label className="text-[12px] text-[#86868B] mb-2 block">{t('countryTrade.endMonth')}</label>
                       <input
                         type="month"
                         value={countryTradeFilters.endYearMonth || '2025-12'}
@@ -575,17 +585,18 @@ const App: React.FC = () => {
               {/* 地图和统计面板 */}
               {countryTradeLoading ? (
                 <div className="flex items-center justify-center h-[600px]">
-                  <div className="text-[#86868B]">加载中...</div>
+                  <div className="text-[#86868B]">{t('countryTrade.loading')}</div>
                 </div>
               ) : (
                 <>
                   <div className="bg-white border border-black/5 rounded-[28px] p-6 shadow-sm h-[600px]">
-                    <h3 className="text-[18px] font-bold text-[#1D1D1F] mb-4">国家贸易地图</h3>
+                    <h3 className="text-[18px] font-bold text-[#1D1D1F] mb-4">{t('countryTrade.tradeMap')}</h3>
                     <div className="h-[550px]">
                       <CountryTradeMap
                         stats={countryTradeStats}
                         countries={countries}
                         selectedHSCodes={countryTradeFilters.hsCode}
+                        shipments={shipments}
                       />
                     </div>
                   </div>

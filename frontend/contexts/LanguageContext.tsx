@@ -97,6 +97,31 @@ const translations: Record<Language, Record<string, string>> = {
     // Common
     'common.map': 'Map',
     'common.stats': 'Statistics',
+    
+    // Country Trade Stats
+    'countryTrade.title': 'Country Trade Statistics',
+    'countryTrade.subtitle': 'Monthly trade data analysis by HS code and country',
+    'countryTrade.hsCodeFilter': 'HS Code Filter',
+    'countryTrade.selectAll': 'Select All',
+    'countryTrade.clearAll': 'Clear All',
+    'countryTrade.selected': 'selected',
+    'countryTrade.timeRange': 'Time Range',
+    'countryTrade.startMonth': 'Start Month',
+    'countryTrade.endMonth': 'End Month',
+    'countryTrade.tradeMap': 'Country Trade Map',
+    'countryTrade.totalTradeValue': 'Total Trade Value',
+    'countryTrade.participatingCountries': 'Participating Countries',
+    'countryTrade.transactionCount': 'Transaction Count',
+    'countryTrade.avgMarketShare': 'Avg Market Share',
+    'countryTrade.tradeTrends': 'Trade Trends',
+    'countryTrade.marketShare': 'Market Share Distribution',
+    'countryTrade.topCountries': 'Top 10 Countries',
+    'countryTrade.tradeValue': 'Trade Value',
+    'countryTrade.low': 'Low',
+    'countryTrade.high': 'High',
+    'countryTrade.maxValue': 'Max Value',
+    'countryTrade.loading': 'Loading...',
+    'countryTrade.noData': 'No Data',
   },
   zh: {
     // App
@@ -184,6 +209,31 @@ const translations: Record<Language, Record<string, string>> = {
     // Common
     'common.map': '地图',
     'common.stats': '统计',
+    
+    // Country Trade Stats
+    'countryTrade.title': '国家贸易统计',
+    'countryTrade.subtitle': '按HS编码和国家的月度贸易数据分析',
+    'countryTrade.hsCodeFilter': 'HS编码筛选',
+    'countryTrade.selectAll': '全选',
+    'countryTrade.clearAll': '取消全选',
+    'countryTrade.selected': '已选择',
+    'countryTrade.timeRange': '时间范围',
+    'countryTrade.startMonth': '起始年月',
+    'countryTrade.endMonth': '结束年月',
+    'countryTrade.tradeMap': '国家贸易地图',
+    'countryTrade.totalTradeValue': '总贸易额',
+    'countryTrade.participatingCountries': '参与国家',
+    'countryTrade.transactionCount': '交易次数',
+    'countryTrade.avgMarketShare': '平均市场份额',
+    'countryTrade.tradeTrends': '贸易趋势',
+    'countryTrade.marketShare': '市场份额分布',
+    'countryTrade.topCountries': 'Top 10 国家',
+    'countryTrade.tradeValue': '贸易额',
+    'countryTrade.low': '低',
+    'countryTrade.high': '高',
+    'countryTrade.maxValue': '最大值',
+    'countryTrade.loading': '加载中...',
+    'countryTrade.noData': '暂无数据',
   },
 };
 

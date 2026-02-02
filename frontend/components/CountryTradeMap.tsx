@@ -1,11 +1,14 @@
 import React, { useEffect, useRef, useMemo } from 'react';
 import * as d3 from 'd3';
-import { CountryMonthlyTradeStat, CountryLocation } from '../types';
+import { CountryMonthlyTradeStat, CountryLocation, Shipment } from '../types';
+import { useLanguage } from '../contexts/LanguageContext';
+import { getPortLocation } from '../utils/portLocations';
 
 interface CountryTradeMapProps {
   stats: CountryMonthlyTradeStat[];
   countries: CountryLocation[];
   selectedHSCodes?: string[];
+  shipments?: Shipment[];
 }
 
 // GeoJSON 缓存
@@ -21,12 +24,15 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
   stats,
   countries,
   selectedHSCodes = [],
+  shipments = [],
 }) => {
+  const { t } = useLanguage();
   const svgRef = useRef<SVGSVGElement>(null);
   const projectionRef = useRef<d3.GeoProjection | null>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   const gMapRef = useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
   const gNodesRef = useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
+  const gFlowsRef = useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
   const tooltipRef = useRef<d3.Selection<HTMLDivElement, unknown, null, undefined> | null>(null);
 
   // 计算每个国家的总贸易额
@@ -84,9 +90,11 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
     const g = svg.append('g');
     const gMap = g.append('g').attr('class', 'map-layer');
     const gNodes = g.append('g').attr('class', 'nodes-layer');
+    const gFlows = g.append('g').attr('class', 'flows-layer');
     
     gMapRef.current = gMap;
     gNodesRef.current = gNodes;
+    gFlowsRef.current = gFlows;
 
     // 创建 Tooltip
     const d3Tooltip = d3.select('body').append('div')
@@ -188,15 +196,15 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
             }
           }
           
-          if (matchedCountry) {
+            if (matchedCountry) {
             const tradeData = countryTradeData.get(matchedCountry.countryCode);
             if (tradeData) {
               tooltip
                 .style('visibility', 'visible')
                 .html(`
                   <div style="font-weight: 600; margin-bottom: 6px;">${matchedCountry.countryName}</div>
-                  <div>贸易额: $${(tradeData.sumOfUsd / 1000000).toFixed(2)}M</div>
-                  <div>交易次数: ${tradeData.tradeCount.toLocaleString()}</div>
+                  <div>${t('countryTrade.tradeValue')}: $${(tradeData.sumOfUsd / 1000000).toFixed(2)}M</div>
+                  <div>${t('countryTrade.transactionCount')}: ${tradeData.tradeCount.toLocaleString()}</div>
                 `);
             }
           }
@@ -252,7 +260,134 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
       .attr('r', d => Math.max(3, Math.min(15, Math.sqrt(d.sumOfUsd / maxTradeValue) * 15)))
       .attr('fill', d => colorScale(d.sumOfUsd));
 
-  }, [stats, countries, countryTradeData, maxTradeValue, colorScale]);
+    // 绘制流向线（基于 shipments 数据）
+    if (shipments.length > 0 && gFlowsRef.current && projection) {
+      const gFlows = gFlowsRef.current;
+      
+      // 筛选 shipments：如果指定了 HS 编码，只显示匹配的
+      const filteredShipments = shipments.filter(s => {
+        if (selectedHSCodes.length === 0) return true;
+        // 检查 HS 编码是否匹配（前6位）
+        return selectedHSCodes.some(code => s.hsCode?.startsWith(code));
+      });
+
+      // 创建国家名称到代码的映射（用于匹配）
+      const countryNameToCodeMap = new Map<string, string>();
+      countries.forEach(country => {
+        countryNameToCodeMap.set(country.countryName.toLowerCase(), country.countryCode);
+        countryNameToCodeMap.set(country.countryCode.toLowerCase(), country.countryCode);
+      });
+
+      // 按国家对聚合流向
+      const flowMap = new Map<string, { origin: string; dest: string; value: number; count: number }>();
+      
+      filteredShipments.forEach(shipment => {
+        // 尝试从国家名称或代码获取国家代码
+        const originName = shipment.countryOfOrigin || shipment.originId || '';
+        const destName = shipment.destinationCountry || shipment.destinationId || '';
+        
+        const originCode = countryNameToCodeMap.get(originName.toLowerCase()) || originName;
+        const destCode = countryNameToCodeMap.get(destName.toLowerCase()) || destName;
+        
+        if (!originCode || !destCode || originCode === destCode) return;
+        
+        // 确保国家代码在 countryLocationMap 中存在
+        if (!countryLocationMap.has(originCode) || !countryLocationMap.has(destCode)) return;
+        
+        const key = `${originCode}_${destCode}`;
+        const existing = flowMap.get(key) || { origin: originCode, dest: destCode, value: 0, count: 0 };
+        flowMap.set(key, {
+          origin: originCode,
+          dest: destCode,
+          value: existing.value + (shipment.totalValueUsd || shipment.value || 0),
+          count: existing.count + 1,
+        });
+      });
+
+      // 获取港口位置映射
+      const portPositionsMap = new Map<string, { lat: number; lng: number; countryCode: string }>();
+      filteredShipments.forEach(s => {
+        if (s.portOfDeparture && s.countryOfOrigin) {
+          const portKey = `${s.portOfDeparture}_${s.countryOfOrigin}`;
+          const portLoc = getPortLocation(s.portOfDeparture, s.countryOfOrigin);
+          if (portLoc) {
+            portPositionsMap.set(portKey, { lat: portLoc.lat, lng: portLoc.lng, countryCode: s.countryOfOrigin });
+          }
+        }
+        if (s.portOfArrival && s.destinationCountry) {
+          const portKey = `${s.portOfArrival}_${s.destinationCountry}`;
+          const portLoc = getPortLocation(s.portOfArrival, s.destinationCountry);
+          if (portLoc) {
+            portPositionsMap.set(portKey, { lat: portLoc.lat, lng: portLoc.lng, countryCode: s.destinationCountry });
+          }
+        }
+      });
+
+      // 计算路径粗细
+      const flows = Array.from(flowMap.values());
+      const valueExtent = d3.extent(flows, d => d.value) as [number, number];
+      const strokeScale = d3.scaleSqrt()
+        .domain(valueExtent[0] !== undefined ? valueExtent : [1, 100])
+        .range([0.5, 3]);
+
+      // 清空现有流向
+      gFlows.selectAll('path.flow-path').remove();
+
+      // 绘制流向线
+      flows.slice(0, 200).forEach(flow => {
+        // 尝试找到源国家和目标国家的位置
+        const originCountry = countryLocationMap.get(flow.origin);
+        const destCountry = countryLocationMap.get(flow.dest);
+        
+        if (!originCountry || !destCountry) return;
+        
+        const sourcePos = projection([originCountry.capitalLng, originCountry.capitalLat]);
+        const targetPos = projection([destCountry.capitalLng, destCountry.capitalLat]);
+        
+        if (!sourcePos || !targetPos) return;
+        
+        const midX = (sourcePos[0] + targetPos[0]) / 2;
+        const midY = (sourcePos[1] + targetPos[1]) / 2 - 50;
+        const lineData = `M${sourcePos[0]},${sourcePos[1]} Q${midX},${midY} ${targetPos[0]},${targetPos[1]}`;
+        
+        const path = gFlows.append('path')
+          .attr('d', lineData)
+          .attr('fill', 'none')
+          .attr('stroke', '#007AFF')
+          .attr('stroke-width', strokeScale(flow.value))
+          .attr('stroke-linecap', 'round')
+          .attr('opacity', 0.4)
+          .attr('class', 'flow-path');
+        
+        path.on('mouseover', function() {
+          d3.select(this).attr('opacity', 0.8).attr('stroke-width', strokeScale(flow.value) * 1.5);
+          if (tooltip) {
+            tooltip
+              .style('visibility', 'visible')
+              .html(`
+                <div style="font-weight: 600; margin-bottom: 6px;">${originCountry.countryName} → ${destCountry.countryName}</div>
+                <div>${t('countryTrade.tradeValue')}: $${(flow.value / 1000000).toFixed(2)}M</div>
+                <div>${t('countryTrade.transactionCount')}: ${flow.count}</div>
+              `);
+          }
+        })
+        .on('mousemove', function(event: MouseEvent) {
+          if (tooltip) {
+            tooltip
+              .style('left', (event.pageX + 10) + 'px')
+              .style('top', (event.pageY - 10) + 'px');
+          }
+        })
+        .on('mouseout', function() {
+          d3.select(this).attr('opacity', 0.4).attr('stroke-width', strokeScale(flow.value));
+          if (tooltip) {
+            tooltip.style('visibility', 'hidden');
+          }
+        });
+      });
+    }
+
+  }, [stats, countries, countryTradeData, maxTradeValue, colorScale, shipments, selectedHSCodes, t]);
 
   return (
     <div className="w-full h-full relative">
@@ -263,18 +398,18 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
       />
       {/* 图例 */}
       <div className="absolute bottom-4 right-4 bg-white/90 backdrop-blur-sm border border-black/10 rounded-lg p-4 shadow-lg">
-        <div className="text-xs font-semibold text-[#1D1D1F] mb-2">贸易额</div>
+        <div className="text-xs font-semibold text-[#1D1D1F] mb-2">{t('countryTrade.tradeValue')}</div>
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 rounded" style={{ background: colorScale(0) }}></div>
-          <span className="text-xs text-[#86868B]">低</span>
+          <span className="text-xs text-[#86868B]">{t('countryTrade.low')}</span>
           <div className="flex-1 h-2 bg-gradient-to-r rounded" style={{ 
             background: `linear-gradient(to right, ${colorScale(0)}, ${colorScale(maxTradeValue)})` 
           }}></div>
           <div className="w-4 h-4 rounded" style={{ background: colorScale(maxTradeValue) }}></div>
-          <span className="text-xs text-[#86868B]">高</span>
+          <span className="text-xs text-[#86868B]">{t('countryTrade.high')}</span>
         </div>
         <div className="text-xs text-[#86868B] mt-2">
-          最大值: ${(maxTradeValue / 1000000).toFixed(2)}M
+          {t('countryTrade.maxValue')}: ${(maxTradeValue / 1000000).toFixed(2)}M
         </div>
       </div>
     </div>

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Package } from 'lucide-react';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface HSCodeSelectorProps {
   selectedHSCodes: string[];
@@ -12,6 +13,7 @@ const HSCodeSelector: React.FC<HSCodeSelectorProps> = ({
   onHSCodeChange,
   availableHSCodes = [],
 }) => {
+  const { t } = useLanguage();
   // 如果没有提供可用HS编码列表，使用常见的半导体相关HS编码
   const defaultHSCodes = availableHSCodes.length > 0 
     ? availableHSCodes 
@@ -38,13 +40,13 @@ const HSCodeSelector: React.FC<HSCodeSelectorProps> = ({
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-[16px] font-bold text-[#1D1D1F] flex items-center gap-2">
           <Package className="w-4 h-4 text-[#007AFF]" />
-          HS编码筛选
+          {t('countryTrade.hsCodeFilter')}
         </h3>
         <button
           onClick={handleSelectAll}
           className="text-[12px] text-[#007AFF] hover:text-[#0051D5] font-medium"
         >
-          {selectedHSCodes.length === defaultHSCodes.length ? '取消全选' : '全选'}
+          {selectedHSCodes.length === defaultHSCodes.length ? t('countryTrade.clearAll') : t('countryTrade.selectAll')}
         </button>
       </div>
       
@@ -70,7 +72,7 @@ const HSCodeSelector: React.FC<HSCodeSelectorProps> = ({
       {selectedHSCodes.length > 0 && (
         <div className="mt-4 pt-4 border-t border-black/5">
           <div className="text-[12px] text-[#86868B]">
-            已选择: <span className="font-semibold text-[#1D1D1F]">{selectedHSCodes.length}</span> 个HS编码
+            {t('countryTrade.selected')}: <span className="font-semibold text-[#1D1D1F]">{selectedHSCodes.length}</span> {t('countryTrade.selected') === '已选择' ? '个HS编码' : 'HS codes'}
           </div>
         </div>
       )}
