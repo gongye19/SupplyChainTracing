@@ -3,10 +3,10 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import SupplyMap from './components/SupplyMap';
 import StatsPanel from './components/StatsPanel';
 import SidebarFilters from './components/SidebarFilters';
+import CountryTradeSidebar from './components/CountryTradeSidebar';
 import AIAssistant from './components/AIAssistant';
 import CountryTradeMap from './components/CountryTradeMap';
 import CountryTradeStatsPanel from './components/CountryTradeStatsPanel';
-import HSCodeSelector from './components/HSCodeSelector';
 import { Transaction, Filters, HSCodeCategory, CountryLocation, Location, Shipment, CountryMonthlyTradeStat, CountryTradeStatSummary, CountryTradeTrend, TopCountry, CountryTradeFilters } from './types';
 import { shipmentsAPI, hsCodeCategoriesAPI, countryLocationsAPI, chatAPI, ChatMessage, countryTradeStatsAPI } from './services/api';
 import { Globe, BarChart3, Map as MapIcon, Package, TrendingUp, Users, ChevronRight } from 'lucide-react';
@@ -476,7 +476,12 @@ const App: React.FC = () => {
              </button>
            </div>
 
-          {activeView !== 'country-trade' && (
+          {activeView === 'country-trade' ? (
+            <CountryTradeSidebar
+              filters={countryTradeFilters}
+              setFilters={setCountryTradeFilters}
+            />
+          ) : (
             <>
               <div className="h-[0.5px] bg-black/5"></div>
 
@@ -569,39 +574,6 @@ const App: React.FC = () => {
               <div className="mb-4">
                 <h2 className="text-[32px] font-bold tracking-tight text-[#1D1D1F]">{t('countryTrade.title')}</h2>
                 <p className="text-[#86868B] text-[16px] font-medium mt-1">{t('countryTrade.subtitle')}</p>
-              </div>
-
-              {/* 筛选器 */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-1">
-                  <HSCodeSelector
-                    selectedHSCodes={countryTradeFilters.hsCode || []}
-                    onHSCodeChange={(hsCodes) => setCountryTradeFilters({ ...countryTradeFilters, hsCode: hsCodes })}
-                  />
-                </div>
-                <div className="lg:col-span-2 bg-white border border-black/5 rounded-[20px] p-6 shadow-sm">
-                  <h3 className="text-[16px] font-bold text-[#1D1D1F] mb-4">{t('countryTrade.timeRange')}</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-[12px] text-[#86868B] mb-2 block">{t('countryTrade.startMonth')}</label>
-                      <input
-                        type="month"
-                        value={countryTradeFilters.startYearMonth || '2021-01'}
-                        onChange={(e) => setCountryTradeFilters({ ...countryTradeFilters, startYearMonth: e.target.value })}
-                        className="w-full px-3 py-2 border border-black/10 rounded-lg text-[14px] focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[12px] text-[#86868B] mb-2 block">{t('countryTrade.endMonth')}</label>
-                      <input
-                        type="month"
-                        value={countryTradeFilters.endYearMonth || '2025-12'}
-                        onChange={(e) => setCountryTradeFilters({ ...countryTradeFilters, endYearMonth: e.target.value })}
-                        className="w-full px-3 py-2 border border-black/10 rounded-lg text-[14px] focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
-                      />
-                    </div>
-                  </div>
-                </div>
               </div>
 
               {/* 地图和统计面板 */}
