@@ -1,17 +1,15 @@
 import React, { useEffect, useRef, useMemo } from 'react';
 import * as d3 from 'd3';
-import { CountryMonthlyTradeStat, CountryLocation, Shipment } from '../types';
+import { CountryMonthlyTradeStat, CountryLocation } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
-import { getPortLocation } from '../utils/portLocations';
 
 interface CountryTradeMapProps {
   stats: CountryMonthlyTradeStat[];
   countries: CountryLocation[];
   selectedHSCodes?: string[];
-  shipments?: Shipment[];
 }
 
-// GeoJSON 缓存
+// GeoJSON 缓存（模块级）
 let worldGeoJsonPromise: Promise<any> | null = null;
 function loadWorldGeoJson() {
   if (!worldGeoJsonPromise) {
@@ -24,7 +22,6 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
   stats,
   countries,
   selectedHSCodes = [],
-  shipments = [],
 }) => {
   const { t } = useLanguage();
   const svgRef = useRef<SVGSVGElement>(null);
@@ -32,8 +29,12 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   const gMapRef = useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
   const gNodesRef = useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
-  const gFlowsRef = useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
   const tooltipRef = useRef<d3.Selection<HTMLDivElement, unknown, null, undefined> | null>(null);
+  
+  // 缓存GeoJSON数据，避免每次更新都重新加载
+  const geoJsonDataRef = useRef<any>(null);
+  const countryLocationMapRef = useRef<Map<string, CountryLocation>>(new Map());
+  const countryTradeDataRef = useRef<Map<string, { sumOfUsd: number; tradeCount: number }>>(new Map());
 
   // 计算每个国家的总贸易额
   const countryTradeData = useMemo(() => {
@@ -52,6 +53,9 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
       });
     });
     
+    // 更新ref，供事件监听器使用
+    countryTradeDataRef.current = tradeMap;
+    
     return tradeMap;
   }, [stats, selectedHSCodes]);
 
@@ -67,7 +71,7 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
       .domain([0, maxTradeValue]);
   }, [maxTradeValue]);
 
-  // 初始化地图
+  // 初始化：只执行一次（创建 SVG 结构、底图、zoom、tooltip、事件绑定）
   useEffect(() => {
     if (!svgRef.current || countries.length === 0) return;
 
@@ -77,8 +81,10 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
 
     const svg = d3.select(svgRef.current);
     
+    // 如果已经初始化过，跳过
     if (gMapRef.current) return;
 
+    // 创建投影
     const projection = d3.geoMercator()
       .scale(width / 5.5)
       .center([0, 25])
@@ -87,16 +93,15 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
 
     const pathGenerator = d3.geoPath().projection(projection);
 
+    // 创建分层结构
     const g = svg.append('g');
     const gMap = g.append('g').attr('class', 'map-layer');
     const gNodes = g.append('g').attr('class', 'nodes-layer');
-    const gFlows = g.append('g').attr('class', 'flows-layer');
     
     gMapRef.current = gMap;
     gNodesRef.current = gNodes;
-    gFlowsRef.current = gFlows;
 
-    // 创建 Tooltip
+    // 创建 Tooltip（只创建一次）
     const d3Tooltip = d3.select('body').append('div')
       .style('position', 'absolute')
       .style('visibility', 'hidden')
@@ -113,13 +118,24 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
       .style('box-shadow', '0 10px 30px rgba(0,0,0,0.15)');
     tooltipRef.current = d3Tooltip;
 
-    // 加载并绘制底图
+    // 更新国家位置映射
+    const countryLocationMap = new Map<string, CountryLocation>();
+    countries.forEach(country => {
+      countryLocationMap.set(country.countryCode, country);
+    });
+    countryLocationMapRef.current = countryLocationMap;
+
+    // 加载并绘制底图（只画一次）
     loadWorldGeoJson().then((data: any) => {
+      // 缓存GeoJSON数据
+      geoJsonDataRef.current = data;
+      
       const filteredFeatures = data.features.filter((f: any) => 
         f.properties.name !== "Antarctica"
       );
 
-      gMap.selectAll('path.country')
+      // 绘制底图
+      const countryPaths = gMap.selectAll('path.country')
         .data(filteredFeatures)
         .enter()
         .append('path')
@@ -128,6 +144,43 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
         .attr('fill', '#EBEBEB')
         .attr('stroke', '#FFFFFF')
         .attr('stroke-width', 1);
+
+      // 绑定事件监听器（只绑定一次）
+      countryPaths.on('mouseover', function(event: MouseEvent, d: any) {
+        const countryName = d.properties.name;
+        const countryCode = d.properties.ISO_A2 || d.properties.ISO_A3;
+        
+        // 查找匹配的国家数据
+        let matchedCountry: CountryLocation | undefined;
+        for (const [code, location] of countryLocationMap.entries()) {
+          if (code === countryCode || location.countryName === countryName) {
+            matchedCountry = location;
+            break;
+          }
+        }
+        
+        if (matchedCountry) {
+          // 从ref获取最新的tradeData（动态获取，不依赖闭包）
+          const tradeData = countryTradeDataRef.current.get(matchedCountry.countryCode);
+          if (tradeData) {
+            d3Tooltip
+              .style('visibility', 'visible')
+              .html(`
+                <div style="font-weight: 600; margin-bottom: 6px;">${matchedCountry.countryName}</div>
+                <div>${t('countryTrade.tradeValue')}: $${(tradeData.sumOfUsd / 1000000).toFixed(2)}M</div>
+                <div>${t('countryTrade.transactionCount')}: ${tradeData.tradeCount.toLocaleString()}</div>
+              `);
+          }
+        }
+      })
+      .on('mousemove', function(event: MouseEvent) {
+        d3Tooltip
+          .style('left', (event.pageX + 10) + 'px')
+          .style('top', (event.pageY - 10) + 'px');
+      })
+      .on('mouseout', function() {
+        d3Tooltip.style('visibility', 'hidden');
+      });
     }).catch((error) => {
       console.error('CountryTradeMap: Error loading world map:', error);
     });
@@ -142,84 +195,42 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
     svg.call(zoom);
     zoomRef.current = zoom;
 
-  }, [countries]);
+  }, [countries, t]);
 
-  // 更新国家节点和颜色
+  // 更新：只更新国家颜色和节点（筛选时执行）
   useEffect(() => {
-    if (!gMapRef.current || !projectionRef.current || countries.length === 0) return;
+    if (!gMapRef.current || !projectionRef.current || !geoJsonDataRef.current || countries.length === 0) return;
 
     const projection = projectionRef.current;
     const gMap = gMapRef.current;
-    const tooltip = tooltipRef.current;
+    const countryLocationMap = countryLocationMapRef.current;
 
-    // 创建国家代码到位置的映射
-    const countryLocationMap = new Map<string, CountryLocation>();
-    countries.forEach(country => {
-      countryLocationMap.set(country.countryCode, country);
-    });
+    // 更新国家颜色（只更新fill属性，不重新绑定事件）
+    gMap.selectAll('path.country')
+      .attr('fill', (d: any) => {
+        const countryName = d.properties.name;
+        const countryCode = d.properties.ISO_A2 || d.properties.ISO_A3;
+        
+        // 查找匹配的国家数据
+        let matchedCountry: CountryLocation | undefined;
+        for (const [code, location] of countryLocationMap.entries()) {
+          if (code === countryCode || location.countryName === countryName) {
+            matchedCountry = location;
+            break;
+          }
+        }
+        
+        if (matchedCountry) {
+          const tradeData = countryTradeData.get(matchedCountry.countryCode);
+          if (tradeData && tradeData.sumOfUsd > 0) {
+            return colorScale(tradeData.sumOfUsd);
+          }
+        }
+        
+        return '#EBEBEB';
+      });
 
-    // 更新国家颜色
-    loadWorldGeoJson().then((data: any) => {
-      gMap.selectAll('path.country')
-        .attr('fill', (d: any) => {
-          // 尝试匹配国家代码
-          const countryName = d.properties.name;
-          const countryCode = d.properties.ISO_A2 || d.properties.ISO_A3;
-          
-          // 查找匹配的国家数据
-          let matchedCountry: CountryLocation | undefined;
-          for (const [code, location] of countryLocationMap.entries()) {
-            if (code === countryCode || location.countryName === countryName) {
-              matchedCountry = location;
-              break;
-            }
-          }
-          
-          if (matchedCountry) {
-            const tradeData = countryTradeData.get(matchedCountry.countryCode);
-            if (tradeData && tradeData.sumOfUsd > 0) {
-              return colorScale(tradeData.sumOfUsd);
-            }
-          }
-          
-          return '#EBEBEB';
-        })
-        .on('mouseover', function(event: MouseEvent, d: any) {
-          const countryName = d.properties.name;
-          const countryCode = d.properties.ISO_A2 || d.properties.ISO_A3;
-          
-          let matchedCountry: CountryLocation | undefined;
-          for (const [code, location] of countryLocationMap.entries()) {
-            if (code === countryCode || location.countryName === countryName) {
-              matchedCountry = location;
-              break;
-            }
-          }
-          
-            if (matchedCountry) {
-            const tradeData = countryTradeData.get(matchedCountry.countryCode);
-            if (tradeData) {
-              tooltip
-                .style('visibility', 'visible')
-                .html(`
-                  <div style="font-weight: 600; margin-bottom: 6px;">${matchedCountry.countryName}</div>
-                  <div>${t('countryTrade.tradeValue')}: $${(tradeData.sumOfUsd / 1000000).toFixed(2)}M</div>
-                  <div>${t('countryTrade.transactionCount')}: ${tradeData.tradeCount.toLocaleString()}</div>
-                `);
-            }
-          }
-        })
-        .on('mousemove', function(event: MouseEvent) {
-          tooltip
-            .style('left', (event.pageX + 10) + 'px')
-            .style('top', (event.pageY - 10) + 'px');
-        })
-        .on('mouseout', function() {
-          tooltip.style('visibility', 'hidden');
-        });
-    });
-
-    // 绘制国家节点（圆点）
+    // 更新国家节点（使用D3 data join模式，只更新变化的部分）
     const nodes = Array.from(countryTradeData.entries())
       .map(([code, data]) => {
         const location = countryLocationMap.get(code);
@@ -241,8 +252,14 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
     const nodeSelection = gNodesRef.current!.selectAll('circle.country-node')
       .data(nodes, (d: any) => d.code);
 
-    nodeSelection.exit().remove();
+    // 移除不再存在的节点
+    nodeSelection.exit()
+      .transition()
+      .duration(200)
+      .attr('r', 0)
+      .remove();
 
+    // 添加新节点
     const nodeEnter = nodeSelection.enter()
       .append('circle')
       .attr('class', 'country-node')
@@ -252,161 +269,16 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
       .attr('stroke-width', 2)
       .attr('opacity', 0.8);
 
+    // 更新所有节点（包括新添加的）
     nodeSelection.merge(nodeEnter)
       .transition()
-      .duration(300)
+      .duration(200)
       .attr('cx', d => d.x)
       .attr('cy', d => d.y)
       .attr('r', d => Math.max(3, Math.min(15, Math.sqrt(d.sumOfUsd / maxTradeValue) * 15)))
       .attr('fill', d => colorScale(d.sumOfUsd));
 
-    // 绘制流向线（基于 shipments 数据）
-    if (shipments.length > 0 && gFlowsRef.current && projection) {
-      const gFlows = gFlowsRef.current;
-      
-      // 筛选 shipments：如果指定了 HS 编码，只显示匹配的
-      const filteredShipments = shipments.filter(s => {
-        if (selectedHSCodes.length === 0) return true;
-        // 检查 HS 编码是否匹配（前6位）
-        return selectedHSCodes.some(code => s.hsCode?.startsWith(code));
-      });
-
-      // 创建国家名称到代码的映射（用于匹配）
-      const countryNameToCodeMap = new Map<string, string>();
-      countries.forEach(country => {
-        countryNameToCodeMap.set(country.countryName.toLowerCase(), country.countryCode);
-        countryNameToCodeMap.set(country.countryCode.toLowerCase(), country.countryCode);
-      });
-
-      // 按国家对聚合流向
-      const flowMap = new Map<string, { origin: string; dest: string; value: number; count: number }>();
-      
-      filteredShipments.forEach(shipment => {
-        // 尝试从国家名称或代码获取国家代码
-        const originName = shipment.countryOfOrigin || shipment.originId || '';
-        const destName = shipment.destinationCountry || shipment.destinationId || '';
-        
-        const originCode = countryNameToCodeMap.get(originName.toLowerCase()) || originName;
-        const destCode = countryNameToCodeMap.get(destName.toLowerCase()) || destName;
-        
-        if (!originCode || !destCode || originCode === destCode) return;
-        
-        // 确保国家代码在 countryLocationMap 中存在
-        if (!countryLocationMap.has(originCode) || !countryLocationMap.has(destCode)) return;
-        
-        const key = `${originCode}_${destCode}`;
-        const existing = flowMap.get(key) || { origin: originCode, dest: destCode, value: 0, count: 0 };
-        flowMap.set(key, {
-          origin: originCode,
-          dest: destCode,
-          value: existing.value + (shipment.totalValueUsd || shipment.value || 0),
-          count: existing.count + 1,
-        });
-      });
-
-      // 获取港口位置映射
-      const portPositionsMap = new Map<string, { lat: number; lng: number; countryCode: string }>();
-      filteredShipments.forEach(s => {
-        if (s.portOfDeparture && s.countryOfOrigin) {
-          const portKey = `${s.portOfDeparture}_${s.countryOfOrigin}`;
-          const portLoc = getPortLocation(s.portOfDeparture, s.countryOfOrigin);
-          if (portLoc) {
-            portPositionsMap.set(portKey, { lat: portLoc.lat, lng: portLoc.lng, countryCode: s.countryOfOrigin });
-          }
-        }
-        if (s.portOfArrival && s.destinationCountry) {
-          const portKey = `${s.portOfArrival}_${s.destinationCountry}`;
-          const portLoc = getPortLocation(s.portOfArrival, s.destinationCountry);
-          if (portLoc) {
-            portPositionsMap.set(portKey, { lat: portLoc.lat, lng: portLoc.lng, countryCode: s.destinationCountry });
-          }
-        }
-      });
-
-      // 计算路径粗细（根据交易量动态调整）
-      const flows = Array.from(flowMap.values());
-      if (flows.length === 0) return;
-      
-      const valueExtent = d3.extent(flows, d => d.value) as [number, number];
-      const strokeScale = d3.scaleSqrt()
-        .domain(valueExtent[0] !== undefined ? valueExtent : [1, 100])
-        .range([1, 5]); // 增加线条粗细范围，使差异更明显
-
-      // 清空现有流向
-      gFlows.selectAll('path.flow-path').remove();
-
-      // 绘制流向线
-      flows.slice(0, 200).forEach(flow => {
-        // 尝试找到源国家和目标国家的位置
-        const originCountry = countryLocationMap.get(flow.origin);
-        const destCountry = countryLocationMap.get(flow.dest);
-        
-        if (!originCountry || !destCountry) return;
-        
-        const sourcePos = projection([originCountry.capitalLng, originCountry.capitalLat]);
-        const targetPos = projection([destCountry.capitalLng, destCountry.capitalLat]);
-        
-        if (!sourcePos || !targetPos) return;
-        
-        const midX = (sourcePos[0] + targetPos[0]) / 2;
-        const midY = (sourcePos[1] + targetPos[1]) / 2 - 50;
-        const lineData = `M${sourcePos[0]},${sourcePos[1]} Q${midX},${midY} ${targetPos[0]},${targetPos[1]}`;
-        
-        const baseStrokeWidth = strokeScale(flow.value);
-        const path = gFlows.append('path')
-          .attr('d', lineData)
-          .attr('fill', 'none')
-          .attr('stroke', '#007AFF')
-          .attr('stroke-width', 0) // 初始为0，通过动画显示
-          .attr('stroke-linecap', 'round')
-          .attr('opacity', 0)
-          .attr('class', 'flow-path');
-        
-        // 先绑定事件，再执行动画
-        path.on('mouseover', function(event: MouseEvent) {
-          d3.select(this)
-            .transition()
-            .duration(200)
-            .attr('opacity', 0.8)
-            .attr('stroke-width', baseStrokeWidth * 1.5);
-          if (tooltip) {
-            tooltip
-              .style('visibility', 'visible')
-              .html(`
-                <div style="font-weight: 600; margin-bottom: 6px;">${originCountry.countryName} → ${destCountry.countryName}</div>
-                <div>${t('countryTrade.tradeValue')}: $${(flow.value / 1000000).toFixed(2)}M</div>
-                <div>${t('countryTrade.transactionCount')}: ${flow.count}</div>
-              `);
-          }
-        })
-        .on('mousemove', function(event: MouseEvent) {
-          if (tooltip) {
-            tooltip
-              .style('left', (event.pageX + 10) + 'px')
-              .style('top', (event.pageY - 10) + 'px');
-          }
-        })
-        .on('mouseout', function() {
-          d3.select(this)
-            .transition()
-            .duration(200)
-            .attr('opacity', 0.4)
-            .attr('stroke-width', baseStrokeWidth);
-          if (tooltip) {
-            tooltip.style('visibility', 'hidden');
-          }
-        });
-        
-        // 在事件绑定后执行动画
-        path.transition()
-          .duration(500)
-          .delay(Math.random() * 300) // 随机延迟，产生动态效果
-          .attr('stroke-width', baseStrokeWidth)
-          .attr('opacity', 0.4);
-      });
-    }
-
-  }, [stats, countries, countryTradeData, maxTradeValue, colorScale, shipments, selectedHSCodes, t]);
+  }, [countryTradeData, maxTradeValue, colorScale, countries]);
 
   return (
     <div className="w-full h-full relative">
@@ -438,4 +310,3 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
 CountryTradeMap.displayName = 'CountryTradeMap';
 
 export default CountryTradeMap;
-
