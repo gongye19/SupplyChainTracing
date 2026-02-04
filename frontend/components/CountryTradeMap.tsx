@@ -312,24 +312,28 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
       .attr('fill', (d: any) => {
         const props = d.properties;
         const countryName = props.name;
-        // 尝试多种可能的 ISO_A3 属性名（包括常见的 GeoJSON 属性名）
-        let isoA3 = props.ISO_A3 || props.iso_a3 || props.ISO3 || props.iso3 || 
-                     props.ISO_A3_EH || props.ISO_A3_TL || props.ADM0_A3 || props.adm0_a3 ||
-                     props.ISO_A3_ || props.iso_a3_ || props.ADM0_A3_IS || props.adm0_a3_is;
         
-        // 如果 GeoJSON 没有 ISO_A3 属性，尝试通过国家名称在 countryLocationMap 中查找
-        if (!isoA3 && countryName) {
+        // 优先通过国家名称在 countryLocationMap 中查找对应的 countryCode（3位代码）
+        let countryCode: string | undefined;
+        if (countryName) {
           const country = Array.from(countryLocationMap.values()).find(
             loc => loc.countryName && loc.countryName.toLowerCase() === countryName.toLowerCase()
           );
           if (country) {
-            isoA3 = country.countryCode; // countryCode 应该是3位代码
+            countryCode = country.countryCode; // countryCode 是3位代码，如 "JPN", "SGP"
           }
         }
         
-        // 简化匹配逻辑：只用 ISO_A3 直接匹配 tradeData（因为 tradeData 的 key 就是3位代码）
-        if (isoA3 && countryTradeData.has(isoA3)) {
-          const tradeData = countryTradeData.get(isoA3);
+        // 如果通过名称没找到，尝试从 GeoJSON 属性中获取 ISO_A3
+        if (!countryCode) {
+          countryCode = props.ISO_A3 || props.iso_a3 || props.ISO3 || props.iso3 || 
+                        props.ISO_A3_EH || props.ISO_A3_TL || props.ADM0_A3 || props.adm0_a3 ||
+                        props.ISO_A3_ || props.iso_a3_ || props.ADM0_A3_IS || props.adm0_a3_is;
+        }
+        
+        // 用 countryCode（3位代码）直接匹配 tradeData
+        if (countryCode && countryTradeData.has(countryCode)) {
+          const tradeData = countryTradeData.get(countryCode);
           if (tradeData && tradeData.sumOfUsd > 0) {
             matchedCount++;
             coloredCount++;
@@ -337,19 +341,12 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
             if (coloredCount === 1) {
               console.log('[CountryTradeMap] First colored country:', {
                 countryName,
-                isoA3,
+                countryCode,
                 tradeData: { sumOfUsd: tradeData.sumOfUsd, tradeCount: tradeData.tradeCount },
                 color: colorScale(tradeData.sumOfUsd)
               });
             }
             return colorScale(tradeData.sumOfUsd);
-          } else if (coloredCount === 0 && matchedCount < 5) {
-            // 如果匹配到了但数据为空，打印前几个
-            console.warn('[CountryTradeMap] Matched but no valid data:', {
-              countryName,
-              isoA3,
-              tradeData: tradeData ? { sumOfUsd: tradeData.sumOfUsd } : null
-            });
           }
         }
         
@@ -445,4 +442,5 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
 CountryTradeMap.displayName = 'CountryTradeMap';
 
 export default CountryTradeMap;
+
 
