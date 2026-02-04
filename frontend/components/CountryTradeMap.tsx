@@ -24,6 +24,17 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
   selectedHSCodes = [],
 }) => {
   const { t } = useLanguage();
+  
+  // 组件挂载和props变化时的调试
+  useEffect(() => {
+    console.log('[CountryTradeMap] Component rendered/updated:', {
+      statsCount: stats.length,
+      countriesCount: countries.length,
+      selectedHSCodes,
+      sampleStats: stats.slice(0, 2).map(s => ({ countryCode: s.countryCode, hsCode: s.hsCode, sumOfUsd: s.sumOfUsd })),
+      sampleCountries: countries.slice(0, 2).map(c => ({ code: c.countryCode, name: c.countryName }))
+    });
+  }, [stats.length, countries.length, selectedHSCodes]);
   const svgRef = useRef<SVGSVGElement>(null);
   const projectionRef = useRef<d3.GeoProjection | null>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
@@ -40,6 +51,12 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
   const countryTradeData = useMemo(() => {
     const tradeMap = new Map<string, { sumOfUsd: number; tradeCount: number }>();
     
+    console.log('[CountryTradeMap] Processing stats:', {
+      statsCount: stats.length,
+      selectedHSCodes,
+      sampleStats: stats.slice(0, 3).map(s => ({ countryCode: s.countryCode, hsCode: s.hsCode, sumOfUsd: s.sumOfUsd }))
+    });
+    
     stats.forEach(stat => {
       // 如果指定了HS编码筛选，只统计匹配的
       if (selectedHSCodes.length > 0 && !selectedHSCodes.includes(stat.hsCode)) {
@@ -51,6 +68,11 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
         sumOfUsd: existing.sumOfUsd + stat.sumOfUsd,
         tradeCount: existing.tradeCount + stat.tradeCount,
       });
+    });
+    
+    console.log('[CountryTradeMap] Country trade data computed:', {
+      tradeMapSize: tradeMap.size,
+      tradeMapEntries: Array.from(tradeMap.entries()).slice(0, 5).map(([code, data]) => ({ code, sumOfUsd: data.sumOfUsd }))
     });
     
     // 更新ref，供事件监听器使用
@@ -199,45 +221,99 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
 
   // 更新：只更新国家颜色和节点（筛选时执行）
   useEffect(() => {
-    if (!gMapRef.current || !projectionRef.current || !geoJsonDataRef.current || countries.length === 0) return;
+    if (!gMapRef.current || !projectionRef.current || !geoJsonDataRef.current || countries.length === 0) {
+      console.log('[CountryTradeMap] Update skipped:', {
+        hasGMap: !!gMapRef.current,
+        hasProjection: !!projectionRef.current,
+        hasGeoJson: !!geoJsonDataRef.current,
+        countriesCount: countries.length
+      });
+      return;
+    }
 
     const projection = projectionRef.current;
     const gMap = gMapRef.current;
     const countryLocationMap = countryLocationMapRef.current;
 
+    console.log('[CountryTradeMap] Updating map colors:', {
+      countryTradeDataSize: countryTradeData.size,
+      countryLocationMapSize: countryLocationMap.size,
+      maxTradeValue,
+      sampleCountries: Array.from(countryLocationMap.entries()).slice(0, 3).map(([code, loc]) => ({ code, name: loc.countryName }))
+    });
+
+    let matchedCount = 0;
+    let coloredCount = 0;
+
     // 更新国家颜色（只更新fill属性，不重新绑定事件）
+    // 首先打印所有可用的国家代码用于调试
+    const allTradeCountryCodes = Array.from(countryTradeData.keys());
+    const allLocationCountryCodes = Array.from(countryLocationMap.keys());
+    console.log('[CountryTradeMap] Matching countries:', {
+      tradeDataCodes: allTradeCountryCodes.slice(0, 10),
+      locationCodes: allLocationCountryCodes.slice(0, 10),
+      commonCodes: allTradeCountryCodes.filter(code => allLocationCountryCodes.includes(code)).slice(0, 10)
+    });
+
     gMap.selectAll('path.country')
       .attr('fill', (d: any) => {
         const countryName = d.properties.name;
         const isoA3 = d.properties.ISO_A3; // 3位代码，如 "USA", "JPN"
+        const isoA2 = d.properties.ISO_A2; // 2位代码，如 "US", "JP"
         
         // 尝试多种匹配方式
         let matchedCountryCode: string | undefined;
         
-        // 1. 优先通过国家名称匹配（最可靠的方式）
-        if (countryName) {
+        // 1. 优先直接匹配 ISO_A3（因为数据中的 countryCode 就是3位代码）
+        if (isoA3 && countryTradeData.has(isoA3)) {
+          matchedCountryCode = isoA3;
+          matchedCount++;
+        }
+        // 2. 如果 ISO_A3 匹配失败，尝试通过 CountryLocation 匹配
+        else if (isoA3 && countryLocationMap.has(isoA3)) {
+          matchedCountryCode = isoA3;
+          matchedCount++;
+        }
+        // 3. 通过国家名称匹配 CountryLocation，然后获取 countryCode
+        else if (countryName) {
           const country = Array.from(countryLocationMap.values()).find(
             loc => loc.countryName && loc.countryName.toLowerCase() === countryName.toLowerCase()
           );
           if (country) {
             matchedCountryCode = country.countryCode;
+            matchedCount++;
           }
-        }
-        
-        // 2. 如果名称匹配失败，尝试 ISO_A3 直接匹配
-        if (!matchedCountryCode && isoA3 && countryLocationMap.has(isoA3)) {
-          matchedCountryCode = isoA3;
         }
         
         if (matchedCountryCode) {
           const tradeData = countryTradeData.get(matchedCountryCode);
           if (tradeData && tradeData.sumOfUsd > 0) {
+            coloredCount++;
+            // 只在第一个匹配时打印调试信息
+            if (coloredCount === 1) {
+              console.log('[CountryTradeMap] First match example:', {
+                countryName,
+                isoA3,
+                isoA2,
+                matchedCountryCode,
+                tradeData: { sumOfUsd: tradeData.sumOfUsd, tradeCount: tradeData.tradeCount },
+                color: colorScale(tradeData.sumOfUsd),
+                hasInTradeData: countryTradeData.has(matchedCountryCode),
+                hasInLocationMap: countryLocationMap.has(matchedCountryCode)
+              });
+            }
             return colorScale(tradeData.sumOfUsd);
           }
         }
         
         return '#EBEBEB';
       });
+
+    console.log('[CountryTradeMap] Color update complete:', {
+      matchedCount,
+      coloredCount,
+      totalCountries: countryTradeData.size
+    });
 
     // 更新国家节点（使用D3 data join模式，只更新变化的部分）
     const nodes = Array.from(countryTradeData.entries())
