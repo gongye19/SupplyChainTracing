@@ -28,6 +28,53 @@ const ISO2_TO_ISO3: Record<string, string> = {
   'TW': 'TWN', 'IS': 'ISR', 'IE': 'IRL'
 };
 
+// 国家名称到3位代码的映射（处理常见变体和特殊情况，如台湾）
+const COUNTRY_NAME_TO_ISO3: Record<string, string> = {
+  // 台湾的常见名称变体
+  'Taiwan': 'TWN',
+  'Taiwan, Province of China': 'TWN',
+  'Taiwan Province of China': 'TWN',
+  'Republic of China': 'TWN',
+  // 其他常见变体
+  'United States': 'USA',
+  'United States of America': 'USA',
+  'USA': 'USA',
+  'United Kingdom': 'GBR',
+  'UK': 'GBR',
+  'Great Britain': 'GBR',
+  'China': 'CHN',
+  "People's Republic of China": 'CHN',
+  'South Korea': 'KOR',
+  'Korea, South': 'KOR',
+  'Republic of Korea': 'KOR',
+  'Netherlands': 'NLD',
+  'Holland': 'NLD',
+  'United Arab Emirates': 'ARE',
+  'UAE': 'ARE',
+  'Dubai': 'ARE',
+  // 其他常见国家
+  'Japan': 'JPN',
+  'Germany': 'DEU',
+  'France': 'FRA',
+  'Italy': 'ITA',
+  'Spain': 'ESP',
+  'Brazil': 'BRA',
+  'Mexico': 'MEX',
+  'India': 'IND',
+  'Thailand': 'THA',
+  'Vietnam': 'VNM',
+  'Philippines': 'PHL',
+  'Indonesia': 'IDN',
+  'Malaysia': 'MYS',
+  'Singapore': 'SGP',
+  'Bangladesh': 'BGD',
+  'Pakistan': 'PAK',
+  'Egypt': 'EGY',
+  'Turkey': 'TUR',
+  'Australia': 'AUS',
+  'Korea': 'KOR'
+};
+
 const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({ 
   stats,
   countries,
@@ -363,6 +410,7 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
         // 优先通过国家名称在 countryLocationMap 中查找对应的 countryCode
         let countryCode: string | undefined;
         if (countryName) {
+          // 1. 先尝试通过国家名称在 countryLocationMap 中查找
           const country = Array.from(countryLocationMap.values()).find(
             loc => loc.countryName && loc.countryName.toLowerCase() === countryName.toLowerCase()
           );
@@ -371,9 +419,25 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
             const code2 = country.countryCode;
             countryCode = ISO2_TO_ISO3[code2] || code2; // 如果是2位代码，转换为3位；如果已经是3位，直接使用
           }
+          
+          // 2. 如果 countryLocationMap 中没找到，尝试通过国家名称映射表直接匹配（处理台湾等特殊情况）
+          if (!countryCode && COUNTRY_NAME_TO_ISO3[countryName]) {
+            countryCode = COUNTRY_NAME_TO_ISO3[countryName];
+          }
+          
+          // 3. 尝试模糊匹配（处理名称变体，如 "Taiwan, Province of China"）
+          if (!countryCode) {
+            const countryNameLower = countryName.toLowerCase();
+            for (const [name, code] of Object.entries(COUNTRY_NAME_TO_ISO3)) {
+              if (countryNameLower.includes(name.toLowerCase()) || name.toLowerCase().includes(countryNameLower)) {
+                countryCode = code;
+                break;
+              }
+            }
+          }
         }
         
-        // 如果通过名称没找到，尝试从 GeoJSON 属性中获取 ISO_A3
+        // 4. 如果通过名称没找到，尝试从 GeoJSON 属性中获取 ISO_A3
         if (!countryCode) {
           countryCode = props.ISO_A3 || props.iso_a3 || props.ISO3 || props.iso3 || 
                         props.ISO_A3_EH || props.ISO_A3_TL || props.ADM0_A3 || props.adm0_a3 ||
@@ -409,6 +473,7 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
         // 优先通过国家名称在 countryLocationMap 中查找对应的 countryCode
         let countryCode: string | undefined;
         if (countryName) {
+          // 1. 先尝试通过国家名称在 countryLocationMap 中查找
           const country = Array.from(countryLocationMap.values()).find(
             loc => loc.countryName && loc.countryName.toLowerCase() === countryName.toLowerCase()
           );
@@ -416,9 +481,25 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
             const code2 = country.countryCode;
             countryCode = ISO2_TO_ISO3[code2] || code2;
           }
+          
+          // 2. 如果 countryLocationMap 中没找到，尝试通过国家名称映射表直接匹配（处理台湾等特殊情况）
+          if (!countryCode && COUNTRY_NAME_TO_ISO3[countryName]) {
+            countryCode = COUNTRY_NAME_TO_ISO3[countryName];
+          }
+          
+          // 3. 尝试模糊匹配（处理名称变体，如 "Taiwan, Province of China"）
+          if (!countryCode) {
+            const countryNameLower = countryName.toLowerCase();
+            for (const [name, code] of Object.entries(COUNTRY_NAME_TO_ISO3)) {
+              if (countryNameLower.includes(name.toLowerCase()) || name.toLowerCase().includes(countryNameLower)) {
+                countryCode = code;
+                break;
+              }
+            }
+          }
         }
         
-        // 如果通过名称没找到，尝试从 GeoJSON 属性中获取 ISO_A3
+        // 4. 如果通过名称没找到，尝试从 GeoJSON 属性中获取 ISO_A3
         if (!countryCode) {
           countryCode = props.ISO_A3 || props.iso_a3 || props.ISO3 || props.iso3 || 
                         props.ISO_A3_EH || props.ISO_A3_TL || props.ADM0_A3 || props.adm0_a3 ||
