@@ -104,10 +104,13 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
     return Math.max(...Array.from(countryTradeData.values()).map(d => d.sumOfUsd));
   }, [countryTradeData]);
 
-  // 颜色比例尺
+  // 颜色比例尺 - 使用更明显的颜色（从浅蓝到深蓝，增强对比度）
   const colorScale = useMemo(() => {
-    return d3.scaleSequential(d3.interpolateBlues)
-      .domain([0, maxTradeValue]);
+    // 使用自定义插值，让颜色更明显
+    return d3.scaleSequential((t: number) => {
+      // 从浅蓝 (#E3F2FD) 到深蓝 (#1565C0)，增强对比度
+      return d3.interpolateRgb('#E3F2FD', '#1565C0')(Math.pow(t, 0.6)); // 使用幂函数增强低值的颜色深度
+    }).domain([0, maxTradeValue]);
   }, [maxTradeValue]);
 
   // 初始化：只执行一次（创建 SVG 结构、底图、zoom、tooltip、事件绑定）
@@ -193,29 +196,55 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
       // 绑定事件监听器（只绑定一次）
       countryPaths.on('mouseover', function(event: MouseEvent, d: any) {
         const countryName = d.properties.name;
-        const countryCode = d.properties.ISO_A2 || d.properties.ISO_A3;
+        const props = d.properties;
         
-        // 查找匹配的国家数据
+        // 优先通过国家名称在 countryLocationMap 中查找对应的 countryCode
+        let countryCode: string | undefined;
         let matchedCountry: CountryLocation | undefined;
-        for (const [code, location] of countryLocationMap.entries()) {
-          if (code === countryCode || location.countryName === countryName) {
-            matchedCountry = location;
-            break;
+        
+        if (countryName) {
+          matchedCountry = Array.from(countryLocationMap.values()).find(
+            loc => loc.countryName && loc.countryName.toLowerCase() === countryName.toLowerCase()
+          );
+          if (matchedCountry) {
+            const code2 = matchedCountry.countryCode;
+            countryCode = ISO2_TO_ISO3[code2] || code2;
           }
         }
         
-        if (matchedCountry) {
-          // 从ref获取最新的tradeData（动态获取，不依赖闭包）
-          const tradeData = countryTradeDataRef.current.get(matchedCountry.countryCode);
-          if (tradeData) {
-            d3Tooltip
-              .style('visibility', 'visible')
-              .html(`
-                <div style="font-weight: 600; margin-bottom: 6px;">${matchedCountry.countryName}</div>
-                <div>${t('countryTrade.tradeValue')}: $${(tradeData.sumOfUsd / 1000000).toFixed(2)}M</div>
-                <div>${t('countryTrade.transactionCount')}: ${tradeData.tradeCount.toLocaleString()}</div>
-              `);
-          }
+        // 如果通过名称没找到，尝试从 GeoJSON 属性中获取 ISO_A3
+        if (!countryCode) {
+          countryCode = props.ISO_A3 || props.iso_a3 || props.ISO3 || props.iso3 || 
+                        props.ISO_A3_EH || props.ISO_A3_TL || props.ADM0_A3 || props.adm0_a3 ||
+                        props.ISO_A3_ || props.iso_a3_ || props.ADM0_A3_IS || props.adm0_a3_is;
+        }
+        
+        // 从ref获取最新的tradeData
+        const tradeData = countryCode ? countryTradeDataRef.current.get(countryCode) : null;
+        
+        // 添加视觉特效：高亮当前国家
+        d3.select(this)
+          .attr('stroke', '#007AFF')
+          .attr('stroke-width', 2.5)
+          .attr('opacity', 0.9)
+          .style('filter', 'brightness(1.2) drop-shadow(0 0 8px rgba(0, 122, 255, 0.6))');
+        
+        // 显示tooltip
+        if (tradeData && tradeData.sumOfUsd > 0) {
+          d3Tooltip
+            .style('visibility', 'visible')
+            .html(`
+              <div style="font-weight: 600; margin-bottom: 6px; font-size: 14px;">${countryName || 'Unknown'}</div>
+              <div style="margin-bottom: 4px;">${t('countryTrade.tradeValue')}: <strong>$${(tradeData.sumOfUsd / 1000000).toFixed(2)}M</strong></div>
+              <div>${t('countryTrade.transactionCount')}: <strong>${tradeData.tradeCount.toLocaleString()}</strong></div>
+            `);
+        } else if (countryName) {
+          d3Tooltip
+            .style('visibility', 'visible')
+            .html(`
+              <div style="font-weight: 600; margin-bottom: 6px; font-size: 14px;">${countryName}</div>
+              <div style="color: #86868B;">${t('countryTrade.noData')}</div>
+            `);
         }
       })
       .on('mousemove', function(event: MouseEvent) {
@@ -224,6 +253,13 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
           .style('top', (event.pageY - 10) + 'px');
       })
       .on('mouseout', function() {
+        // 移除视觉特效
+        d3.select(this)
+          .attr('stroke', '#FFFFFF')
+          .attr('stroke-width', 1)
+          .attr('opacity', 1)
+          .style('filter', null);
+        
         d3Tooltip.style('visibility', 'hidden');
       });
     }).catch((error) => {
@@ -318,6 +354,7 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
     console.log('[CountryTradeMap] Sample GeoJSON countries check:', JSON.stringify(sampleGeoJsonCountries, null, 2));
     console.log('[CountryTradeMap] First 10 tradeDataCodes:', Array.from(countryTradeData.keys()).slice(0, 10));
 
+    // 更新国家颜色，同时更新鼠标悬停事件（确保能正确显示tooltip）
     gMap.selectAll('path.country')
       .attr('fill', (d: any) => {
         const props = d.properties;
@@ -363,6 +400,73 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
         }
         
         return '#EBEBEB';
+      })
+      // 更新鼠标悬停事件，确保能正确显示tooltip
+      .on('mouseover', function(event: MouseEvent, d: any) {
+        const countryName = d.properties.name;
+        const props = d.properties;
+        
+        // 优先通过国家名称在 countryLocationMap 中查找对应的 countryCode
+        let countryCode: string | undefined;
+        if (countryName) {
+          const country = Array.from(countryLocationMap.values()).find(
+            loc => loc.countryName && loc.countryName.toLowerCase() === countryName.toLowerCase()
+          );
+          if (country) {
+            const code2 = country.countryCode;
+            countryCode = ISO2_TO_ISO3[code2] || code2;
+          }
+        }
+        
+        // 如果通过名称没找到，尝试从 GeoJSON 属性中获取 ISO_A3
+        if (!countryCode) {
+          countryCode = props.ISO_A3 || props.iso_a3 || props.ISO3 || props.iso3 || 
+                        props.ISO_A3_EH || props.ISO_A3_TL || props.ADM0_A3 || props.adm0_a3 ||
+                        props.ISO_A3_ || props.iso_a3_ || props.ADM0_A3_IS || props.adm0_a3_is;
+        }
+        
+        // 从ref获取最新的tradeData
+        const tradeData = countryCode ? countryTradeDataRef.current.get(countryCode) : null;
+        
+        // 添加视觉特效：高亮当前国家
+        d3.select(this)
+          .attr('stroke', '#007AFF')
+          .attr('stroke-width', 2.5)
+          .attr('opacity', 0.9)
+          .style('filter', 'brightness(1.2) drop-shadow(0 0 8px rgba(0, 122, 255, 0.6))');
+        
+        // 显示tooltip
+        if (tradeData && tradeData.sumOfUsd > 0) {
+          tooltipRef.current!
+            .style('visibility', 'visible')
+            .html(`
+              <div style="font-weight: 600; margin-bottom: 6px; font-size: 14px;">${countryName || 'Unknown'}</div>
+              <div style="margin-bottom: 4px;">${t('countryTrade.tradeValue')}: <strong>$${(tradeData.sumOfUsd / 1000000).toFixed(2)}M</strong></div>
+              <div>${t('countryTrade.transactionCount')}: <strong>${tradeData.tradeCount.toLocaleString()}</strong></div>
+            `);
+        } else if (countryName) {
+          tooltipRef.current!
+            .style('visibility', 'visible')
+            .html(`
+              <div style="font-weight: 600; margin-bottom: 6px; font-size: 14px;">${countryName}</div>
+              <div style="color: #86868B;">${t('countryTrade.noData')}</div>
+            `);
+        }
+      })
+      .on('mousemove', function(event: MouseEvent) {
+        tooltipRef.current!
+          .style('left', (event.pageX + 10) + 'px')
+          .style('top', (event.pageY - 10) + 'px');
+      })
+      .on('mouseout', function() {
+        // 移除视觉特效
+        d3.select(this)
+          .attr('stroke', '#FFFFFF')
+          .attr('stroke-width', 1)
+          .attr('opacity', 1)
+          .style('filter', null);
+        
+        tooltipRef.current!.style('visibility', 'hidden');
       });
 
     console.log('[CountryTradeMap] Color update complete:', {
