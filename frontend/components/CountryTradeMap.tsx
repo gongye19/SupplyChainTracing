@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useRef, useMemo, useState } from 'react';
 import * as d3 from 'd3';
 import { CountryMonthlyTradeStat, CountryLocation } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -46,6 +46,7 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
   const geoJsonDataRef = useRef<any>(null);
   const countryLocationMapRef = useRef<Map<string, CountryLocation>>(new Map());
   const countryTradeDataRef = useRef<Map<string, { sumOfUsd: number; tradeCount: number }>>(new Map());
+  const [geoJsonLoaded, setGeoJsonLoaded] = useState(false);
 
   // 计算每个国家的总贸易额
   const countryTradeData = useMemo(() => {
@@ -99,7 +100,10 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
 
     const width = svgRef.current.clientWidth;
     const height = svgRef.current.clientHeight;
-    if (width === 0 || height === 0) return;
+    if (width === 0 || height === 0) {
+      console.warn('[CountryTradeMap] SVG container has zero dimensions:', { width, height, 'parentHeight': svgRef.current.parentElement?.clientHeight });
+      return;
+    }
 
     const svg = d3.select(svgRef.current);
     
@@ -151,6 +155,9 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
     loadWorldGeoJson().then((data: any) => {
       // 缓存GeoJSON数据
       geoJsonDataRef.current = data;
+      setGeoJsonLoaded(true);
+      
+      console.log('[CountryTradeMap] GeoJSON loaded');
       
       const filteredFeatures = data.features.filter((f: any) => 
         f.properties.name !== "Antarctica"
@@ -221,13 +228,18 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
 
   // 更新：只更新国家颜色和节点（筛选时执行）
   useEffect(() => {
-    if (!gMapRef.current || !projectionRef.current || !geoJsonDataRef.current || countries.length === 0) {
+    if (!gMapRef.current || !projectionRef.current || !geoJsonLoaded || countries.length === 0) {
       console.log('[CountryTradeMap] Update skipped:', {
         hasGMap: !!gMapRef.current,
         hasProjection: !!projectionRef.current,
-        hasGeoJson: !!geoJsonDataRef.current,
+        hasGeoJson: geoJsonLoaded,
         countriesCount: countries.length
       });
+      return;
+    }
+    
+    if (!geoJsonDataRef.current) {
+      console.log('[CountryTradeMap] GeoJSON data not available yet');
       return;
     }
 
@@ -321,8 +333,11 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
         const location = countryLocationMap.get(code);
         if (!location || data.sumOfUsd === 0) return null;
         
-        const [x, y] = projection([location.capitalLng, location.capitalLat]);
-        if (!x || !y) return null;
+        const p = projection([location.capitalLng, location.capitalLat]);
+        if (!p) return null;
+        const [x, y] = p;
+        // 修复：不能使用 !x || !y，因为 x=0 或 y=0 是合法坐标
+        if (x == null || y == null || Number.isNaN(x) || Number.isNaN(y)) return null;
         
         return {
           code,
@@ -363,14 +378,14 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
       .attr('r', d => Math.max(3, Math.min(15, Math.sqrt(d.sumOfUsd / maxTradeValue) * 15)))
       .attr('fill', d => colorScale(d.sumOfUsd));
 
-  }, [countryTradeData, maxTradeValue, colorScale, countries]);
+  }, [countryTradeData, maxTradeValue, colorScale, countries, geoJsonLoaded]);
 
   return (
-    <div className="w-full h-full relative">
+    <div className="w-full h-full relative" style={{ minHeight: '400px' }}>
       <svg
         ref={svgRef}
         className="w-full h-full"
-        style={{ background: '#FAFAFA' }}
+        style={{ background: '#FAFAFA', minHeight: '400px' }}
       />
       {/* 图例 */}
       <div className="absolute bottom-4 right-4 bg-white/90 backdrop-blur-sm border border-black/10 rounded-lg p-4 shadow-lg">
