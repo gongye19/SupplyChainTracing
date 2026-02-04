@@ -278,20 +278,28 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
       sampleLocations: Array.from(countryLocationMap.entries()).slice(0, 3).map(([code, loc]) => ({ code, name: loc.countryName }))
     });
 
-    // 先检查前几个国家的匹配情况
+    // 先检查前几个国家的匹配情况，打印所有属性
     const sampleGeoJsonCountries: any[] = [];
     gMap.selectAll('path.country').each(function(d: any) {
-      if (sampleGeoJsonCountries.length < 10) {
+      if (sampleGeoJsonCountries.length < 3) {
         const props = d.properties;
-        const isoA3 = props.ISO_A3 || props.iso_a3 || props.ISO3 || props.iso3;
+        // 打印所有属性名，看看实际有什么
+        const allPropKeys = Object.keys(props);
+        // 尝试所有可能的 ISO_A3 属性名
+        const isoA3 = props.ISO_A3 || props.iso_a3 || props.ISO3 || props.iso3 || props.ISO_A3_EH || props.ISO_A3_TL || props.ADM0_A3 || props.adm0_a3;
         const isoA2 = props.ISO_A2 || props.iso_a2 || props.ISO2 || props.iso2;
         const hasInTradeData = isoA3 ? countryTradeData.has(isoA3) : false;
         const tradeData = isoA3 ? countryTradeData.get(isoA3) : null;
         sampleGeoJsonCountries.push({
           name: props.name,
+          allPropKeys: allPropKeys,
+          // 只打印前几个属性的值，避免日志过长
+          sampleProps: allPropKeys.slice(0, 10).reduce((acc: any, key: string) => {
+            acc[key] = props[key];
+            return acc;
+          }, {}),
           isoA3: isoA3,
           isoA2: isoA2,
-          allProps: Object.keys(props).filter(k => k.toLowerCase().includes('iso') || k.toLowerCase().includes('code')),
           hasInTradeData: hasInTradeData,
           tradeData: tradeData ? { sumOfUsd: tradeData.sumOfUsd } : null
         });
@@ -304,8 +312,10 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
       .attr('fill', (d: any) => {
         const props = d.properties;
         const countryName = props.name;
-        // 尝试多种可能的 ISO_A3 属性名
-        const isoA3 = props.ISO_A3 || props.iso_a3 || props.ISO3 || props.iso3;
+        // 尝试多种可能的 ISO_A3 属性名（包括常见的 GeoJSON 属性名）
+        const isoA3 = props.ISO_A3 || props.iso_a3 || props.ISO3 || props.iso3 || 
+                      props.ISO_A3_EH || props.ISO_A3_TL || props.ADM0_A3 || props.adm0_a3 ||
+                      props.ISO_A3_ || props.iso_a3_ || props.ADM0_A3_IS || props.adm0_a3_is;
         
         // 简化匹配逻辑：只用 ISO_A3 直接匹配 tradeData（因为 tradeData 的 key 就是3位代码）
         if (isoA3 && countryTradeData.has(isoA3)) {
