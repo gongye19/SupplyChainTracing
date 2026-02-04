@@ -9,10 +9,14 @@ import sys
 from pathlib import Path
 from sqlalchemy import create_engine, text
 
-# 数据库连接（从环境变量读取）
+# 数据库连接（Railway 数据库）
+# 优先使用环境变量，如果没有则使用 Railway 公网地址
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql://postgres:123456@localhost:5433/supplychain"
+    os.getenv(
+        "DATABASE_PUBLIC_URL",
+        "postgresql://postgres:MWXAjkGpQgosJuCgIPcRdudhiyAiXCRl@crossover.proxy.rlwy.net:42314/railway"
+    )
 )
 
 def clean_old_tables():

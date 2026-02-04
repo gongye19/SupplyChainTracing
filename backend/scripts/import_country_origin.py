@@ -222,10 +222,14 @@ if __name__ == "__main__":
     # 数据目录
     data_dir = project_root / "data" / "SemiConductor" / "CountryOfOrigin"
     
-    # 数据库连接
+    # 数据库连接（Railway 数据库）
+    # 优先使用环境变量，如果没有则使用 Railway 公网地址
     database_url = os.getenv(
         "DATABASE_URL",
-        "postgresql://postgres:123456@localhost:5433/supplychain"
+        os.getenv(
+            "DATABASE_PUBLIC_URL",
+            "postgresql://postgres:MWXAjkGpQgosJuCgIPcRdudhiyAiXCRl@crossover.proxy.rlwy.net:42314/railway"
+        )
     )
     
     clear_first = '--clear' in sys.argv

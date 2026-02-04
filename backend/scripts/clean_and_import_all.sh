@@ -13,8 +13,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 BACKEND_DIR="$PROJECT_ROOT/backend"
 
-# 数据库连接（从环境变量读取，如果没有则使用默认值）
-DATABASE_URL="${DATABASE_URL:-postgresql://postgres:123456@localhost:5433/supplychain}"
+# 数据库连接（Railway 数据库）
+# 优先使用环境变量，如果没有则使用 Railway 公网地址
+DATABASE_URL="${DATABASE_URL:-${DATABASE_PUBLIC_URL:-postgresql://postgres:MWXAjkGpQgosJuCgIPcRdudhiyAiXCRl@crossover.proxy.rlwy.net:42314/railway}}"
 
 echo "数据库连接: ${DATABASE_URL}"
 echo ""
