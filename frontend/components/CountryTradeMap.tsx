@@ -276,16 +276,20 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
     const sampleGeoJsonCountries: any[] = [];
     gMap.selectAll('path.country').each(function(d: any) {
       if (sampleGeoJsonCountries.length < 10) {
+        const isoA3 = d.properties.ISO_A3;
+        const hasInTradeData = isoA3 ? countryTradeData.has(isoA3) : false;
+        const tradeData = isoA3 ? countryTradeData.get(isoA3) : null;
         sampleGeoJsonCountries.push({
           name: d.properties.name,
-          isoA3: d.properties.ISO_A3,
+          isoA3: isoA3,
           isoA2: d.properties.ISO_A2,
-          hasInTradeData: d.properties.ISO_A3 ? countryTradeData.has(d.properties.ISO_A3) : false,
-          tradeData: d.properties.ISO_A3 ? countryTradeData.get(d.properties.ISO_A3) : null
+          hasInTradeData: hasInTradeData,
+          tradeData: tradeData ? { sumOfUsd: tradeData.sumOfUsd } : null
         });
       }
     });
-    console.log('[CountryTradeMap] Sample GeoJSON countries check:', sampleGeoJsonCountries);
+    console.log('[CountryTradeMap] Sample GeoJSON countries check:', JSON.stringify(sampleGeoJsonCountries, null, 2));
+    console.log('[CountryTradeMap] First 10 tradeDataCodes:', Array.from(countryTradeData.keys()).slice(0, 10));
 
     gMap.selectAll('path.country')
       .attr('fill', (d: any) => {
