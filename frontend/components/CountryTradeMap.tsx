@@ -205,23 +205,49 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
     const gMap = gMapRef.current;
     const countryLocationMap = countryLocationMapRef.current;
 
+    // 创建国家代码映射表（支持多种匹配方式）
+    // ISO_A2 (2位) -> ISO_A3 (3位) 映射表
+    const isoA2ToA3Map = new Map<string, string>();
+    countryLocationMap.forEach((location, code) => {
+      // 如果 countryCode 是3位，尝试找到对应的2位代码
+      // 这里我们通过国家名称来建立映射
+      isoA2ToA3Map.set(location.countryName.toLowerCase(), code);
+    });
+
     // 更新国家颜色（只更新fill属性，不重新绑定事件）
     gMap.selectAll('path.country')
       .attr('fill', (d: any) => {
         const countryName = d.properties.name;
-        const countryCode = d.properties.ISO_A2 || d.properties.ISO_A3;
+        const isoA2 = d.properties.ISO_A2; // 2位代码，如 "US", "JP"
+        const isoA3 = d.properties.ISO_A3; // 3位代码，如 "USA", "JPN"
         
-        // 查找匹配的国家数据
-        let matchedCountry: CountryLocation | undefined;
-        for (const [code, location] of countryLocationMap.entries()) {
-          if (code === countryCode || location.countryName === countryName) {
-            matchedCountry = location;
-            break;
+        // 尝试多种匹配方式
+        let matchedCountryCode: string | undefined;
+        
+        // 1. 优先匹配 ISO_A3（3位代码）- 最直接
+        if (isoA3 && countryLocationMap.has(isoA3)) {
+          matchedCountryCode = isoA3;
+        }
+        // 2. 通过国家名称匹配（最可靠的方式）
+        else if (countryName) {
+          const country = Array.from(countryLocationMap.values()).find(
+            loc => loc.countryName && loc.countryName.toLowerCase() === countryName.toLowerCase()
+          );
+          if (country) {
+            matchedCountryCode = country.countryCode;
           }
         }
+        // 3. 如果还有 ISO_A2，尝试通过名称映射找到对应的3位代码
+        if (!matchedCountryCode && isoA2) {
+          // 查找是否有国家名称匹配
+          const country = Array.from(countryLocationMap.values()).find(
+            loc => loc.countryCode && loc.countryCode.length === 3
+          );
+          // 这里主要依赖国家名称匹配，因为 ISO_A2 到 ISO_A3 的转换比较复杂
+        }
         
-        if (matchedCountry) {
-          const tradeData = countryTradeData.get(matchedCountry.countryCode);
+        if (matchedCountryCode) {
+          const tradeData = countryTradeData.get(matchedCountryCode);
           if (tradeData && tradeData.sumOfUsd > 0) {
             return colorScale(tradeData.sumOfUsd);
           }

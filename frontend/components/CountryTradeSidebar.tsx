@@ -42,7 +42,8 @@ const CountryTradeSidebar: React.FC<CountryTradeSidebarProps> = ({
                 type="month"
                 value={filters.startYearMonth || '2021-01'}
                 onChange={(e) => setFilters({ ...filters, startYearMonth: e.target.value })}
-                className="w-full px-3 py-2 border border-black/10 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+                className="w-full px-3 py-2 border border-black/10 rounded-lg text-[13px] font-mono focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+                lang="en"
               />
             </div>
             <div>
@@ -51,7 +52,8 @@ const CountryTradeSidebar: React.FC<CountryTradeSidebarProps> = ({
                 type="month"
                 value={filters.endYearMonth || '2025-12'}
                 onChange={(e) => setFilters({ ...filters, endYearMonth: e.target.value })}
-                className="w-full px-3 py-2 border border-black/10 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+                className="w-full px-3 py-2 border border-black/10 rounded-lg text-[13px] font-mono focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+                lang="en"
               />
             </div>
           </div>
