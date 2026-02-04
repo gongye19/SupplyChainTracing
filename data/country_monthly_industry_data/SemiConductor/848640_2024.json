@@ -1,16 +1,6 @@
 {
     "01": [
         {
-            "weight": 2661429.385,
-            "quantity": 355824.0,
-            "sumOfUSD": 606302372.825,
-            "weightAvgPrice": 227.8108,
-            "quantityAvgPrice": 1703.9389,
-            "tradeCount": 263.0,
-            "countryCode": "N/A",
-            "amountSharePct": 0.36810239634893105
-        },
-        {
             "weight": 702851.547,
             "quantity": 1051725.0,
             "sumOfUSD": 338184068.811,
@@ -483,16 +473,6 @@
     ],
     "02": [
         {
-            "weight": 1651404.499,
-            "quantity": 250438.0,
-            "sumOfUSD": 400658797.463,
-            "weightAvgPrice": 242.617,
-            "quantityAvgPrice": 1599.8323,
-            "tradeCount": 290.0,
-            "countryCode": "N/A",
-            "amountSharePct": 0.3358933631624765
-        },
-        {
             "weight": 220277.932,
             "quantity": 17047.0,
             "sumOfUSD": 186514196.52,
@@ -954,16 +934,6 @@
         }
     ],
     "03": [
-        {
-            "weight": 2231422.803,
-            "quantity": 277284.0,
-            "sumOfUSD": 363532721.221,
-            "weightAvgPrice": 162.9152,
-            "quantityAvgPrice": 1311.0483,
-            "tradeCount": 286.0,
-            "countryCode": "N/A",
-            "amountSharePct": 0.29024252503305203
-        },
         {
             "weight": 406295.223,
             "quantity": 227500.0,
@@ -1427,16 +1397,6 @@
     ],
     "04": [
         {
-            "weight": 2526199.839,
-            "quantity": 464967.20900000003,
-            "sumOfUSD": 524017784.705,
-            "weightAvgPrice": 207.4332,
-            "quantityAvgPrice": 1126.9994,
-            "tradeCount": 284.0,
-            "countryCode": "N/A",
-            "amountSharePct": 0.3102074875616452
-        },
-        {
             "weight": 393652.577,
             "quantity": 713455.0,
             "sumOfUSD": 326102256.51699996,
@@ -1898,16 +1858,6 @@
         }
     ],
     "05": [
-        {
-            "weight": 1640078.928,
-            "quantity": 1229113.0,
-            "sumOfUSD": 305599604.855,
-            "weightAvgPrice": 186.3323,
-            "quantityAvgPrice": 248.6343,
-            "tradeCount": 301.0,
-            "countryCode": "N/A",
-            "amountSharePct": 0.2748361271440598
-        },
         {
             "weight": 280392.379,
             "quantity": 1927869.0,
@@ -2431,16 +2381,6 @@
     ],
     "06": [
         {
-            "weight": 1640897.509,
-            "quantity": 321010.822,
-            "sumOfUSD": 296304291.48,
-            "weightAvgPrice": 180.5745,
-            "quantityAvgPrice": 923.0352,
-            "tradeCount": 185.0,
-            "countryCode": "N/A",
-            "amountSharePct": 0.27410551991166243
-        },
-        {
             "weight": 375324.671,
             "quantity": 1495480.0,
             "sumOfUSD": 196565104.089,
@@ -2912,16 +2852,6 @@
         }
     ],
     "07": [
-        {
-            "weight": 1952964.862,
-            "quantity": 1522095.561,
-            "sumOfUSD": 492183325.283,
-            "weightAvgPrice": 252.0185,
-            "quantityAvgPrice": 323.359,
-            "tradeCount": 248.0,
-            "countryCode": "N/A",
-            "amountSharePct": 0.33323310154214414
-        },
         {
             "weight": 407143.531,
             "quantity": 2337081.0,
@@ -3445,16 +3375,6 @@
             "amountSharePct": 0.15585605230607574
         },
         {
-            "weight": 341555.737,
-            "quantity": 142342.688,
-            "sumOfUSD": 120468884.79200001,
-            "weightAvgPrice": 352.7064,
-            "quantityAvgPrice": 846.33,
-            "tradeCount": 112.0,
-            "countryCode": "N/A",
-            "amountSharePct": 0.15067300276809517
-        },
-        {
             "weight": 318375.8,
             "quantity": 4861.0,
             "sumOfUSD": 94166976.57000001,
@@ -3886,16 +3806,6 @@
         }
     ],
     "09": [
-        {
-            "weight": 538043.165,
-            "quantity": 104732.0,
-            "sumOfUSD": 199385748.777,
-            "weightAvgPrice": 370.5757,
-            "quantityAvgPrice": 1903.771,
-            "tradeCount": 103.0,
-            "countryCode": "N/A",
-            "amountSharePct": 0.19841483250928413
-        },
         {
             "weight": 227112.59999999998,
             "quantity": 5390.0,
@@ -4369,16 +4279,6 @@
     ],
     "10": [
         {
-            "weight": 472503.06,
-            "quantity": 165280.0,
-            "sumOfUSD": 191705415.55900002,
-            "weightAvgPrice": 405.7231,
-            "quantityAvgPrice": 1159.8827,
-            "tradeCount": 104.0,
-            "countryCode": "N/A",
-            "amountSharePct": 0.21384928872251868
-        },
-        {
             "weight": 176935.0,
             "quantity": 5270.0,
             "sumOfUSD": 154984050.63,
@@ -4850,16 +4750,6 @@
         }
     ],
     "11": [
-        {
-            "weight": 631938.88,
-            "quantity": 140903.0,
-            "sumOfUSD": 182698290.56599998,
-            "weightAvgPrice": 289.1075,
-            "quantityAvgPrice": 1296.6246,
-            "tradeCount": 109.0,
-            "countryCode": "N/A",
-            "amountSharePct": 0.2090212905788713
-        },
         {
             "weight": 224627.57,
             "quantity": 12127.0,
@@ -5352,16 +5242,6 @@
         }
     ],
     "12": [
-        {
-            "weight": 815208.6,
-            "quantity": 176783.0,
-            "sumOfUSD": 289580027.236,
-            "weightAvgPrice": 355.222,
-            "quantityAvgPrice": 1638.0536,
-            "tradeCount": 212.0,
-            "countryCode": "N/A",
-            "amountSharePct": 0.24319721495851568
-        },
         {
             "weight": 197963.04,
             "quantity": 57123.0,

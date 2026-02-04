@@ -6,10 +6,15 @@
 
 import json
 import sys
+import os
 from pathlib import Path
 from sqlalchemy import create_engine, text
 
-DATABASE_URL = "postgresql://postgres:MWXAjkGpQgosJuCgIPcRdudhiyAiXCRl@crossover.proxy.rlwy.net:42314/railway"
+# 数据库连接（从环境变量读取，如果没有则使用默认值）
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql://postgres:123456@localhost:5433/supplychain"
+)
 
 def create_table(engine):
     """创建国家月度贸易统计表"""

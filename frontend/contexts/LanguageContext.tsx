@@ -98,9 +98,9 @@ const translations: Record<Language, Record<string, string>> = {
     'common.map': 'Map',
     'common.stats': 'Statistics',
     
-    // Country Trade Stats
-    'countryTrade.title': 'Country Trade',
-    'countryTrade.subtitle': 'Monthly trade data analysis by HS code and country',
+    // Country Statistics
+    'countryTrade.title': 'Country Statistics',
+    'countryTrade.subtitle': 'Monthly trade statistics analysis by HS code and country',
     'countryTrade.hsCodeFilter': 'HS Code Filter',
     'countryTrade.selectAll': 'Select All',
     'countryTrade.clearAll': 'Clear All',
@@ -108,7 +108,7 @@ const translations: Record<Language, Record<string, string>> = {
     'countryTrade.timeRange': 'Time Range',
     'countryTrade.startMonth': 'Start Month',
     'countryTrade.endMonth': 'End Month',
-    'countryTrade.tradeMap': 'Country Trade Map',
+    'countryTrade.tradeMap': 'Country Statistics Map',
     'countryTrade.totalTradeValue': 'Total Trade Value',
     'countryTrade.participatingCountries': 'Participating Countries',
     'countryTrade.transactionCount': 'Transaction Count',
@@ -210,9 +210,9 @@ const translations: Record<Language, Record<string, string>> = {
     'common.map': '地图',
     'common.stats': '统计',
     
-    // Country Trade Stats
-    'countryTrade.title': '国家贸易',
-    'countryTrade.subtitle': '按HS编码和国家的月度贸易数据分析',
+    // Country Statistics
+    'countryTrade.title': '国家统计',
+    'countryTrade.subtitle': '按HS编码和国家的月度贸易统计分析',
     'countryTrade.hsCodeFilter': 'HS编码筛选',
     'countryTrade.selectAll': '全选',
     'countryTrade.clearAll': '取消全选',
@@ -220,7 +220,7 @@ const translations: Record<Language, Record<string, string>> = {
     'countryTrade.timeRange': '时间范围',
     'countryTrade.startMonth': '起始年月',
     'countryTrade.endMonth': '结束年月',
-    'countryTrade.tradeMap': '国家贸易地图',
+    'countryTrade.tradeMap': '国家统计地图',
     'countryTrade.totalTradeValue': '总贸易额',
     'countryTrade.participatingCountries': '参与国家',
     'countryTrade.transactionCount': '交易次数',
