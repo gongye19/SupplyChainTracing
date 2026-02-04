@@ -90,14 +90,9 @@ const App: React.FC = () => {
         }));
         setCountries(countriesData);
         
-        // 从所有数据中提取公司列表（保持不变，不受筛选影响）
-        const allCompanies = new Set<string>();
-        allShipmentsData.forEach(s => {
-          allCompanies.add(s.exporterName);
-          allCompanies.add(s.importerName);
-        });
-        setCompanies(Array.from(allCompanies).sort());
-        console.log('All companies loaded:', Array.from(allCompanies).sort());
+        // 注意：聚合数据不包含公司信息，所以公司列表为空
+        setCompanies([]);
+        console.log('Companies list cleared (aggregated data has no company info)');
       } catch (error) {
         console.error('Failed to load initial data:', error);
         alert(t('app.loadDataError') + (error as Error).message);
@@ -251,10 +246,12 @@ const App: React.FC = () => {
         const countryPairs = new Set<string>();
         data.forEach(s => {
           // 使用国家代码作为键（顺序固定：原产国-目的地国家）
-          const originCode = getCountryCode(s.countryOfOrigin);
-          const destCode = getCountryCode(s.destinationCountry);
-          const pair = `${originCode}-${destCode}`;
-          countryPairs.add(pair);
+          const originCode = s.originCountryCode || getCountryCode(s.countryOfOrigin || '');
+          const destCode = s.destinationCountryCode || getCountryCode(s.destinationCountry || '');
+          if (originCode && destCode) {
+            const pair = `${originCode}-${destCode}`;
+            countryPairs.add(pair);
+          }
         });
         
         // 计算唯一品类数量（HS Code 前2位）
@@ -315,61 +312,59 @@ const App: React.FC = () => {
     };
   }, [filters, hsCodeCategories.length, countries.length, scheduleFetch]);
 
-  // 将原始 shipments 按港口对聚合，转换为地图组件格式
-  // 每个港口对（出发港口 → 到达港口）合并成一条线，顺序不能相反
+  // 将聚合统计数据按国家对聚合，转换为地图组件格式
+  // 每个国家对（原产国 → 目的地国家）合并成一条线
   const shipmentsForMap = useMemo(() => {
-    // 按港口对聚合所有交易（只包含有港口信息的交易）
-    const portPairGroups = new Map<string, {
-      portOfDeparture: string;
-      portOfArrival: string;
+    // 按国家对聚合所有交易
+    const countryPairGroups = new Map<string, {
       originCountryCode: string;
       destinationCountryCode: string;
       shipments: Shipment[];
       totalValue: number;
       totalQuantity: number;
+      totalWeight: number;
+      totalTradeCount: number;
       hsCodes: Set<string>;
-      companies: Set<string>; // 统计涉及的公司对
     }>();
     
     shipments.forEach(shipment => {
-      // 只处理有完整港口信息的交易
-      if (!shipment.portOfDeparture || !shipment.portOfArrival) {
-        return; // 跳过没有港口信息的交易
+      // 使用原产国和目的地国家代码
+      const originCountryCode = shipment.originCountryCode || getCountryCode(shipment.countryOfOrigin || '');
+      const destinationCountryCode = shipment.destinationCountryCode || getCountryCode(shipment.destinationCountry || '');
+      
+      if (!originCountryCode || !destinationCountryCode) {
+        return; // 跳过没有国家代码的交易
       }
       
-      const originCountryCode = getCountryCode(shipment.countryOfOrigin);
-      const destinationCountryCode = getCountryCode(shipment.destinationCountry);
+      // 使用国家对作为聚合键（顺序固定，不能相反）
+      const pairKey = `${originCountryCode}-${destinationCountryCode}`;
       
-      // 使用出发港口-到达港口作为聚合键（顺序固定，不能相反）
-      const pairKey = `${shipment.portOfDeparture}_${originCountryCode}-${shipment.portOfArrival}_${destinationCountryCode}`;
-      
-      if (!portPairGroups.has(pairKey)) {
-        portPairGroups.set(pairKey, {
-          portOfDeparture: shipment.portOfDeparture,
-          portOfArrival: shipment.portOfArrival,
+      if (!countryPairGroups.has(pairKey)) {
+        countryPairGroups.set(pairKey, {
           originCountryCode,
           destinationCountryCode,
           shipments: [],
           totalValue: 0,
           totalQuantity: 0,
-          hsCodes: new Set(),
-          companies: new Set()
+          totalWeight: 0,
+          totalTradeCount: 0,
+          hsCodes: new Set()
         });
       }
       
-      const group = portPairGroups.get(pairKey)!;
+      const group = countryPairGroups.get(pairKey)!;
       group.shipments.push(shipment);
       group.totalValue += shipment.totalValueUsd || 0;
       group.totalQuantity += shipment.quantity || 0;
+      group.totalWeight += shipment.weight || 0;
+      group.totalTradeCount += shipment.tradeCount || 0;
       if (shipment.hsCode) {
         group.hsCodes.add(shipment.hsCode);
       }
-      // 记录涉及的公司对
-      group.companies.add(`${shipment.exporterName} → ${shipment.importerName}`);
     });
     
     // 转换为地图组件格式
-    return Array.from(portPairGroups.values()).map((group, index) => {
+    return Array.from(countryPairGroups.values()).map((group, index) => {
       // 获取所有品类（HS Code 前2位）
       const categoryCodes = Array.from(group.hsCodes).map(code => code.slice(0, 2));
       const uniqueCategories = Array.from(new Set(categoryCodes));
@@ -379,31 +374,29 @@ const App: React.FC = () => {
       const hsCategory = hsCodeCategories.find(cat => cat.hsCode === mainCategoryCode);
       const categoryColor = getHSCodeColorCached(mainCategoryCode);
       
-      // 获取涉及的公司名称（用于显示）
-      const companyNames = Array.from(group.companies);
-      const exporterName = companyNames.length > 0 ? companyNames[0].split(' → ')[0] : '';
-      const importerName = companyNames.length > 0 ? companyNames[0].split(' → ')[1] : '';
+      // 获取国家名称（用于显示）
+      const originCountry = countries.find(c => c.countryCode === group.originCountryCode);
+      const destCountry = countries.find(c => c.countryCode === group.destinationCountryCode);
       
       return {
-        id: `port-pair-${index}-${group.portOfDeparture}-${group.portOfArrival}`,
-        originId: group.originCountryCode, // 保留用于兼容
-        destinationId: group.destinationCountryCode, // 保留用于兼容
-        portOfDeparture: group.portOfDeparture,
-        portOfArrival: group.portOfArrival,
-        countryOfOrigin: group.shipments[0]?.countryOfOrigin || '',
-        destinationCountry: group.shipments[0]?.destinationCountry || '',
-        exporterCompanyName: exporterName,
-        importerCompanyName: importerName,
+        id: `country-pair-${index}-${group.originCountryCode}-${group.destinationCountryCode}`,
+        originId: group.originCountryCode,
+        destinationId: group.destinationCountryCode,
+        countryOfOrigin: originCountry?.countryName || group.originCountryCode,
+        destinationCountry: destCountry?.countryName || group.destinationCountryCode,
         material: Array.from(group.hsCodes).join(','),
         category: hsCategory?.chapterName || 'Unknown',
         categoryColor,
         quantity: group.totalQuantity,
         value: group.totalValue / 1000000, // 转换为百万美元
         status: 'completed',
-        timestamp: group.shipments[0]?.date || ''
+        timestamp: group.shipments[0]?.date || `${group.shipments[0]?.year}-${String(group.shipments[0]?.month).padStart(2, '0')}-01`,
+        // 新增字段
+        tradeCount: group.totalTradeCount,
+        weight: group.totalWeight,
       };
     });
-  }, [shipments, hsCodeCategories, getCountryCode]);
+  }, [shipments, hsCodeCategories, countries, getCountryCode]);
 
   // 调试信息
   useEffect(() => {
@@ -490,7 +483,6 @@ const App: React.FC = () => {
                 setFilters={setFilters}
                 hsCodeCategories={hsCodeCategories}
                 countries={countries}
-                companies={companies}
                 shipments={shipments}
               />
             </>

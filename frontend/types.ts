@@ -79,41 +79,36 @@ export interface Filters {
   selectedCompanies: string[]; // 公司名称数组
 }
 
-// 原始交易数据（从 shipments_raw 表）和地图组件使用的合并接口
+// 国家原产地贸易统计数据（从 country_origin_trade_stats 表）和地图组件使用的合并接口
 export interface Shipment {
-  // 原始数据字段（从 shipments_raw 表）
-  date?: string; // YYYY-MM-DD
-  importerName?: string;
-  exporterName?: string;
-  hsCode?: string; // 4位 HS Code
-  productEnglish?: string;
-  productDescription?: string;
-  weightKg?: number;
+  // 聚合统计数据字段（从 country_origin_trade_stats 表）
+  year: number;
+  month: number;
+  hsCode: string; // 6位 HS Code
+  industry?: string;
+  originCountryCode: string; // 原产国代码
+  destinationCountryCode: string; // 目的地国家代码
+  weight?: number;
   quantity?: number;
-  quantityUnit?: string;
-  totalValueUsd?: number;
-  unitPricePerKg?: number;
-  unitPricePerItem?: number;
-  countryOfOrigin?: string;
-  destinationCountry?: string;
-  portOfDeparture?: string;
-  portOfArrival?: string;
-  importExport?: string;
-  transportMode?: string;
-  tradeTerm?: string;
+  totalValueUsd?: number; // sum_of_usd
+  weightAvgPrice?: number;
+  quantityAvgPrice?: number;
+  tradeCount: number;
+  amountSharePct?: number;
+  
+  // 向后兼容字段（用于前端显示）
+  countryOfOrigin?: string; // 原产国名称（从代码映射）
+  destinationCountry?: string; // 目的地国家名称（从代码映射）
+  date?: string; // YYYY-MM-DD（从 year, month 生成）
   
   // 地图组件需要的字段
-  categoryColor?: string; // 品类颜色，直接从交易数据获取
+  categoryColor?: string; // 品类颜色
   id?: string;
-  originId?: string;
-  destinationId?: string;
-  exporterCompanyId?: string;
-  importerCompanyId?: string;
-  exporterCompanyName?: string;
-  importerCompanyName?: string;
+  originId?: string; // 原产国代码（用于地图）
+  destinationId?: string; // 目的地国家代码（用于地图）
   material?: string;
   category?: string;
-  value?: number;
+  value?: number; // 总价值（百万美元）
   status?: string;
   timestamp?: string;
 }

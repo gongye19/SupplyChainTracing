@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Filters, HSCodeCategory, CountryLocation, Shipment } from '../types';
-import { Calendar, Building2, Package, Filter, ChevronDown, Check, Building } from 'lucide-react';
+import { Calendar, Building2, Package, Filter, ChevronDown, Check } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface SidebarFiltersProps {
@@ -8,7 +8,6 @@ interface SidebarFiltersProps {
   setFilters: React.Dispatch<React.SetStateAction<Filters>>;
   hsCodeCategories: HSCodeCategory[];
   countries: CountryLocation[];
-  companies: string[]; // 公司名称列表
   shipments: Shipment[]; // 实际数据，用于提取出现的品类和小类
 }
 
@@ -17,7 +16,6 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
   setFilters, 
   hsCodeCategories, 
   countries, 
-  companies,
   shipments
 }) => {
   const { t } = useLanguage();
@@ -26,14 +24,12 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
   const [countriesOpen, setCountriesOpen] = useState(false);
   const [hsCodeCategoriesOpen, setHsCodeCategoriesOpen] = useState(false);
   const [hsCodeSubcategoriesOpen, setHsCodeSubcategoriesOpen] = useState(false);
-  const [companiesOpen, setCompaniesOpen] = useState(false);
   
   const startDateRef = useRef<HTMLDivElement>(null);
   const endDateRef = useRef<HTMLDivElement>(null);
   const countriesRef = useRef<HTMLDivElement>(null);
   const hsCodeCategoriesRef = useRef<HTMLDivElement>(null);
   const hsCodeSubcategoriesRef = useRef<HTMLDivElement>(null);
-  const companiesRef = useRef<HTMLDivElement>(null);
 
   // 点击外部关闭下拉框
   useEffect(() => {
@@ -53,19 +49,16 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
       if (hsCodeSubcategoriesRef.current && !hsCodeSubcategoriesRef.current.contains(event.target as Node)) {
         setHsCodeSubcategoriesOpen(false);
       }
-      if (companiesRef.current && !companiesRef.current.contains(event.target as Node)) {
-        setCompaniesOpen(false);
-      }
     };
 
-    if (startDateOpen || endDateOpen || countriesOpen || hsCodeCategoriesOpen || hsCodeSubcategoriesOpen || companiesOpen) {
+    if (startDateOpen || endDateOpen || countriesOpen || hsCodeCategoriesOpen || hsCodeSubcategoriesOpen) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [startDateOpen, endDateOpen, countriesOpen, hsCodeCategoriesOpen, hsCodeSubcategoriesOpen, companiesOpen]);
+  }, [startDateOpen, endDateOpen, countriesOpen, hsCodeCategoriesOpen, hsCodeSubcategoriesOpen]);
 
   // 生成日期选项（从2003-01-01到当前）
   const generateDateOptions = () => {
@@ -158,14 +151,6 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
     }));
   };
 
-  const toggleCompany = (companyName: string) => {
-    setFilters(prev => ({
-      ...prev,
-      selectedCompanies: prev.selectedCompanies.includes(companyName)
-        ? prev.selectedCompanies.filter(c => c !== companyName)
-        : [...prev.selectedCompanies, companyName]
-    }));
-  };
 
   return (
     <div className="flex flex-col gap-10 p-1">
@@ -185,7 +170,6 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
               selectedCountries: [], 
               selectedHSCodeCategories: [],
               selectedHSCodeSubcategories: [],
-              selectedCompanies: []
             });
           }}
           className="text-[12px] text-[#007AFF] hover:underline font-semibold"
@@ -445,46 +429,6 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
         </div>
       </section>
 
-      {/* 公司筛选 */}
-      <section className="space-y-2.5">
-        <label className="text-[11px] font-bold text-[#86868B] uppercase tracking-widest flex items-center gap-2.5">
-          <Building className="w-4 h-4" /> {t('filters.companies')}
-        </label>
-        <div className="relative" ref={companiesRef}>
-          <button 
-            onClick={() => setCompaniesOpen(!companiesOpen)}
-            className="w-full bg-[#F5F5F7] border border-black/5 rounded-[12px] px-3 py-2.5 flex items-center justify-between text-[12px] text-[#1D1D1F] font-semibold hover:bg-[#EBEBEB] transition-all shadow-sm"
-          >
-            <span className="truncate">
-              {filters.selectedCompanies.length === 0 
-                ? t('filters.selectAll') 
-                : `${filters.selectedCompanies.length} ${t('filters.selected')}`}
-            </span>
-            <ChevronDown className={`w-3.5 h-3.5 text-[#86868B] transition-transform ${companiesOpen ? 'rotate-180' : ''}`} />
-          </button>
-          
-          {companiesOpen && (
-            <div className="absolute top-full left-0 right-0 mt-2 bg-white/90 backdrop-blur-xl border border-black/5 rounded-[16px] shadow-2xl z-50 max-h-72 overflow-y-auto custom-scrollbar p-1.5 animate-in fade-in zoom-in-95 duration-200">
-              {companies.length === 0 ? (
-                <div className="px-3 py-2 text-[12px] text-[#86868B]">
-                  {shipments.length === 0 ? t('filters.loading') : t('filters.noCompanies')}
-                </div>
-              ) : (
-                companies.map(companyName => (
-                <div 
-                  key={companyName}
-                  onClick={() => toggleCompany(companyName)}
-                  className={`px-3 py-2 text-[12px] flex items-center justify-between cursor-pointer rounded-[8px] transition-colors mb-0.5 last:mb-0 ${filters.selectedCompanies.includes(companyName) ? 'bg-[#007AFF] text-white font-bold' : 'text-[#1D1D1F] hover:bg-black/5'}`}
-                >
-                  <span className="truncate">{companyName}</span>
-                  {filters.selectedCompanies.includes(companyName) && <Check className="w-3.5 h-3.5 flex-shrink-0 ml-2" />}
-                </div>
-                ))
-              )}
-            </div>
-          )}
-        </div>
-      </section>
     </div>
   );
 };

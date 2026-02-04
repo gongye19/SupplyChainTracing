@@ -11,76 +11,60 @@ router = APIRouter()
 
 @router.get("", response_model=List[Shipment])
 def get_shipments(
-    start_date: Optional[str] = Query(None, description="起始日期 (YYYY-MM-DD)"),
-    end_date: Optional[str] = Query(None, description="结束日期 (YYYY-MM-DD)"),
-    country: Optional[List[str]] = Query(None, description="国家筛选（可多个，国家名称）"),
-    company: Optional[List[str]] = Query(None, description="公司名称筛选（可多个）"),
-    hs_code_prefix: Optional[List[str]] = Query(None, description="HS Code 2位大类筛选（可多个，如 42, 54, 62）"),
-    hs_code_suffix: Optional[List[str]] = Query(None, description="HS Code 2位小类筛选（可多个，如 04, 07, 05），需配合大类使用"),
-    hs_code: Optional[List[str]] = Query(None, description="完整 HS Code 4位筛选（可多个，如 4204, 5407）"),
+    start_year_month: Optional[str] = Query(None, description="起始年月 (YYYY-MM)"),
+    end_year_month: Optional[str] = Query(None, description="结束年月 (YYYY-MM)"),
+    country: Optional[List[str]] = Query(None, description="国家筛选（可多个，国家代码，如 CN, US, JP）"),
+    hs_code_prefix: Optional[List[str]] = Query(None, description="HS Code 2位大类筛选（可多个，如 85, 84）"),
+    hs_code: Optional[List[str]] = Query(None, description="完整 HS Code 6位筛选（可多个，如 854231）"),
+    industry: Optional[str] = Query(None, description="行业筛选（如 SemiConductor）"),
     limit: Optional[int] = Query(10000, description="返回记录数限制（默认10000）"),
     db: Session = Depends(get_db)
 ):
-    """获取原始交易数据（从 shipments_raw 表）"""
-    query = "SELECT * FROM shipments_raw WHERE 1=1"
+    """获取国家原产地贸易统计数据（从 country_origin_trade_stats 表）"""
+    query = "SELECT * FROM country_origin_trade_stats WHERE 1=1"
     params = {}
     
-    # 日期筛选
-    if start_date:
-        query += " AND date >= :start_date"
-        params['start_date'] = start_date
-    if end_date:
-        query += " AND date <= :end_date"
-        params['end_date'] = end_date
+    # 年月筛选
+    if start_year_month:
+        year_val, month_val = start_year_month.split('-')
+        query += " AND (year > :start_year OR (year = :start_year AND month >= :start_month))"
+        params['start_year'] = int(year_val)
+        params['start_month'] = int(month_val)
     
-    # 国家筛选
+    if end_year_month:
+        year_val, month_val = end_year_month.split('-')
+        query += " AND (year < :end_year OR (year = :end_year AND month <= :end_month))"
+        params['end_year'] = int(year_val)
+        params['end_month'] = int(month_val)
+    
+    # 国家筛选（原产国或目的地国家）
     if country:
         placeholders = ', '.join([f':country_{i}' for i in range(len(country))])
-        query += f" AND (country_of_origin IN ({placeholders}) OR destination_country IN ({placeholders}))"
+        query += f" AND (origin_country_code IN ({placeholders}) OR destination_country_code IN ({placeholders}))"
         for i, c in enumerate(country):
             params[f'country_{i}'] = c
     
-    # 公司筛选
-    if company:
-        placeholders = ', '.join([f':company_{i}' for i in range(len(company))])
-        query += f" AND (exporter_name IN ({placeholders}) OR importer_name IN ({placeholders}))"
-        for i, c in enumerate(company):
-            params[f'company_{i}'] = c
-    
-    # HS Code 筛选（优先级：完整4位 > 大类+小类 > 大类）
+    # HS Code 筛选（优先级：完整6位 > 大类）
     if hs_code:
-        # 完整4位 HS Code 筛选
+        # 完整6位 HS Code 筛选
         placeholders = ', '.join([f':hs_code_{i}' for i in range(len(hs_code))])
         query += f" AND hs_code IN ({placeholders})"
         for i, c in enumerate(hs_code):
             params[f'hs_code_{i}'] = c
-    elif hs_code_prefix and hs_code_suffix:
-        # 大类 + 小类组合筛选
-        # 生成所有可能的组合
-        combinations = []
-        for prefix in hs_code_prefix:
-            for suffix in hs_code_suffix:
-                combinations.append(f"{prefix}{suffix}")
-        if combinations:
-            placeholders = ', '.join([f':hs_combo_{i}' for i in range(len(combinations))])
-            query += f" AND hs_code IN ({placeholders})"
-            for i, combo in enumerate(combinations):
-                params[f'hs_combo_{i}'] = combo
     elif hs_code_prefix:
         # 只按大类筛选（前2位）
         placeholders = ', '.join([f':hs_prefix_{i}' for i in range(len(hs_code_prefix))])
         query += f" AND LEFT(hs_code, 2) IN ({placeholders})"
         for i, prefix in enumerate(hs_code_prefix):
             params[f'hs_prefix_{i}'] = prefix
-    elif hs_code_suffix:
-        # 只按小类筛选（后2位）- 不推荐单独使用，但支持
-        placeholders = ', '.join([f':hs_suffix_{i}' for i in range(len(hs_code_suffix))])
-        query += f" AND RIGHT(hs_code, 2) IN ({placeholders})"
-        for i, suffix in enumerate(hs_code_suffix):
-            params[f'hs_suffix_{i}'] = suffix
+    
+    # 行业筛选
+    if industry:
+        query += " AND industry = :industry"
+        params['industry'] = industry
     
     # 添加排序和限制
-    query += " ORDER BY date DESC, total_value_usd DESC"
+    query += " ORDER BY year DESC, month DESC, sum_of_usd DESC"
     if limit:
         query += f" LIMIT :limit"
         params['limit'] = limit
@@ -88,29 +72,30 @@ def get_shipments(
     result = db.execute(text(query), params)
     rows = result.fetchall()
     
-    # 转换为字典列表
+    # 转换为字典列表（适配新的 Schema）
     shipments = []
     for row in rows:
+        # 生成日期字符串（用于向后兼容）
+        date_str = f"{row.year}-{row.month:02d}-01"
+        
         shipment_dict = {
-            'date': row.date.strftime('%Y-%m-%d') if row.date else None,
-            'importer_name': row.importer_name,
-            'exporter_name': row.exporter_name,
+            'year': row.year,
+            'month': row.month,
             'hs_code': row.hs_code,
-            'product_english': row.product_english,
-            'product_description': row.product_description,
-            'weight_kg': float(row.weight_kg) if row.weight_kg else None,
+            'industry': row.industry,
+            'origin_country_code': row.origin_country_code,
+            'destination_country_code': row.destination_country_code,
+            'weight': float(row.weight) if row.weight else None,
             'quantity': float(row.quantity) if row.quantity else None,
-            'quantity_unit': row.quantity_unit,
-            'total_value_usd': float(row.total_value_usd) if row.total_value_usd else None,
-            'unit_price_per_kg': float(row.unit_price_per_kg) if row.unit_price_per_kg else None,
-            'unit_price_per_item': float(row.unit_price_per_item) if row.unit_price_per_item else None,
-            'country_of_origin': row.country_of_origin,
-            'destination_country': row.destination_country,
-            'port_of_departure': row.port_of_departure,
-            'port_of_arrival': row.port_of_arrival,
-            'import_export': row.import_export,
-            'transport_mode': row.transport_mode,
-            'trade_term': row.trade_term,
+            'total_value_usd': float(row.sum_of_usd) if row.sum_of_usd else None,
+            'weight_avg_price': float(row.weight_avg_price) if row.weight_avg_price else None,
+            'quantity_avg_price': float(row.quantity_avg_price) if row.quantity_avg_price else None,
+            'trade_count': int(row.trade_count) if row.trade_count else 0,
+            'amount_share_pct': float(row.amount_share_pct) if row.amount_share_pct else None,
+            # 向后兼容字段（从代码映射，这里先设为代码，前端可以进一步映射）
+            'country_of_origin': row.origin_country_code,
+            'destination_country': row.destination_country_code,
+            'date': date_str,
         }
         shipments.append(shipment_dict)
     

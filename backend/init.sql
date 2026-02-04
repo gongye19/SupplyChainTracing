@@ -154,3 +154,38 @@ CREATE INDEX IF NOT EXISTS idx_cmts_industry ON country_monthly_trade_stats(indu
 CREATE INDEX IF NOT EXISTS idx_cmts_hs_year ON country_monthly_trade_stats(hs_code, year);
 CREATE INDEX IF NOT EXISTS idx_cmts_year_month_country ON country_monthly_trade_stats(year, month, country_code);
 
+-- 创建国家原产地贸易统计表（用于替换 shipments_raw）
+CREATE TABLE IF NOT EXISTS country_origin_trade_stats (
+    id VARCHAR(150) PRIMARY KEY,
+    hs_code VARCHAR(6) NOT NULL,
+    year INTEGER NOT NULL,
+    month INTEGER NOT NULL,
+    origin_country_code VARCHAR(3) NOT NULL,
+    destination_country_code VARCHAR(3) NOT NULL,
+    industry VARCHAR(50),
+    
+    -- 统计数据
+    weight DECIMAL(20, 2),
+    quantity DECIMAL(20, 2),
+    sum_of_usd DECIMAL(20, 2),
+    weight_avg_price DECIMAL(15, 4),
+    quantity_avg_price DECIMAL(15, 4),
+    trade_count INTEGER,
+    amount_share_pct DECIMAL(10, 8),
+    
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    CONSTRAINT uq_hs_year_month_origin_dest UNIQUE (hs_code, year, month, origin_country_code, destination_country_code)
+);
+
+-- 创建索引
+CREATE INDEX IF NOT EXISTS idx_cots_hs_code ON country_origin_trade_stats(hs_code);
+CREATE INDEX IF NOT EXISTS idx_cots_year_month ON country_origin_trade_stats(year, month);
+CREATE INDEX IF NOT EXISTS idx_cots_origin_country ON country_origin_trade_stats(origin_country_code);
+CREATE INDEX IF NOT EXISTS idx_cots_dest_country ON country_origin_trade_stats(destination_country_code);
+CREATE INDEX IF NOT EXISTS idx_cots_industry ON country_origin_trade_stats(industry);
+CREATE INDEX IF NOT EXISTS idx_cots_hs_year ON country_origin_trade_stats(hs_code, year);
+CREATE INDEX IF NOT EXISTS idx_cots_year_month_origin ON country_origin_trade_stats(year, month, origin_country_code);
+CREATE INDEX IF NOT EXISTS idx_cots_year_month_dest ON country_origin_trade_stats(year, month, destination_country_code);
+

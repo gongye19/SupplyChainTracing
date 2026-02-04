@@ -188,27 +188,33 @@ class HSCodeCategory(BaseModel):
     class Config:
         from_attributes = True
 
-# Shipment Schema (from shipments_raw table)
+# Shipment Schema (from country_origin_trade_stats table - 聚合统计数据)
 class Shipment(BaseModel):
-    date: str  # YYYY-MM-DD
-    importer_name: str
-    exporter_name: str
-    hs_code: str  # 4位 HS Code
-    product_english: Optional[str] = None
-    product_description: Optional[str] = None
-    weight_kg: Optional[float] = None
+    # 时间维度（改为年月）
+    year: int
+    month: int
+    
+    # HS编码和行业
+    hs_code: str  # 6位 HS Code
+    industry: Optional[str] = None
+    
+    # 国家维度
+    origin_country_code: str  # 原产国代码
+    destination_country_code: str  # 目的地国家代码
+    
+    # 统计指标
+    weight: Optional[float] = None
     quantity: Optional[float] = None
-    quantity_unit: Optional[str] = None
-    total_value_usd: Optional[float] = None
-    unit_price_per_kg: Optional[float] = None
-    unit_price_per_item: Optional[float] = None
-    country_of_origin: str
-    destination_country: str
-    port_of_departure: Optional[str] = None
-    port_of_arrival: Optional[str] = None
-    import_export: Optional[str] = None
-    transport_mode: Optional[str] = None
-    trade_term: Optional[str] = None
+    total_value_usd: Optional[float] = None  # sum_of_usd
+    weight_avg_price: Optional[float] = None
+    quantity_avg_price: Optional[float] = None
+    trade_count: int
+    amount_share_pct: Optional[float] = None
+    
+    # 向后兼容字段（用于前端显示）
+    country_of_origin: Optional[str] = None  # 原产国名称（从代码映射）
+    destination_country: Optional[str] = None  # 目的地国家名称（从代码映射）
+    date: Optional[str] = None  # 格式化为 YYYY-MM-DD（从 year, month 生成）
     
     class Config:
         from_attributes = True

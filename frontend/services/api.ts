@@ -135,65 +135,65 @@ export const monthlyCompanyFlowsAPI = {
   },
 };
 
-// Shipments API（原始交易数据）
+// Shipments API（国家原产地贸易统计数据）
 export const shipmentsAPI = {
   getAll: async (filters?: Partial<Filters>): Promise<Shipment[]> => {
     const params = new URLSearchParams();
-    // 将 YYYY-MM 格式转换为日期范围
+    
+    // 日期筛选：转换为 YYYY-MM 格式
     if (filters?.startDate) {
-      // 如果是 YYYY-MM 格式，转换为该月第一天
-      if (filters.startDate.match(/^\d{4}-\d{2}$/)) {
-        params.append('start_date', `${filters.startDate}-01`);
-      } else {
-        params.append('start_date', filters.startDate);
+      // 如果是 YYYY-MM-DD 格式，提取 YYYY-MM
+      if (filters.startDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        params.append('start_year_month', filters.startDate.substring(0, 7));
+      } else if (filters.startDate.match(/^\d{4}-\d{2}$/)) {
+        params.append('start_year_month', filters.startDate);
       }
     }
     if (filters?.endDate) {
-      // 如果是 YYYY-MM 格式，转换为该月最后一天
-      if (filters.endDate.match(/^\d{4}-\d{2}$/)) {
-        const [year, month] = filters.endDate.split('-').map(Number);
-        const lastDay = new Date(year, month, 0).getDate(); // 获取该月最后一天
-        params.append('end_date', `${filters.endDate}-${String(lastDay).padStart(2, '0')}`);
-      } else {
-        params.append('end_date', filters.endDate);
+      // 如果是 YYYY-MM-DD 格式，提取 YYYY-MM
+      if (filters.endDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        params.append('end_year_month', filters.endDate.substring(0, 7));
+      } else if (filters.endDate.match(/^\d{4}-\d{2}$/)) {
+        params.append('end_year_month', filters.endDate);
       }
     }
+    
+    // 国家筛选：使用国家代码（需要从国家名称转换为代码）
     if (filters?.selectedCountries?.length) {
-      filters.selectedCountries.forEach(name => params.append('country', name));
+      // 这里假设 selectedCountries 已经是国家代码，如果不是需要转换
+      filters.selectedCountries.forEach(code => params.append('country', code));
     }
-    if (filters?.selectedCompanies?.length) {
-      filters.selectedCompanies.forEach(name => params.append('company', name));
-    }
+    
+    // HS Code 筛选：使用2位大类前缀
     if (filters?.selectedHSCodeCategories?.length) {
       filters.selectedHSCodeCategories.forEach(prefix => params.append('hs_code_prefix', prefix));
     }
-    if (filters?.selectedHSCodeSubcategories?.length) {
-      filters.selectedHSCodeSubcategories.forEach(suffix => params.append('hs_code_suffix', suffix));
-    }
+    
+    // 行业筛选（可选）
+    // params.append('industry', 'SemiConductor');
+    
     // 限制返回数量
     params.append('limit', '50000');
 
     const data = await fetchAPI<any[]>(`/api/shipments?${params.toString()}`);
     return data.map((item: any) => ({
-      date: item.date,
-      importerName: item.importer_name,
-      exporterName: item.exporter_name,
+      year: item.year,
+      month: item.month,
       hsCode: item.hs_code,
-      productEnglish: item.product_english,
-      productDescription: item.product_description,
-      weightKg: item.weight_kg,
+      industry: item.industry,
+      originCountryCode: item.origin_country_code,
+      destinationCountryCode: item.destination_country_code,
+      weight: item.weight,
       quantity: item.quantity,
-      quantityUnit: item.quantity_unit,
       totalValueUsd: item.total_value_usd,
-      unitPricePerKg: item.unit_price_per_kg,
-      unitPricePerItem: item.unit_price_per_item,
-      countryOfOrigin: item.country_of_origin,
-      destinationCountry: item.destination_country,
-      portOfDeparture: item.port_of_departure,
-      portOfArrival: item.port_of_arrival,
-      importExport: item.import_export,
-      transportMode: item.transport_mode,
-      tradeTerm: item.trade_term,
+      weightAvgPrice: item.weight_avg_price,
+      quantityAvgPrice: item.quantity_avg_price,
+      tradeCount: item.trade_count || 0,
+      amountSharePct: item.amount_share_pct,
+      // 向后兼容字段
+      countryOfOrigin: item.country_of_origin || item.origin_country_code,
+      destinationCountry: item.destination_country || item.destination_country_code,
+      date: item.date || `${item.year}-${String(item.month).padStart(2, '0')}-01`,
     }));
   },
 };
