@@ -18,6 +18,16 @@ function loadWorldGeoJson() {
   return worldGeoJsonPromise;
 }
 
+// 2位代码到3位代码的映射（ISO 3166-1 alpha-2 到 alpha-3）
+const ISO2_TO_ISO3: Record<string, string> = {
+  'AU': 'AUS', 'BD': 'BGD', 'BR': 'BRA', 'CN': 'CHN', 'EG': 'EGY',
+  'FR': 'FRA', 'DE': 'DEU', 'IN': 'IND', 'ID': 'IDN', 'IT': 'ITA',
+  'JP': 'JPN', 'MY': 'MYS', 'MX': 'MEX', 'NL': 'NLD', 'PK': 'PAK',
+  'PH': 'PHL', 'SG': 'SGP', 'KR': 'KOR', 'ES': 'ESP', 'TH': 'THA',
+  'TR': 'TUR', 'AE': 'ARE', 'GB': 'GBR', 'US': 'USA', 'VN': 'VNM',
+  'TW': 'TWN', 'IS': 'ISR', 'IE': 'IRL'
+};
+
 const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({ 
   stats,
   countries,
@@ -313,14 +323,16 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
         const props = d.properties;
         const countryName = props.name;
         
-        // 优先通过国家名称在 countryLocationMap 中查找对应的 countryCode（3位代码）
+        // 优先通过国家名称在 countryLocationMap 中查找对应的 countryCode
         let countryCode: string | undefined;
         if (countryName) {
           const country = Array.from(countryLocationMap.values()).find(
             loc => loc.countryName && loc.countryName.toLowerCase() === countryName.toLowerCase()
           );
           if (country) {
-            countryCode = country.countryCode; // countryCode 是3位代码，如 "JPN", "SGP"
+            // country.countryCode 可能是2位代码（如 "JP", "US"），需要转换为3位代码
+            const code2 = country.countryCode;
+            countryCode = ISO2_TO_ISO3[code2] || code2; // 如果是2位代码，转换为3位；如果已经是3位，直接使用
           }
         }
         
