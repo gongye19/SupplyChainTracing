@@ -73,7 +73,13 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
     
     console.log('[CountryTradeMap] Country trade data computed:', {
       tradeMapSize: tradeMap.size,
-      tradeMapEntries: Array.from(tradeMap.entries()).slice(0, 5).map(([code, data]) => ({ code, sumOfUsd: data.sumOfUsd }))
+      tradeMapEntries: Array.from(tradeMap.entries()).slice(0, 10).map(([code, data]) => ({ 
+        code, 
+        codeLength: code.length,
+        codeType: typeof code,
+        sumOfUsd: data.sumOfUsd 
+      })),
+      allCodes: Array.from(tradeMap.keys()).slice(0, 20)
     });
     
     // 更新ref，供事件监听器使用
@@ -276,13 +282,16 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
     const sampleGeoJsonCountries: any[] = [];
     gMap.selectAll('path.country').each(function(d: any) {
       if (sampleGeoJsonCountries.length < 10) {
-        const isoA3 = d.properties.ISO_A3;
+        const props = d.properties;
+        const isoA3 = props.ISO_A3 || props.iso_a3 || props.ISO3 || props.iso3;
+        const isoA2 = props.ISO_A2 || props.iso_a2 || props.ISO2 || props.iso2;
         const hasInTradeData = isoA3 ? countryTradeData.has(isoA3) : false;
         const tradeData = isoA3 ? countryTradeData.get(isoA3) : null;
         sampleGeoJsonCountries.push({
-          name: d.properties.name,
+          name: props.name,
           isoA3: isoA3,
-          isoA2: d.properties.ISO_A2,
+          isoA2: isoA2,
+          allProps: Object.keys(props).filter(k => k.toLowerCase().includes('iso') || k.toLowerCase().includes('code')),
           hasInTradeData: hasInTradeData,
           tradeData: tradeData ? { sumOfUsd: tradeData.sumOfUsd } : null
         });
@@ -293,8 +302,10 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
 
     gMap.selectAll('path.country')
       .attr('fill', (d: any) => {
-        const countryName = d.properties.name;
-        const isoA3 = d.properties.ISO_A3; // 3位代码，如 "USA", "JPN"
+        const props = d.properties;
+        const countryName = props.name;
+        // 尝试多种可能的 ISO_A3 属性名
+        const isoA3 = props.ISO_A3 || props.iso_a3 || props.ISO3 || props.iso3;
         
         // 简化匹配逻辑：只用 ISO_A3 直接匹配 tradeData（因为 tradeData 的 key 就是3位代码）
         if (isoA3 && countryTradeData.has(isoA3)) {
