@@ -272,6 +272,21 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
       sampleLocations: Array.from(countryLocationMap.entries()).slice(0, 3).map(([code, loc]) => ({ code, name: loc.countryName }))
     });
 
+    // 先检查前几个国家的匹配情况
+    const sampleGeoJsonCountries: any[] = [];
+    gMap.selectAll('path.country').each(function(d: any) {
+      if (sampleGeoJsonCountries.length < 10) {
+        sampleGeoJsonCountries.push({
+          name: d.properties.name,
+          isoA3: d.properties.ISO_A3,
+          isoA2: d.properties.ISO_A2,
+          hasInTradeData: d.properties.ISO_A3 ? countryTradeData.has(d.properties.ISO_A3) : false,
+          tradeData: d.properties.ISO_A3 ? countryTradeData.get(d.properties.ISO_A3) : null
+        });
+      }
+    });
+    console.log('[CountryTradeMap] Sample GeoJSON countries check:', sampleGeoJsonCountries);
+
     gMap.selectAll('path.country')
       .attr('fill', (d: any) => {
         const countryName = d.properties.name;
@@ -293,6 +308,13 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
               });
             }
             return colorScale(tradeData.sumOfUsd);
+          } else if (coloredCount === 0 && matchedCount < 5) {
+            // 如果匹配到了但数据为空，打印前几个
+            console.warn('[CountryTradeMap] Matched but no valid data:', {
+              countryName,
+              isoA3,
+              tradeData: tradeData ? { sumOfUsd: tradeData.sumOfUsd } : null
+            });
           }
         }
         
