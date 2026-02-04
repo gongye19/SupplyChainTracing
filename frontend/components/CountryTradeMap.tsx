@@ -313,9 +313,19 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
         const props = d.properties;
         const countryName = props.name;
         // 尝试多种可能的 ISO_A3 属性名（包括常见的 GeoJSON 属性名）
-        const isoA3 = props.ISO_A3 || props.iso_a3 || props.ISO3 || props.iso3 || 
-                      props.ISO_A3_EH || props.ISO_A3_TL || props.ADM0_A3 || props.adm0_a3 ||
-                      props.ISO_A3_ || props.iso_a3_ || props.ADM0_A3_IS || props.adm0_a3_is;
+        let isoA3 = props.ISO_A3 || props.iso_a3 || props.ISO3 || props.iso3 || 
+                     props.ISO_A3_EH || props.ISO_A3_TL || props.ADM0_A3 || props.adm0_a3 ||
+                     props.ISO_A3_ || props.iso_a3_ || props.ADM0_A3_IS || props.adm0_a3_is;
+        
+        // 如果 GeoJSON 没有 ISO_A3 属性，尝试通过国家名称在 countryLocationMap 中查找
+        if (!isoA3 && countryName) {
+          const country = Array.from(countryLocationMap.values()).find(
+            loc => loc.countryName && loc.countryName.toLowerCase() === countryName.toLowerCase()
+          );
+          if (country) {
+            isoA3 = country.countryCode; // countryCode 应该是3位代码
+          }
+        }
         
         // 简化匹配逻辑：只用 ISO_A3 直接匹配 tradeData（因为 tradeData 的 key 就是3位代码）
         if (isoA3 && countryTradeData.has(isoA3)) {
