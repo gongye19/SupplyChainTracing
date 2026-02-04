@@ -262,9 +262,14 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
     const allTradeCountryCodes = Array.from(countryTradeData.keys());
     const allLocationCountryCodes = Array.from(countryLocationMap.keys());
     console.log('[CountryTradeMap] Matching countries:', {
-      tradeDataCodes: allTradeCountryCodes.slice(0, 10),
-      locationCodes: allLocationCountryCodes.slice(0, 10),
-      commonCodes: allTradeCountryCodes.filter(code => allLocationCountryCodes.includes(code)).slice(0, 10)
+      tradeDataCodes: allTradeCountryCodes.slice(0, 20),
+      locationCodes: allLocationCountryCodes.slice(0, 20),
+      commonCodes: allTradeCountryCodes.filter(code => allLocationCountryCodes.includes(code)).slice(0, 10),
+      tradeDataSize: allTradeCountryCodes.length,
+      locationSize: allLocationCountryCodes.length,
+      // 打印一些示例数据
+      sampleTradeData: Array.from(countryTradeData.entries()).slice(0, 3).map(([code, data]) => ({ code, sumOfUsd: data.sumOfUsd })),
+      sampleLocations: Array.from(countryLocationMap.entries()).slice(0, 3).map(([code, loc]) => ({ code, name: loc.countryName }))
     });
 
     gMap.selectAll('path.country')
@@ -273,48 +278,74 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
         const isoA3 = d.properties.ISO_A3; // 3位代码，如 "USA", "JPN"
         const isoA2 = d.properties.ISO_A2; // 2位代码，如 "US", "JP"
         
-        // 尝试多种匹配方式
+        // 尝试多种匹配方式，优先使用 ISO_A3（因为 tradeData 的 key 是3位代码）
         let matchedCountryCode: string | undefined;
+        let matchMethod = '';
         
         // 1. 优先直接匹配 ISO_A3（因为数据中的 countryCode 就是3位代码）
         if (isoA3 && countryTradeData.has(isoA3)) {
           matchedCountryCode = isoA3;
+          matchMethod = 'ISO_A3 direct';
           matchedCount++;
         }
-        // 2. 如果 ISO_A3 匹配失败，尝试通过 CountryLocation 匹配
-        else if (isoA3 && countryLocationMap.has(isoA3)) {
-          matchedCountryCode = isoA3;
-          matchedCount++;
-        }
-        // 3. 通过国家名称匹配 CountryLocation，然后获取 countryCode
+        // 2. 如果 ISO_A3 在 tradeData 中不存在，尝试通过名称匹配找到对应的 countryCode
         else if (countryName) {
           const country = Array.from(countryLocationMap.values()).find(
             loc => loc.countryName && loc.countryName.toLowerCase() === countryName.toLowerCase()
           );
           if (country) {
-            matchedCountryCode = country.countryCode;
+            // 关键：优先尝试用 ISO_A3 去 tradeData 查找（因为 tradeData 的 key 是3位代码）
+            if (isoA3 && countryTradeData.has(isoA3)) {
+              matchedCountryCode = isoA3;
+              matchMethod = 'ISO_A3 via name match';
+            } else {
+              // 如果 ISO_A3 不在 tradeData 中，尝试用 country.countryCode
+              matchedCountryCode = country.countryCode;
+              matchMethod = 'country.countryCode via name match';
+            }
             matchedCount++;
           }
         }
         
         if (matchedCountryCode) {
           const tradeData = countryTradeData.get(matchedCountryCode);
+          // 添加详细调试信息（只在前几个匹配时打印）
+          if (matchedCount <= 3) {
+            console.log('[CountryTradeMap] Match attempt:', {
+              countryName,
+              isoA3,
+              isoA2,
+              matchedCountryCode,
+              matchMethod,
+              hasInTradeData: countryTradeData.has(matchedCountryCode),
+              tradeData: tradeData ? { sumOfUsd: tradeData.sumOfUsd, tradeCount: tradeData.tradeCount } : null,
+              allTradeKeys: Array.from(countryTradeData.keys()).slice(0, 5)
+            });
+          }
+          
           if (tradeData && tradeData.sumOfUsd > 0) {
             coloredCount++;
-            // 只在第一个匹配时打印调试信息
+            // 只在第一个成功着色时打印调试信息
             if (coloredCount === 1) {
-              console.log('[CountryTradeMap] First match example:', {
+              console.log('[CountryTradeMap] First colored country:', {
                 countryName,
                 isoA3,
-                isoA2,
                 matchedCountryCode,
+                matchMethod,
                 tradeData: { sumOfUsd: tradeData.sumOfUsd, tradeCount: tradeData.tradeCount },
-                color: colorScale(tradeData.sumOfUsd),
-                hasInTradeData: countryTradeData.has(matchedCountryCode),
-                hasInLocationMap: countryLocationMap.has(matchedCountryCode)
+                color: colorScale(tradeData.sumOfUsd)
               });
             }
             return colorScale(tradeData.sumOfUsd);
+          } else if (matchedCount <= 3) {
+            console.warn('[CountryTradeMap] Matched but no trade data:', {
+              countryName,
+              isoA3,
+              matchedCountryCode,
+              matchMethod,
+              hasTradeData: !!tradeData,
+              sumOfUsd: tradeData?.sumOfUsd
+            });
           }
         }
         
