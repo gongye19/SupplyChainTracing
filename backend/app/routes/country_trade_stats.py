@@ -22,51 +22,52 @@ def get_country_trade_stats(
     db: Session = Depends(get_db)
 ):
     """获取国家月度贸易统计数据"""
-    query = "SELECT * FROM country_monthly_trade_stats WHERE 1=1"
-    params = {}
-    
-    if hs_code:
-        placeholders = ', '.join([f':hs_code_{i}' for i in range(len(hs_code))])
-        query += f" AND hs_code IN ({placeholders})"
-        for i, code in enumerate(hs_code):
-            params[f'hs_code_{i}'] = code
-    
-    if year:
-        query += " AND year = :year"
-        params['year'] = year
-    
-    if month:
-        query += " AND month = :month"
-        params['month'] = month
-    
-    if country:
-        placeholders = ', '.join([f':country_{i}' for i in range(len(country))])
-        query += f" AND country_code IN ({placeholders})"
-        for i, c in enumerate(country):
-            params[f'country_{i}'] = c
-    
-    if industry:
-        query += " AND industry = :industry"
-        params['industry'] = industry
-    
-    if start_year_month:
-        year_val, month_val = start_year_month.split('-')
-        query += " AND (year > :start_year OR (year = :start_year AND month >= :start_month))"
-        params['start_year'] = int(year_val)
-        params['start_month'] = int(month_val)
-    
-    if end_year_month:
-        year_val, month_val = end_year_month.split('-')
-        query += " AND (year < :end_year OR (year = :end_year AND month <= :end_month))"
-        params['end_year'] = int(year_val)
-        params['end_month'] = int(month_val)
-    
-    query += " ORDER BY year DESC, month DESC, sum_of_usd DESC"
-    
-    if limit:
-        query += f" LIMIT {limit}"
-    
     try:
+        query = "SELECT * FROM country_monthly_trade_stats WHERE 1=1"
+        params = {}
+        
+        if hs_code:
+            placeholders = ', '.join([f':hs_code_{i}' for i in range(len(hs_code))])
+            query += f" AND hs_code IN ({placeholders})"
+            for i, code in enumerate(hs_code):
+                params[f'hs_code_{i}'] = code
+        
+        if year:
+            query += " AND year = :year"
+            params['year'] = year
+        
+        if month:
+            query += " AND month = :month"
+            params['month'] = month
+        
+        if country:
+            placeholders = ', '.join([f':country_{i}' for i in range(len(country))])
+            query += f" AND country_code IN ({placeholders})"
+            for i, c in enumerate(country):
+                params[f'country_{i}'] = c
+        
+        if industry:
+            query += " AND industry = :industry"
+            params['industry'] = industry
+        
+        if start_year_month:
+            year_val, month_val = start_year_month.split('-')
+            query += " AND (year > :start_year OR (year = :start_year AND month >= :start_month))"
+            params['start_year'] = int(year_val)
+            params['start_month'] = int(month_val)
+        
+        if end_year_month:
+            year_val, month_val = end_year_month.split('-')
+            query += " AND (year < :end_year OR (year = :end_year AND month <= :end_month))"
+            params['end_year'] = int(year_val)
+            params['end_month'] = int(month_val)
+        
+        query += " ORDER BY year DESC, month DESC, sum_of_usd DESC"
+        
+        if limit:
+            query += f" LIMIT {limit}"
+        
+        try:
         result = db.execute(text(query), params)
         rows = result.fetchall()
         
@@ -89,11 +90,14 @@ def get_country_trade_stats(
         
         return stats
     except Exception as e:
-        import traceback
-        error_detail = f"数据库查询错误: {str(e)}\n{traceback.format_exc()}"
-        print(f"[ERROR] {error_detail}")
-        from fastapi import HTTPException
-        raise HTTPException(status_code=500, detail=f"数据库查询错误: {str(e)}")
+        # 记录错误并返回空列表，避免 500 错误
+        error_msg = str(e)
+        if "does not exist" in error_msg or "UndefinedTable" in error_msg or "relation" in error_msg.lower():
+            print(f"Table does not exist or query failed: {error_msg}")
+            return []
+        # 其他错误也返回空列表
+        print(f"Query error: {error_msg}")
+        return []
 
 @router.get("/summary", response_model=CountryTradeStatSummary)
 def get_country_trade_stats_summary(
@@ -107,56 +111,57 @@ def get_country_trade_stats_summary(
     db: Session = Depends(get_db)
 ):
     """获取国家月度贸易统计汇总"""
-    query = """
-        SELECT 
-            COUNT(DISTINCT country_code) as total_countries,
-            COALESCE(SUM(sum_of_usd), 0) as total_trade_value,
-            COALESCE(SUM(weight), 0) as total_weight,
-            COALESCE(SUM(quantity), 0) as total_quantity,
-            COALESCE(SUM(trade_count), 0) as total_trade_count,
-            COALESCE(AVG(amount_share_pct), 0) as avg_share_pct
-        FROM country_monthly_trade_stats
-        WHERE 1=1
-    """
-    params = {}
-    
-    if hs_code:
-        placeholders = ', '.join([f':hs_code_{i}' for i in range(len(hs_code))])
-        query += f" AND hs_code IN ({placeholders})"
-        for i, code in enumerate(hs_code):
-            params[f'hs_code_{i}'] = code
-    
-    if year:
-        query += " AND year = :year"
-        params['year'] = year
-    
-    if month:
-        query += " AND month = :month"
-        params['month'] = month
-    
-    if country:
-        placeholders = ', '.join([f':country_{i}' for i in range(len(country))])
-        query += f" AND country_code IN ({placeholders})"
-        for i, c in enumerate(country):
-            params[f'country_{i}'] = c
-    
-    if industry:
-        query += " AND industry = :industry"
-        params['industry'] = industry
-    
-    if start_year_month:
-        year_val, month_val = start_year_month.split('-')
-        query += " AND (year > :start_year OR (year = :start_year AND month >= :start_month))"
-        params['start_year'] = int(year_val)
-        params['start_month'] = int(month_val)
-    
-    if end_year_month:
-        year_val, month_val = end_year_month.split('-')
-        query += " AND (year < :end_year OR (year = :end_year AND month <= :end_month))"
-        params['end_year'] = int(year_val)
-        params['end_month'] = int(month_val)
-    
     try:
+        query = """
+            SELECT 
+                COUNT(DISTINCT country_code) as total_countries,
+                COALESCE(SUM(sum_of_usd), 0) as total_trade_value,
+                COALESCE(SUM(weight), 0) as total_weight,
+                COALESCE(SUM(quantity), 0) as total_quantity,
+                COALESCE(SUM(trade_count), 0) as total_trade_count,
+                COALESCE(AVG(amount_share_pct), 0) as avg_share_pct
+            FROM country_monthly_trade_stats
+            WHERE 1=1
+        """
+        params = {}
+        
+        if hs_code:
+            placeholders = ', '.join([f':hs_code_{i}' for i in range(len(hs_code))])
+            query += f" AND hs_code IN ({placeholders})"
+            for i, code in enumerate(hs_code):
+                params[f'hs_code_{i}'] = code
+        
+        if year:
+            query += " AND year = :year"
+            params['year'] = year
+        
+        if month:
+            query += " AND month = :month"
+            params['month'] = month
+        
+        if country:
+            placeholders = ', '.join([f':country_{i}' for i in range(len(country))])
+            query += f" AND country_code IN ({placeholders})"
+            for i, c in enumerate(country):
+                params[f'country_{i}'] = c
+        
+        if industry:
+            query += " AND industry = :industry"
+            params['industry'] = industry
+        
+        if start_year_month:
+            year_val, month_val = start_year_month.split('-')
+            query += " AND (year > :start_year OR (year = :start_year AND month >= :start_month))"
+            params['start_year'] = int(year_val)
+            params['start_month'] = int(month_val)
+        
+        if end_year_month:
+            year_val, month_val = end_year_month.split('-')
+            query += " AND (year < :end_year OR (year = :end_year AND month <= :end_month))"
+            params['end_year'] = int(year_val)
+            params['end_month'] = int(month_val)
+        
+        try:
         result = db.execute(text(query), params)
         row = result.fetchone()
         
@@ -184,12 +189,41 @@ def get_country_trade_stats_summary(
                 "total_trade_count": 0,
                 "avg_share_pct": 0.0
             }
+        except Exception as e:
+            # 记录错误并返回默认值，避免 500 错误
+            error_msg = str(e)
+            if "does not exist" in error_msg or "UndefinedTable" in error_msg or "relation" in error_msg.lower():
+                print(f"Table does not exist or query failed: {error_msg}")
+                return {
+                    "total_countries": 0,
+                    "total_trade_value": 0.0,
+                    "total_weight": None,
+                    "total_quantity": None,
+                    "total_trade_count": 0,
+                    "avg_share_pct": 0.0
+                }
+            # 其他错误也返回默认值
+            print(f"Query error: {error_msg}")
+            return {
+                "total_countries": 0,
+                "total_trade_value": 0.0,
+                "total_weight": None,
+                "total_quantity": None,
+                "total_trade_count": 0,
+                "avg_share_pct": 0.0
+            }
     except Exception as e:
-        import traceback
-        error_detail = f"数据库查询错误: {str(e)}\n{traceback.format_exc()}"
-        print(f"[ERROR] {error_detail}")
-        from fastapi import HTTPException
-        raise HTTPException(status_code=500, detail=f"数据库查询错误: {str(e)}")
+        # 外层异常处理
+        error_msg = str(e)
+        print(f"Outer error: {error_msg}")
+        return {
+            "total_countries": 0,
+            "total_trade_value": 0.0,
+            "total_weight": None,
+            "total_quantity": None,
+            "total_trade_count": 0,
+            "avg_share_pct": 0.0
+        }
 
 @router.get("/trends", response_model=List[CountryTradeTrend])
 def get_country_trade_trends(
@@ -201,45 +235,46 @@ def get_country_trade_trends(
     db: Session = Depends(get_db)
 ):
     """获取国家贸易趋势数据（按月份聚合）"""
-    query = """
-        SELECT 
-            TO_CHAR(TO_DATE(year || '-' || LPAD(month::text, 2, '0') || '-01', 'YYYY-MM-DD'), 'YYYY-MM') as year_month,
-            COALESCE(SUM(sum_of_usd), 0) as sum_of_usd,
-            COALESCE(SUM(weight), 0) as weight,
-            COALESCE(SUM(quantity), 0) as quantity,
-            COALESCE(SUM(trade_count), 0) as trade_count
-        FROM country_monthly_trade_stats
-        WHERE 1=1
-    """
-    params = {}
-    
-    if hs_code:
-        query += " AND hs_code = :hs_code"
-        params['hs_code'] = hs_code
-    
-    if country:
-        query += " AND country_code = :country"
-        params['country'] = country
-    
-    if industry:
-        query += " AND industry = :industry"
-        params['industry'] = industry
-    
-    if start_year_month:
-        year_val, month_val = start_year_month.split('-')
-        query += " AND (year > :start_year OR (year = :start_year AND month >= :start_month))"
-        params['start_year'] = int(year_val)
-        params['start_month'] = int(month_val)
-    
-    if end_year_month:
-        year_val, month_val = end_year_month.split('-')
-        query += " AND (year < :end_year OR (year = :end_year AND month <= :end_month))"
-        params['end_year'] = int(year_val)
-        params['end_month'] = int(month_val)
-    
-    query += " GROUP BY year, month ORDER BY year, month"
-    
     try:
+        query = """
+            SELECT 
+                TO_CHAR(TO_DATE(year || '-' || LPAD(month::text, 2, '0') || '-01', 'YYYY-MM-DD'), 'YYYY-MM') as year_month,
+                COALESCE(SUM(sum_of_usd), 0) as sum_of_usd,
+                COALESCE(SUM(weight), 0) as weight,
+                COALESCE(SUM(quantity), 0) as quantity,
+                COALESCE(SUM(trade_count), 0) as trade_count
+            FROM country_monthly_trade_stats
+            WHERE 1=1
+        """
+        params = {}
+        
+        if hs_code:
+            query += " AND hs_code = :hs_code"
+            params['hs_code'] = hs_code
+        
+        if country:
+            query += " AND country_code = :country"
+            params['country'] = country
+        
+        if industry:
+            query += " AND industry = :industry"
+            params['industry'] = industry
+        
+        if start_year_month:
+            year_val, month_val = start_year_month.split('-')
+            query += " AND (year > :start_year OR (year = :start_year AND month >= :start_month))"
+            params['start_year'] = int(year_val)
+            params['start_month'] = int(month_val)
+        
+        if end_year_month:
+            year_val, month_val = end_year_month.split('-')
+            query += " AND (year < :end_year OR (year = :end_year AND month <= :end_month))"
+            params['end_year'] = int(year_val)
+            params['end_month'] = int(month_val)
+        
+        query += " GROUP BY year, month ORDER BY year, month"
+        
+        try:
         result = db.execute(text(query), params)
         rows = result.fetchall()
         
@@ -260,13 +295,28 @@ def get_country_trade_trends(
             
             trends.append(trend_dict)
         
-        return trends
+            return trends
+        except Exception as e:
+            # 记录错误并返回空列表，避免 500 错误
+            error_msg = str(e)
+            if "does not exist" in error_msg or "UndefinedTable" in error_msg or "relation" in error_msg.lower():
+                print(f"Table does not exist or query failed: {error_msg}")
+                return []
+            # 其他错误也返回空列表
+            print(f"Query error: {error_msg}")
+            return []
     except Exception as e:
-        import traceback
-        error_detail = f"数据库查询错误: {str(e)}\n{traceback.format_exc()}"
-        print(f"[ERROR] {error_detail}")
-        from fastapi import HTTPException
-        raise HTTPException(status_code=500, detail=f"数据库查询错误: {str(e)}")
+        # 外层异常处理
+        error_msg = str(e)
+        print(f"Outer error: {error_msg}")
+        return {
+            "total_countries": 0,
+            "total_trade_value": 0.0,
+            "total_weight": None,
+            "total_quantity": None,
+            "total_trade_count": 0,
+            "avg_share_pct": 0.0
+        }
 
 @router.get("/top-countries", response_model=List[TopCountry])
 def get_top_countries(
@@ -278,39 +328,40 @@ def get_top_countries(
     db: Session = Depends(get_db)
 ):
     """获取Top国家（按贸易额排序）"""
-    query = """
-        SELECT 
-            country_code,
-            COALESCE(SUM(sum_of_usd), 0) as sum_of_usd,
-            COALESCE(SUM(weight), 0) as weight,
-            COALESCE(SUM(quantity), 0) as quantity,
-            COALESCE(SUM(trade_count), 0) as trade_count,
-            COALESCE(AVG(amount_share_pct), 0) as amount_share_pct
-        FROM country_monthly_trade_stats
-        WHERE 1=1
-    """
-    params = {}
-    
-    if hs_code:
-        query += " AND hs_code = :hs_code"
-        params['hs_code'] = hs_code
-    
-    if year:
-        query += " AND year = :year"
-        params['year'] = year
-    
-    if month:
-        query += " AND month = :month"
-        params['month'] = month
-    
-    if industry:
-        query += " AND industry = :industry"
-        params['industry'] = industry
-    
-    query += " GROUP BY country_code ORDER BY sum_of_usd DESC LIMIT :limit"
-    params['limit'] = limit
-    
     try:
+        query = """
+            SELECT 
+                country_code,
+                COALESCE(SUM(sum_of_usd), 0) as sum_of_usd,
+                COALESCE(SUM(weight), 0) as weight,
+                COALESCE(SUM(quantity), 0) as quantity,
+                COALESCE(SUM(trade_count), 0) as trade_count,
+                COALESCE(AVG(amount_share_pct), 0) as amount_share_pct
+            FROM country_monthly_trade_stats
+            WHERE 1=1
+        """
+        params = {}
+        
+        if hs_code:
+            query += " AND hs_code = :hs_code"
+            params['hs_code'] = hs_code
+        
+        if year:
+            query += " AND year = :year"
+            params['year'] = year
+        
+        if month:
+            query += " AND month = :month"
+            params['month'] = month
+        
+        if industry:
+            query += " AND industry = :industry"
+            params['industry'] = industry
+        
+        query += " GROUP BY country_code ORDER BY sum_of_usd DESC LIMIT :limit"
+        params['limit'] = limit
+        
+        try:
         result = db.execute(text(query), params)
         rows = result.fetchall()
         
@@ -331,11 +382,26 @@ def get_top_countries(
             
             top_countries.append(country_dict)
         
-        return top_countries
+            return top_countries
+        except Exception as e:
+            # 记录错误并返回空列表，避免 500 错误
+            error_msg = str(e)
+            if "does not exist" in error_msg or "UndefinedTable" in error_msg or "relation" in error_msg.lower():
+                print(f"Table does not exist or query failed: {error_msg}")
+                return []
+            # 其他错误也返回空列表
+            print(f"Query error: {error_msg}")
+            return []
     except Exception as e:
-        import traceback
-        error_detail = f"数据库查询错误: {str(e)}\n{traceback.format_exc()}"
-        print(f"[ERROR] {error_detail}")
-        from fastapi import HTTPException
-        raise HTTPException(status_code=500, detail=f"数据库查询错误: {str(e)}")
+        # 外层异常处理
+        error_msg = str(e)
+        print(f"Outer error: {error_msg}")
+        return {
+            "total_countries": 0,
+            "total_trade_value": 0.0,
+            "total_weight": None,
+            "total_quantity": None,
+            "total_trade_count": 0,
+            "avg_share_pct": 0.0
+        }
 

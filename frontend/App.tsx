@@ -12,6 +12,7 @@ import { shipmentsAPI, hsCodeCategoriesAPI, countryLocationsAPI, chatAPI, ChatMe
 import { Globe, BarChart3, Map as MapIcon, Package, TrendingUp, Users, ChevronRight } from 'lucide-react';
 import { useLanguage } from './contexts/LanguageContext';
 import { getHSCodeColorCached } from './utils/hsCodeColors';
+import { COUNTRY_COORDINATES, getCountriesFromCodes } from './utils/countryCoordinates';
 
 const App: React.FC = () => {
   const { language, setLanguage, t } = useLanguage();
@@ -78,17 +79,59 @@ const App: React.FC = () => {
         ]);
         console.log('HS Code Categories loaded:', hsCodeCatsData);
         console.log('Countries loaded:', locationsData);
-        setHsCodeCategories(hsCodeCatsData);
-        // 将 Location 转换为 CountryLocation 格式
-        const countriesData: CountryLocation[] = locationsData.map(loc => ({
-          countryCode: loc.countryCode,
-          countryName: loc.countryName,
-          capitalLat: loc.latitude,
-          capitalLng: loc.longitude,
-          region: loc.region,
-          continent: loc.continent
-        }));
-        setCountries(countriesData);
+        console.log('Shipments (raw):', allShipmentsData.length);
+        
+        // 处理 HS Code Categories
+        let finalHsCodeCats = hsCodeCatsData;
+        if (finalHsCodeCats.length === 0 && allShipmentsData.length > 0) {
+          // 从 shipments 数据中提取 HS Code 分类
+          const hsCodeSet = new Set<string>();
+          allShipmentsData.forEach(s => {
+            if (s.hsCode && s.hsCode.length >= 2) {
+              hsCodeSet.add(s.hsCode.slice(0, 2));
+            }
+          });
+          finalHsCodeCats = Array.from(hsCodeSet).sort().map(code => ({
+            hsCode: code,
+            chapterName: `Chapter ${code}` // 默认名称，可以后续改进
+          }));
+          console.log('Generated HS Code Categories from shipments:', finalHsCodeCats.length);
+        }
+        setHsCodeCategories(finalHsCodeCats);
+        
+        // 处理 Countries
+        let finalCountries: CountryLocation[] = [];
+        if (locationsData.length > 0) {
+          // 使用 API 返回的数据
+          finalCountries = locationsData.map(loc => ({
+            countryCode: loc.countryCode,
+            countryName: loc.countryName,
+            capitalLat: loc.latitude,
+            capitalLng: loc.longitude,
+            region: loc.region,
+            continent: loc.continent
+          }));
+        } else if (allShipmentsData.length > 0) {
+          // 从 shipments 数据中提取国家代码
+          const countryCodeSet = new Set<string>();
+          allShipmentsData.forEach(s => {
+            if (s.originCountryCode) countryCodeSet.add(s.originCountryCode);
+            if (s.destinationCountryCode) countryCodeSet.add(s.destinationCountryCode);
+          });
+          
+          // 使用国家坐标映射表生成 countries
+          const countryCoords = getCountriesFromCodes(Array.from(countryCodeSet));
+          finalCountries = countryCoords.map(coord => ({
+            countryCode: coord.countryCode,
+            countryName: coord.countryName,
+            capitalLat: coord.capitalLat,
+            capitalLng: coord.capitalLng,
+            region: coord.region,
+            continent: coord.continent
+          }));
+          console.log('Generated Countries from shipments:', finalCountries.length);
+        }
+        setCountries(finalCountries);
         
         // 注意：聚合数据不包含公司信息，所以公司列表为空
         setCompanies([]);
