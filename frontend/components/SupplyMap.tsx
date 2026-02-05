@@ -549,7 +549,6 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
                 <div class="flex flex-col gap-1">
                   <span class="text-[#86868B] text-[10px] font-bold uppercase">${directionLabel}</span>
                   <span class="text-[#007AFF] font-semibold text-[13px]">${origin.name} &rarr; ${dest.name}</span>
-                  <span class="text-[#86868B] text-[11px] mt-0.5">${routeGroup.originCountry} &rarr; ${routeGroup.destinationCountry}</span>
                 </div>
                 <div class="flex justify-between items-center">
                   <span class="text-[#86868B] text-[10px] font-bold uppercase">${transactionCountLabel}</span>
