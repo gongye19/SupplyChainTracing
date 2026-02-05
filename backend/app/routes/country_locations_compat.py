@@ -12,21 +12,7 @@ router = APIRouter()
 def get_country_locations(db: Session = Depends(get_db)):
     """从港口位置表中提取唯一的国家信息（向后兼容 /api/country-locations）"""
     try:
-        # 检查表是否存在
-        check_table = db.execute(text("""
-            SELECT EXISTS (
-                SELECT FROM information_schema.tables 
-                WHERE table_schema = 'public' 
-                AND table_name = 'port_locations'
-            )
-        """))
-        table_exists = check_table.scalar() if check_table else False
-        
-        if not table_exists:
-            # 表不存在，返回空列表
-            print("Table port_locations does not exist, returning empty list")
-            return []
-        
+        # 直接尝试查询，如果表不存在会被捕获
         query = """
             SELECT 
                 country_code,

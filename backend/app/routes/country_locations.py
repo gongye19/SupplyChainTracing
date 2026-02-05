@@ -15,21 +15,7 @@ def get_port_locations(
 ):
     """获取所有港口位置"""
     try:
-        # 检查表是否存在
-        check_table = db.execute(text("""
-            SELECT EXISTS (
-                SELECT FROM information_schema.tables 
-                WHERE table_schema = 'public' 
-                AND table_name = 'port_locations'
-            )
-        """))
-        table_exists = check_table.scalar() if check_table else False
-        
-        if not table_exists:
-            # 表不存在，返回空列表
-            print("Table port_locations does not exist, returning empty list")
-            return []
-        
+        # 直接尝试查询，如果表不存在会被捕获
         if country_code:
             query = "SELECT * FROM port_locations WHERE country_code = :country_code ORDER BY port_name"
             params = {"country_code": country_code}
@@ -69,21 +55,7 @@ def get_port_locations(
 def get_country_locations_from_ports(db: Session = Depends(get_db)):
     """从港口位置表中提取唯一的国家信息（向后兼容）"""
     try:
-        # 检查表是否存在
-        check_table = db.execute(text("""
-            SELECT EXISTS (
-                SELECT FROM information_schema.tables 
-                WHERE table_schema = 'public' 
-                AND table_name = 'port_locations'
-            )
-        """))
-        table_exists = check_table.scalar() if check_table else False
-        
-        if not table_exists:
-            # 表不存在，返回空列表
-            print("Table port_locations does not exist, returning empty list")
-            return []
-        
+        # 直接尝试查询，如果表不存在会被捕获
         query = """
             SELECT DISTINCT ON (country_code)
                 country_code,

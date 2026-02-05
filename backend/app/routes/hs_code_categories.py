@@ -12,21 +12,7 @@ router = APIRouter()
 def get_hs_code_categories(db: Session = Depends(get_db)):
     """获取所有 HS Code 品类"""
     try:
-        # 检查表是否存在
-        check_table = db.execute(text("""
-            SELECT EXISTS (
-                SELECT FROM information_schema.tables 
-                WHERE table_schema = 'public' 
-                AND table_name = 'hs_code_categories'
-            )
-        """))
-        table_exists = check_table.scalar() if check_table else False
-        
-        if not table_exists:
-            # 表不存在，返回空列表
-            print("Table hs_code_categories does not exist, returning empty list")
-            return []
-        
+        # 直接尝试查询，如果表不存在会被捕获
         query = "SELECT * FROM hs_code_categories ORDER BY hs_code"
         result = db.execute(text(query))
         rows = result.fetchall()
