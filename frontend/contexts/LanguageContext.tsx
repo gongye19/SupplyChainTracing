@@ -95,8 +95,8 @@ const translations: Record<Language, Record<string, string>> = {
     'ai.close': 'Close',
     
     // Common
-    'common.map': 'Map',
-    'common.stats': 'Statistics',
+    'common.map': 'Trade Map',
+    'common.stats': 'Trade Statistics',
     
     // Country Statistics
     'countryTrade.title': 'Country Statistics',
@@ -207,8 +207,8 @@ const translations: Record<Language, Record<string, string>> = {
     'ai.close': '关闭',
     
     // Common
-    'common.map': '地图',
-    'common.stats': '统计',
+    'common.map': '贸易地图',
+    'common.stats': '贸易统计',
     
     // Country Statistics
     'countryTrade.title': '国家统计',
