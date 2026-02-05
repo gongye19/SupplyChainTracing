@@ -557,55 +557,10 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
     });
 
     // 更新国家节点（使用D3 data join模式，只更新变化的部分）
-    const nodes = Array.from(countryTradeData.entries())
-      .map(([code, data]) => {
-        const location = countryLocationMap.get(code);
-        if (!location || data.sumOfUsd === 0) return null;
-        
-        const p = projection([location.capitalLng, location.capitalLat]);
-        if (!p) return null;
-        const [x, y] = p;
-        // 修复：不能使用 !x || !y，因为 x=0 或 y=0 是合法坐标
-        if (x == null || y == null || Number.isNaN(x) || Number.isNaN(y)) return null;
-        
-        return {
-          code,
-          x,
-          y,
-          ...data,
-          location,
-        };
-      })
-      .filter((n): n is NonNullable<typeof n> => n !== null);
-
-    const nodeSelection = gNodesRef.current!.selectAll('circle.country-node')
-      .data(nodes, (d: any) => d.code);
-
-    // 移除不再存在的节点
-    nodeSelection.exit()
-      .transition()
-      .duration(200)
-      .attr('r', 0)
-      .remove();
-
-    // 添加新节点
-    const nodeEnter = nodeSelection.enter()
-      .append('circle')
-      .attr('class', 'country-node')
-      .attr('r', 0)
-      .attr('fill', '#007AFF')
-      .attr('stroke', '#fff')
-      .attr('stroke-width', 2)
-      .attr('opacity', 0.8);
-
-    // 更新所有节点（包括新添加的）
-    nodeSelection.merge(nodeEnter)
-      .transition()
-      .duration(200)
-      .attr('cx', d => d.x)
-      .attr('cy', d => d.y)
-      .attr('r', d => Math.max(3, Math.min(15, Math.sqrt(d.sumOfUsd / maxTradeValue) * 15)))
-      .attr('fill', d => colorScale(d.sumOfUsd));
+    // 移除圆形热力圈节点（不再显示）
+    if (gNodesRef.current) {
+      gNodesRef.current.selectAll('circle.country-node').remove();
+    }
 
   }, [countryTradeData, maxTradeValue, colorScale, countries, geoJsonLoaded]);
 

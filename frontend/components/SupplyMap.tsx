@@ -442,7 +442,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
       const valueExtent = d3.extent(routeGroups, d => d.totalValue) as [number, number];
       const strokeScale = d3.scaleSqrt()
         .domain(valueExtent[0] !== undefined ? valueExtent : [1, 100])
-        .range([0.5, 2.5]); // 根据交易价值，范围 0.5-2.5（更细）
+        .range([1, 5]); // 根据交易价值，范围 1-5（更粗，更明显）
 
       // preview 模式：只显示前 100 条路径，不画粒子
       // final 模式：显示所有路径，画粒子（但限制粒子数量）
@@ -494,11 +494,11 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
         // 如果缺少国家位置，跳过该交易
         if (!sourcePos || !targetPos || !origin || !dest) return;
           
-          const midX = (sourcePos[0] + targetPos[0]) / 2;
-          const midY = (sourcePos[1] + targetPos[1]) / 2 - 50; 
-          const lineData = `M${sourcePos[0]},${sourcePos[1]} Q${midX},${midY} ${targetPos[0]},${targetPos[1]}`;
+        // 使用直线连接（之前的形状）
+        const lineData = `M${sourcePos[0]},${sourcePos[1]} L${targetPos[0]},${targetPos[1]}`;
           
-        const color = routeGroup.mainColor;
+        // 使用固定的蓝色
+        const color = '#007AFF';
         const thickness = strokeScale(routeGroup.totalValue); // 根据交易价值计算粗细
 
         const arc = gFlows.append('path')
@@ -538,7 +538,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
               <div class="space-y-3">
                 <div class="flex items-center justify-between gap-4 pb-2 border-b border-black/5">
                   <div class="flex items-center gap-2">
-                    <div class="w-3 h-3 rounded-full" style="background-color: ${color}"></div>
+                    <div class="w-3 h-3 rounded-full" style="background-color: #007AFF"></div>
                     <span class="font-bold text-[16px] text-[#1D1D1F]">${categoryDisplayName}</span>
                   </div>
                 </div>
@@ -596,7 +596,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
               .attr('data-base-radius', particleBaseRadius)
               .attr('data-base-stroke-width', particleBaseStrokeWidth)
             .attr('fill', '#FFFFFF')
-            .attr('stroke', color)
+            .attr('stroke', '#007AFF')
             .attr('stroke-width', particleBaseStrokeWidth)
               .attr('class', 'shipment-particle')
             .style('filter', 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))');
