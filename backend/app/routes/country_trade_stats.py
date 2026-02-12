@@ -211,10 +211,13 @@ def get_country_trade_trends(
 
 @router.get("/top-countries", response_model=List[TopCountry])
 def get_top_countries(
-    hs_code: Optional[str] = Query(None, description="HS编码（6位）"),
+    hs_code: Optional[List[str]] = Query(None, description="HS编码（6位，可多个）"),
     year: Optional[int] = Query(None, description="年份筛选"),
     month: Optional[int] = Query(None, description="月份筛选（1-12）"),
+    country: Optional[List[str]] = Query(None, description="国家代码筛选（可多个）"),
     industry: Optional[str] = Query(None, description="行业筛选"),
+    start_year_month: Optional[str] = Query(None, description="起始年月 (YYYY-MM)"),
+    end_year_month: Optional[str] = Query(None, description="结束年月 (YYYY-MM)"),
     limit: int = Query(10, description="返回Top N国家"),
     db: Session = Depends(get_db),
 ):
@@ -230,18 +233,17 @@ def get_top_countries(
         WHERE 1=1
     """
     params: dict = {}
-    if hs_code:
-        query += " AND hs_code = :hs_code"
-        params["hs_code"] = hs_code
-    if year:
-        query += " AND year = :year"
-        params["year"] = year
-    if month:
-        query += " AND month = :month"
-        params["month"] = month
-    if industry:
-        query += " AND industry = :industry"
-        params["industry"] = industry
+    query, params = _apply_common_filters(
+        query,
+        params,
+        hs_code=hs_code,
+        year=year,
+        month=month,
+        country=country,
+        industry=industry,
+        start_year_month=start_year_month,
+        end_year_month=end_year_month,
+    )
 
     query += " GROUP BY country_code ORDER BY sum_of_usd DESC LIMIT :limit"
     params["limit"] = limit

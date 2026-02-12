@@ -249,8 +249,11 @@ const App: React.FC = () => {
             endYearMonth: countryTradeFilters.endYearMonth,
           }),
           countryTradeStatsAPI.getTopCountries({
-            hsCode: countryTradeFilters.hsCode?.[0],
+            hsCode: countryTradeFilters.hsCode,
+            country: countryTradeFilters.country,
             industry: countryTradeFilters.industry,
+            startYearMonth: countryTradeFilters.startYearMonth,
+            endYearMonth: countryTradeFilters.endYearMonth,
             limit: 10,
           }),
         ]);

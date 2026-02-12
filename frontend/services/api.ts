@@ -409,16 +409,19 @@ export const countryTradeStatsAPI = {
 
   getTopCountries: async (
     filters?: {
-      hsCode?: string;
+      hsCode?: string[];
       year?: number;
       month?: number;
+      country?: string[];
       industry?: string;
+      startYearMonth?: string;
+      endYearMonth?: string;
       limit?: number;
     }
   ): Promise<TopCountry[]> => {
     const params = new URLSearchParams();
-    if (filters?.hsCode) {
-      params.append('hs_code', filters.hsCode);
+    if (filters?.hsCode?.length) {
+      filters.hsCode.forEach(code => params.append('hs_code', code));
     }
     if (filters?.year) {
       params.append('year', filters.year.toString());
@@ -426,8 +429,17 @@ export const countryTradeStatsAPI = {
     if (filters?.month) {
       params.append('month', filters.month.toString());
     }
+    if (filters?.country?.length) {
+      filters.country.forEach(c => params.append('country', c));
+    }
     if (filters?.industry) {
       params.append('industry', filters.industry);
+    }
+    if (filters?.startYearMonth) {
+      params.append('start_year_month', filters.startYearMonth);
+    }
+    if (filters?.endYearMonth) {
+      params.append('end_year_month', filters.endYearMonth);
     }
     params.append('limit', (filters?.limit || 10).toString());
 
