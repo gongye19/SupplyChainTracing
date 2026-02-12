@@ -701,14 +701,14 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
             {filters && (
               <>
                 <div className="flex items-start gap-2">
-                  <span className="text-[#86868B] font-semibold min-w-[60px]">时间:</span>
+                  <span className="text-[#86868B] font-semibold min-w-[60px]">Time:</span>
                   <span className="text-[#1D1D1F]">{filters.startDate} ~ {filters.endDate}</span>
                 </div>
                 
                 {/* 国家 */}
                 {filters.selectedCountries.length > 0 && (
                   <div className="flex items-start gap-2">
-                    <span className="text-[#86868B] font-semibold min-w-[60px]">国家:</span>
+                    <span className="text-[#86868B] font-semibold min-w-[60px]">Country:</span>
                     <span className="text-[#1D1D1F]">
                       {(() => {
                         const selectedCountryNames = filters.selectedCountries.map(
@@ -725,7 +725,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
                 {/* 公司 */}
                 {filters.selectedCompanies.length > 0 && (
                   <div className="flex items-start gap-2">
-                    <span className="text-[#86868B] font-semibold min-w-[60px]">公司:</span>
+                    <span className="text-[#86868B] font-semibold min-w-[60px]">Company:</span>
                     <span className="text-[#1D1D1F]">
                       {filters.selectedCompanies.length <= 1 
                         ? filters.selectedCompanies.join(', ')
@@ -737,7 +737,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
                 {/* 大类 */}
                 {filters.selectedHSCodeCategories.length > 0 && (
                   <div className="flex items-start gap-2">
-                    <span className="text-[#86868B] font-semibold min-w-[60px]">大类:</span>
+                    <span className="text-[#86868B] font-semibold min-w-[60px]">Category:</span>
                     <span className="text-[#1D1D1F]">
                       {filters.selectedHSCodeCategories.map(code => `HS${code}`).join(', ')}
                     </span>
@@ -747,7 +747,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
                 {/* 小类 */}
                 {filters.selectedHSCodeSubcategories.length > 0 && (
                   <div className="flex items-start gap-2">
-                    <span className="text-[#86868B] font-semibold min-w-[60px]">小类:</span>
+                    <span className="text-[#86868B] font-semibold min-w-[60px]">Subcategory:</span>
                     <span className="text-[#1D1D1F]">
                       {filters.selectedHSCodeSubcategories.join(', ')}
                     </span>
@@ -759,7 +759,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
                  filters.selectedCompanies.length === 0 && 
                  filters.selectedHSCodeCategories.length === 0 && 
                  filters.selectedHSCodeSubcategories.length === 0 && (
-                  <div className="text-[#86868B] text-[10px] italic">无筛选条件</div>
+                  <div className="text-[#86868B] text-[10px] italic">No filters selected</div>
                 )}
               </>
             )}
