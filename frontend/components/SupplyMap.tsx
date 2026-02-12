@@ -93,7 +93,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
     const gFlows = g.append('g').attr('class', 'flows-layer');
 
     const defs = svg.append('defs');
-    const addArrowMarker = (id: string, color: string) => {
+    const addArrowMarker = (id: string) => {
       defs.append('marker')
         .attr('id', id)
         .attr('viewBox', '0 -4 8 8')
@@ -104,12 +104,11 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
         .attr('orient', 'auto')
         .append('path')
         .attr('d', 'M0,-3L8,0L0,3Z')
-        .attr('fill', color)
+        // 跟随线条颜色，不额外占用方向配色通道
+        .attr('fill', 'context-stroke')
         .attr('opacity', 0.95);
     };
-    addArrowMarker('flow-arrow-inbound', '#34C759');
-    addArrowMarker('flow-arrow-outbound', '#FF6B6B');
-    addArrowMarker('flow-arrow-transit', '#007AFF');
+    addArrowMarker('flow-arrow');
     
     gMapRef.current = gMap;
     gNodesRef.current = gNodes;
@@ -545,18 +544,19 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
         const cy = (sy + ty) / 2 + normalY * curvature;
         const lineData = `M${sx},${sy} Q${cx},${cy} ${tx},${ty}`;
           
-        const color =
-          routeGroup.flowType === 'inbound'
-            ? '#34C759'
-            : routeGroup.flowType === 'outbound'
-              ? '#FF6B6B'
-              : '#007AFF';
+        const color = routeGroup.mainColor || '#007AFF';
         const directionText =
           routeGroup.flowType === 'inbound'
             ? (language === 'zh' ? '流入' : 'Inbound')
             : routeGroup.flowType === 'outbound'
               ? (language === 'zh' ? '流出' : 'Outbound')
               : (language === 'zh' ? '中转' : 'Transit');
+        const dashArray =
+          routeGroup.flowType === 'inbound'
+            ? '10 8'
+            : routeGroup.flowType === 'transit'
+              ? '3 7'
+              : null;
         const thickness = strokeScale(routeGroup.totalValue); // 根据交易价值计算粗细
 
         // 底层光晕，增强层次感
@@ -577,7 +577,8 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
           .attr('data-base-stroke-width', thickness)
             .attr('stroke-linecap', 'round')
             .attr('opacity', 0.28)
-          .attr('marker-end', `url(#flow-arrow-${routeGroup.flowType})`)
+          .attr('marker-end', 'url(#flow-arrow)')
+          .attr('stroke-dasharray', dashArray)
           .attr('class', 'shipment-path');
 
         if (!isDenseMode && routeIndex < 160) {
@@ -601,6 +602,26 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
             particleAnimationsRef.current.add(up);
           };
           breath();
+        }
+
+        // 用虚线偏移方向表达流动感，不依赖颜色区分流入/流出
+        if (!isDenseMode && routeIndex < 180 && dashArray) {
+          const isInbound = routeGroup.flowType === 'inbound';
+          const flow = () => {
+            const transition = arc.transition()
+              .duration(1800 + Math.random() * 700)
+              .ease(d3.easeLinear)
+              .attr('stroke-dashoffset', isInbound ? -26 : 26)
+              .on('end', () => {
+                particleAnimationsRef.current.delete(transition);
+                if (!isPreview) {
+                  arc.attr('stroke-dashoffset', 0);
+                  flow();
+                }
+              });
+            particleAnimationsRef.current.add(transition);
+          };
+          flow();
         }
 
           arc.on('mouseover', function(event) {
@@ -632,7 +653,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
               <div class="space-y-3">
                 <div class="flex items-center justify-between gap-4 pb-2 border-b border-black/5">
                   <div class="flex items-center gap-2">
-                    <div class="w-3 h-3 rounded-full" style="background-color: #007AFF"></div>
+                    <div class="w-3 h-3 rounded-full" style="background-color: ${color}"></div>
                     <span class="font-bold text-[16px] text-[#1D1D1F]">${categoryDisplayName}</span>
                   </div>
                 </div>
@@ -646,7 +667,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
                 </div>
                 <div class="flex justify-between items-center">
                   <span class="text-[#86868B] text-[10px] font-bold uppercase">${language === 'zh' ? '方向类型' : 'Flow Type'}</span>
-                  <span style="color:${color}" class="font-bold">${directionText}</span>
+                  <span class="font-bold text-[#1D1D1F]">${directionText}</span>
                 </div>
                 <div class="flex justify-between items-center">
                   <span class="text-[#86868B] text-[10px] font-bold uppercase">${transactionCountLabel}</span>
