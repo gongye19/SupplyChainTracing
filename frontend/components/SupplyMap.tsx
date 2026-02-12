@@ -634,7 +634,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
       <div className="absolute top-6 left-6 z-20">
         <div className="bg-white/95 backdrop-blur-xl p-4 rounded-[18px] border border-black/[0.05] shadow-lg min-w-[200px] max-w-[280px] pointer-events-auto">
           <div className="mb-3 pb-2.5 border-b border-black/10">
-            <span className="text-[10px] text-[#86868B] font-bold uppercase tracking-widest">{t('map.activeFilters') || 'Active Filters'}</span>
+            <span className="text-[12px] text-[#1D1D1F] font-bold uppercase tracking-widest">{t('map.activeFilters') || 'Filter Control'}</span>
           </div>
           <div className="flex flex-col gap-2.5 text-[11px]">
             {/* 时间范围 */}

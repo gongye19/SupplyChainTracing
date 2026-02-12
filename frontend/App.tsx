@@ -32,7 +32,11 @@ const App: React.FC = () => {
     selectedHSCodeSubcategories: [],
     selectedCompanies: []
   };
-  const [mapFilters, setMapFilters] = useState<Filters>(defaultFilters);
+  const defaultMapFilters: Filters = {
+    ...defaultFilters,
+    selectedCountries: ['China', 'United States'],
+  };
+  const [mapFilters, setMapFilters] = useState<Filters>(defaultMapFilters);
   const [statsFilters, setStatsFilters] = useState<Filters>(defaultFilters);
 
   const [shipments, setShipments] = useState<Shipment[]>([]);
