@@ -415,12 +415,15 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
     if (shipments.length > 0) {
       // shipments 已经是按国家对聚合的，每个国家对一条线
       // 直接使用 shipments 作为 routeGroups
+      const countryLookup = new Map<string, CountryLocation>();
+      countries.forEach((c) => countryLookup.set(c.countryCode, c));
+
       const routeGroups = shipments.map(shipment => {
         // 获取国家名称
         const originCountryCode = shipment.originId || shipment.originCountryCode;
         const destCountryCode = shipment.destinationId || shipment.destinationCountryCode;
-        const originCountry = countries.find(c => c.countryCode === originCountryCode)?.countryName || originCountryCode;
-        const destinationCountry = countries.find(c => c.countryCode === destCountryCode)?.countryName || destCountryCode;
+        const originCountry = countryLookup.get(originCountryCode)?.countryName || originCountryCode;
+        const destinationCountry = countryLookup.get(destCountryCode)?.countryName || destCountryCode;
         
         const focusCountry = selectedCountries[0];
         const flowType =
@@ -455,12 +458,9 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
       const routeGroupsArray = routeGroups
         .sort((a, b) => b.totalValue - a.totalValue); // 按交易价值降序
       const maxPaths = isPreview
-        ? Math.min(120, routeGroupsArray.length)
-        : Math.min(600, routeGroupsArray.length);
-      const isDenseMode = routeGroupsArray.length > 320;
-      const maxParticles = isPreview
-        ? 0
-        : (isDenseMode ? Math.min(10, routeGroupsArray.length) : Math.min(24, routeGroupsArray.length));
+        ? Math.min(90, routeGroupsArray.length)
+        : Math.min(420, routeGroupsArray.length);
+      const isDenseMode = routeGroupsArray.length > 250;
 
       // 获取翻译文本（在循环外部）
       const materialNameLabel = t('map.materialName');
@@ -550,7 +550,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
             .attr('opacity', 0.28)
           .attr('class', 'shipment-path');
 
-        if (!isDenseMode && routeIndex < 180) {
+        if (!isDenseMode && routeIndex < 120) {
           const breath = () => {
             const up = arc.transition()
               .duration(1300 + Math.random() * 500)
@@ -590,7 +590,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
           .attr('class', 'shipment-highlight')
           .style('pointer-events', 'none');
 
-        if (!isDenseMode && !isPreview && routeIndex < 220) {
+        if (!isDenseMode && !isPreview && routeIndex < 140) {
           const flow = () => {
             const transition = highlight.transition()
               .duration(2200 + Math.random() * 1100)

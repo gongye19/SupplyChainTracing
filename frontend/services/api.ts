@@ -45,7 +45,10 @@ async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> 
 }
 
 export const shipmentsAPI = {
-  getAll: async (filters?: Partial<Filters>): Promise<Shipment[]> => {
+  getAll: async (
+    filters?: Partial<Filters>,
+    options?: { signal?: AbortSignal; limit?: number }
+  ): Promise<Shipment[]> => {
     const params = new URLSearchParams();
     
     // 日期筛选：转换为 YYYY-MM 格式
@@ -81,9 +84,11 @@ export const shipmentsAPI = {
     // params.append('industry', 'SemiConductor');
     
     // 限制返回数量
-    params.append('limit', '50000');
+    params.append('limit', String(options?.limit ?? 50000));
 
-    const data = await fetchAPI<any[]>(`/api/shipments?${params.toString()}`);
+    const data = await fetchAPI<any[]>(`/api/shipments?${params.toString()}`, {
+      signal: options?.signal,
+    });
     return data.map((item: any) => ({
       year: item.year,
       month: item.month,

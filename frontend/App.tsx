@@ -72,8 +72,21 @@ const App: React.FC = () => {
   useEffect(() => { filtersRef.current = mapFilters; }, [mapFilters]);
   const abortRef = useRef<AbortController | null>(null);
   const finalTimerRef = useRef<number | null>(null);
+  const shipmentsCacheRef = useRef<Map<string, Shipment[]>>(new Map());
+  const lastRequestedKeyRef = useRef<string>('');
   // 标记是否正在拖动（用于时间滑块）
   const isDraggingRef = useRef<boolean>(false);
+
+  const buildShipmentsCacheKey = useCallback((filtersToUse: Filters) => {
+    const sortedCountries = [...(filtersToUse.selectedCountries || [])].sort().join(',');
+    const sortedCategories = [...(filtersToUse.selectedHSCodeCategories || [])].sort().join(',');
+    return [
+      filtersToUse.startDate || '',
+      filtersToUse.endDate || '',
+      sortedCountries,
+      sortedCategories,
+    ].join('|');
+  }, []);
 
   // 加载初始数据
   useEffect(() => {
@@ -244,6 +257,41 @@ const App: React.FC = () => {
 
   // 加载原始交易数据
   const loadShipments = useCallback(async (filtersToUse: Filters, mode: 'preview' | 'final') => {
+    const requestKey = buildShipmentsCacheKey(filtersToUse);
+
+    if (lastRequestedKeyRef.current === `${mode}:${requestKey}`) {
+      return;
+    }
+    lastRequestedKeyRef.current = `${mode}:${requestKey}`;
+
+    const cached = shipmentsCacheRef.current.get(requestKey);
+    if (cached) {
+      setShipments(cached);
+      if (mode === 'final') {
+        const uniqueCountries = new Set<string>();
+        cached.forEach(s => {
+          uniqueCountries.add(s.countryOfOrigin);
+          uniqueCountries.add(s.destinationCountry);
+        });
+        const countryPairs = new Set<string>();
+        cached.forEach(s => {
+          const originCode = s.originCountryCode || getCountryCode(s.countryOfOrigin || '');
+          const destCode = s.destinationCountryCode || getCountryCode(s.destinationCountry || '');
+          if (originCode && destCode) countryPairs.add(`${originCode}-${destCode}`);
+        });
+        const uniqueCategories = new Set<string>();
+        cached.forEach(s => {
+          if (s.hsCode && s.hsCode.length >= 2) uniqueCategories.add(s.hsCode.slice(0, 2));
+        });
+        setStats({
+          transactions: countryPairs.size,
+          suppliers: uniqueCountries.size,
+          categories: uniqueCategories.size,
+        });
+      }
+      return;
+    }
+
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -260,7 +308,10 @@ const App: React.FC = () => {
 
       logger.debug(`[Shipments] Loading (${mode})`, filtersToUse);
       const startTime = performance.now();
-      const data = await shipmentsAPI.getAll(filtersToUse);
+      const data = await shipmentsAPI.getAll(filtersToUse, {
+        signal: controller.signal,
+        limit: mode === 'preview' ? 15000 : 50000,
+      });
       const duration = performance.now() - startTime;
 
       if (controller.signal.aborted) {
@@ -273,6 +324,7 @@ const App: React.FC = () => {
       }
 
       logger.debug(`[Shipments] Loaded (${mode}) in ${duration.toFixed(0)}ms:`, data.length);
+      shipmentsCacheRef.current.set(requestKey, data);
       setShipments(data);
       
       // 注意：不再从筛选结果中更新公司列表
@@ -324,7 +376,7 @@ const App: React.FC = () => {
         setFilterLoading(false);
       }
     }
-  }, [getCountryCode]);
+  }, [buildShipmentsCacheKey, getCountryCode]);
 
   // 调度器：map filters 变化 => 立刻 preview + 延迟 final
   const scheduleFetch = useCallback((nextFilters: Filters, reason: 'drag' | 'click') => {
