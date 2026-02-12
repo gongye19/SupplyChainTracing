@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 type ActiveThumb = 'start' | 'end' | null;
 
@@ -28,6 +28,18 @@ const MonthRangeSlider: React.FC<MonthRangeSliderProps> = ({
   minMonth = '2021-01',
 }) => {
   const [activeThumb, setActiveThumb] = useState<ActiveThumb>(null);
+
+  useEffect(() => {
+    const clearActiveThumb = () => setActiveThumb(null);
+    window.addEventListener('pointerup', clearActiveThumb);
+    window.addEventListener('mouseup', clearActiveThumb);
+    window.addEventListener('touchend', clearActiveThumb);
+    return () => {
+      window.removeEventListener('pointerup', clearActiveThumb);
+      window.removeEventListener('mouseup', clearActiveThumb);
+      window.removeEventListener('touchend', clearActiveThumb);
+    };
+  }, []);
 
   const maxMonth = useMemo(() => {
     const now = new Date();
@@ -78,7 +90,7 @@ const MonthRangeSlider: React.FC<MonthRangeSliderProps> = ({
           </div>
         </div>
 
-        <div className="relative h-8">
+        <div className="relative h-8 group/month-slider">
           <div className="absolute top-1/2 -translate-y-1/2 w-full h-1.5 rounded-full bg-[#D1D1D6]" />
           <div
             className="absolute top-1/2 -translate-y-1/2 h-1.5 rounded-full bg-[#007AFF]"
@@ -100,7 +112,7 @@ const MonthRangeSlider: React.FC<MonthRangeSliderProps> = ({
             }}
             onMouseUp={() => setActiveThumb(null)}
             onTouchEnd={() => setActiveThumb(null)}
-            className="absolute inset-0 w-full appearance-none bg-transparent pointer-events-auto"
+            className="month-range month-range-start absolute inset-0 w-full appearance-none bg-transparent pointer-events-none"
             style={{ zIndex: startZ }}
           />
           <input
@@ -118,11 +130,65 @@ const MonthRangeSlider: React.FC<MonthRangeSliderProps> = ({
             }}
             onMouseUp={() => setActiveThumb(null)}
             onTouchEnd={() => setActiveThumb(null)}
-            className="absolute inset-0 w-full appearance-none bg-transparent pointer-events-auto"
+            className="month-range month-range-end absolute inset-0 w-full appearance-none bg-transparent pointer-events-none"
             style={{ zIndex: endZ }}
           />
         </div>
       </div>
+
+      <style>{`
+        .month-range::-webkit-slider-runnable-track {
+          height: 6px;
+          background: transparent;
+        }
+        .month-range::-moz-range-track {
+          height: 6px;
+          background: transparent;
+        }
+        .month-range::-webkit-slider-thumb {
+          pointer-events: auto;
+          -webkit-appearance: none;
+          appearance: none;
+          width: 16px;
+          height: 16px;
+          margin-top: -5px;
+          border-radius: 9999px;
+          background: #007AFF;
+          border: 2px solid #FFFFFF;
+          box-shadow: 0 2px 6px rgba(0, 122, 255, 0.35);
+          cursor: grab;
+          transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+        }
+        .month-range::-moz-range-thumb {
+          pointer-events: auto;
+          width: 16px;
+          height: 16px;
+          border-radius: 9999px;
+          background: #007AFF;
+          border: 2px solid #FFFFFF;
+          box-shadow: 0 2px 6px rgba(0, 122, 255, 0.35);
+          cursor: grab;
+          transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+        }
+        .month-range:hover::-webkit-slider-thumb {
+          transform: scale(1.08);
+          box-shadow: 0 3px 10px rgba(0, 122, 255, 0.45);
+        }
+        .month-range:hover::-moz-range-thumb {
+          transform: scale(1.08);
+          box-shadow: 0 3px 10px rgba(0, 122, 255, 0.45);
+        }
+        .month-range:active::-webkit-slider-thumb {
+          transform: scale(1.15);
+          box-shadow: 0 4px 12px rgba(0, 122, 255, 0.55);
+          cursor: grabbing;
+        }
+        .month-range:active::-moz-range-thumb {
+          transform: scale(1.15);
+          box-shadow: 0 4px 12px rgba(0, 122, 255, 0.55);
+          cursor: grabbing;
+        }
+      `}</style>
     </section>
   );
 };
