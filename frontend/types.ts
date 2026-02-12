@@ -71,9 +71,9 @@ export interface Location {
 
 // 筛选条件
 export interface Filters {
-  startDate: string; // YYYY-MM-DD 格式
-  endDate: string;   // YYYY-MM-DD 格式
-  selectedCountries: string[]; // 国家名称数组
+  startDate: string; // YYYY-MM 格式
+  endDate: string;   // YYYY-MM 格式
+  selectedCountries: string[]; // 国家代码数组（ISO3，如 CHN/USA）
   selectedHSCodeCategories: string[]; // HS Code 2位大类数组（如 ["42", "54", "62"]）
   selectedHSCodeSubcategories: string[]; // HS Code 2位小类数组（如 ["04", "07", "05"]）
   selectedCompanies: string[]; // 公司名称数组

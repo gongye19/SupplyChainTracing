@@ -111,6 +111,5 @@ if __name__ == "__main__":
     print("=" * 60)
     print()
     print("下一步：")
-    print("1. 运行: python backend/scripts/import_country_origin.py --clear")
-    print("2. 运行: python backend/scripts/import_country_trade_stats.py --clear")
+    print("1. 运行: python backend/scripts/batch_import_all.py --clear")
 

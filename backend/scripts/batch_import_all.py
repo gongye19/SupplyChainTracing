@@ -113,12 +113,13 @@ def should_filter_record(data):
     """判断是否应该过滤记录"""
     weight = data.get('weight')
     quantity = data.get('quantity')
-    sum_of_usd = data.get('sumOfUSD')
+    country_code = data.get('countryCode')
     
-    # 过滤条件：weight=0 且 quantity=0 且 sumOfUSD=0
-    if (weight is not None and weight == 0 and
-        quantity is not None and quantity == 0 and
-        sum_of_usd is not None and sum_of_usd == 0):
+    # 统一过滤条件：
+    # - weight = 0
+    # - quantity = 0
+    # - countryCode = 'N/A'
+    if weight == 0 or quantity == 0 or country_code == 'N/A':
         return True
     return False
 

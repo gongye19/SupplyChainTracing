@@ -72,12 +72,12 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
     return Array.from(subcategories).sort();
   }, [shipments, filters.selectedHSCodeCategories]);
 
-  const toggleCountry = (countryName: string) => {
+  const toggleCountry = (countryCode: string) => {
     setFilters(prev => ({
       ...prev,
-      selectedCountries: prev.selectedCountries.includes(countryName) 
-        ? prev.selectedCountries.filter(c => c !== countryName)
-        : [...prev.selectedCountries, countryName]
+      selectedCountries: prev.selectedCountries.includes(countryCode)
+        ? prev.selectedCountries.filter(c => c !== countryCode)
+        : [...prev.selectedCountries, countryCode]
     }));
   };
 
@@ -188,14 +188,14 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
                 countries.map(country => (
                 <div 
                   key={country.countryCode}
-                  onClick={() => toggleCountry(country.countryName)}
-                  className={`px-3 py-2 text-[12px] flex items-center justify-between cursor-pointer rounded-[8px] transition-colors mb-0.5 last:mb-0 ${filters.selectedCountries.includes(country.countryName) ? 'bg-[#007AFF] text-white font-bold' : 'text-[#1D1D1F] hover:bg-black/5'}`}
+                  onClick={() => toggleCountry(country.countryCode)}
+                  className={`px-3 py-2 text-[12px] flex items-center justify-between cursor-pointer rounded-[8px] transition-colors mb-0.5 last:mb-0 ${filters.selectedCountries.includes(country.countryCode) ? 'bg-[#007AFF] text-white font-bold' : 'text-[#1D1D1F] hover:bg-black/5'}`}
                 >
                   <div className="flex flex-col">
                     <span>{country.countryName}</span>
                     <span className={`text-[9px] uppercase font-bold opacity-60`}>{country.countryCode}</span>
                   </div>
-                  {filters.selectedCountries.includes(country.countryName) && <Check className="w-3.5 h-3.5" />}
+                  {filters.selectedCountries.includes(country.countryCode) && <Check className="w-3.5 h-3.5" />}
                 </div>
                 ))
               )}

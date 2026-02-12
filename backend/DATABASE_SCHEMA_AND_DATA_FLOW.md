@@ -167,7 +167,7 @@
 支持过滤：
 
 - `start_year_month/end_year_month`
-- `country`（匹配 origin 或 destination）
+- `country`（匹配 origin 或 destination，必须传国家代码/ISO3）
 - `hs_code` 或 `hs_code_prefix`
 - `industry`
 
@@ -190,6 +190,7 @@
 - `GET /api/country-locations` -> `port_locations`
 
 > 若上述旧表不存在，接口返回空数组。
+> 仅“表不存在”会返回空；其他数据库异常会返回 500，便于定位问题。
 
 ## 6) 清理与重建
 
@@ -221,9 +222,11 @@
 - 可选 `--clear` 清空后重导
 - 批量写入（默认较大 batch）
 - 同时导入两类新数据
+- 与 `import_country_origin.py` 使用相同过滤规则（`weight=0` 或 `quantity=0` 或 `countryCode='N/A'` 过滤）
 
 ## 8) 注意事项
 
-- `backend/init.sql` 中仍包含部分历史业务表（`categories/companies/locations/transactions` 等）；这些并非当前新数据主链路的核心依赖。
+- `backend/app/main.py` 已不再注册历史路由（`/api/transactions`、`/api/companies`、`/api/locations`、`/api/monthly-company-flows`）。
+- `backend/init.sql` 中仍包含部分历史业务表定义（`categories/companies/locations/transactions` 等）；这些并非当前新数据主链路的核心依赖。
 - 当前前端在 `hs_code_categories/port_locations` 返回空时，已有降级逻辑（会从 `shipments` 动态补齐部分展示信息）。
 

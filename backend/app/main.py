@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 import os
 import re
 
-from .routes import categories, transactions, companies, locations, chat, monthly_company_flows, hs_code_categories, country_locations as port_locations_route, country_locations_compat, shipments, country_trade_stats
+from .routes import chat, hs_code_categories, country_locations as port_locations_route, country_locations_compat, shipments, country_trade_stats
 from .database import get_db
 
 app = FastAPI(title="Supply Chain API", version="1.0.0")
@@ -149,13 +149,8 @@ class CORSDebugMiddleware(BaseHTTPMiddleware):
 # 添加 CORS 调试中间件（仅在需要时启用）
 # app.add_middleware(CORSDebugMiddleware)
 
-# 注册路由
-app.include_router(categories.router, prefix="/api/categories", tags=["categories"])
-app.include_router(transactions.router, prefix="/api/transactions", tags=["transactions"])
-app.include_router(companies.router, prefix="/api/companies", tags=["companies"])
-app.include_router(locations.router, prefix="/api/locations", tags=["locations"])
+# 注册路由（仅保留当前数据链路使用的接口）
 app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
-app.include_router(monthly_company_flows.router, prefix="/api/monthly-company-flows", tags=["monthly-company-flows"])
 app.include_router(shipments.router, prefix="/api/shipments", tags=["shipments"])
 app.include_router(hs_code_categories.router, prefix="/api/hs-code-categories", tags=["hs-code-categories"])
 app.include_router(port_locations_route.router, prefix="/api/port-locations", tags=["port-locations"])
@@ -210,16 +205,9 @@ def debug_db(db: Session = Depends(get_db)):
         """))
         tables = [row[0] for row in result.fetchall()]
         
-        # 检查 monthly_company_flows 表的记录数
-        count = 0
-        if 'monthly_company_flows' in tables:
-            result = db.execute(text("SELECT COUNT(*) FROM monthly_company_flows"))
-            count = result.scalar()
-        
         return {
             "status": "connected",
             "tables_found": tables,
-            "monthly_company_flows_count": count
         }
     except Exception as e:
         return {

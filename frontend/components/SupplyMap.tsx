@@ -62,6 +62,14 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
     return [];
   }, []);
 
+  const countryCodeToName = useMemo(() => {
+    const map = new Map<string, string>();
+    countries.forEach((country) => {
+      map.set(country.countryCode, country.countryName);
+    });
+    return map;
+  }, [countries]);
+
   // 初始化：只执行一次（创建 SVG 结构、底图、zoom、tooltip）
   useEffect(() => {
     if (!svgRef.current || countries.length === 0) return;
@@ -626,7 +634,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
         }
       });
       }
-  }, [shipments, selectedCountries, activeCompanies, companies, countries, categoryColors, categories, isPreview]);
+  }, [shipments, selectedCountries, activeCompanies, companies, countries, categoryColors, categories, isPreview, countryCodeToName]);
 
   return (
     <div className="w-full h-full relative overflow-hidden rounded-[24px] border border-black/5 bg-white shadow-[0_4px_24px_rgba(0,0,0,0.04)]">
@@ -650,9 +658,14 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
                   <div className="flex items-start gap-2">
                     <span className="text-[#86868B] font-semibold min-w-[60px]">国家:</span>
                     <span className="text-[#1D1D1F]">
-                      {filters.selectedCountries.length <= 2 
-                        ? filters.selectedCountries.join(', ')
-                        : `${filters.selectedCountries.slice(0, 2).join(', ')} +${filters.selectedCountries.length - 2}`}
+                      {(() => {
+                        const selectedCountryNames = filters.selectedCountries.map(
+                          (code) => countryCodeToName.get(code) || code
+                        );
+                        return selectedCountryNames.length <= 2
+                          ? selectedCountryNames.join(', ')
+                          : `${selectedCountryNames.slice(0, 2).join(', ')} +${selectedCountryNames.length - 2}`;
+                      })()}
                     </span>
                   </div>
                 )}

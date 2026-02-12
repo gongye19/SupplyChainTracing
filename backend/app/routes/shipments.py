@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Depends, Query
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List, Optional
-from datetime import datetime
 
 from ..database import get_db
 from ..schemas import Shipment
+from ..utils.db_helpers import is_missing_table_error
 
 router = APIRouter()
 
@@ -13,7 +14,7 @@ router = APIRouter()
 def get_shipments(
     start_year_month: Optional[str] = Query(None, description="起始年月 (YYYY-MM)"),
     end_year_month: Optional[str] = Query(None, description="结束年月 (YYYY-MM)"),
-    country: Optional[List[str]] = Query(None, description="国家筛选（可多个，国家代码，如 CN, US, JP）"),
+    country: Optional[List[str]] = Query(None, description="国家代码筛选（可多个，ISO3，如 CHN, USA, JPN）"),
     hs_code_prefix: Optional[List[str]] = Query(None, description="HS Code 2位大类筛选（可多个，如 85, 84）"),
     hs_code: Optional[List[str]] = Query(None, description="完整 HS Code 6位筛选（可多个，如 854231）"),
     industry: Optional[str] = Query(None, description="行业筛选（如 SemiConductor）"),
@@ -22,26 +23,6 @@ def get_shipments(
 ):
     """获取国家原产地贸易统计数据（从 country_origin_trade_stats 表）"""
     try:
-        # 首先检查表是否存在（使用更安全的方式）
-        try:
-            check_table = db.execute(text("""
-                SELECT EXISTS (
-                    SELECT FROM information_schema.tables 
-                    WHERE table_schema = 'public' 
-                    AND table_name = 'country_origin_trade_stats'
-                )
-            """))
-            table_exists = check_table.scalar()
-        except Exception as check_error:
-            # 如果检查表存在性时出错，也认为表不存在
-            print(f"Error checking table existence: {check_error}")
-            table_exists = False
-        
-        if not table_exists:
-            # 表不存在，返回空列表
-            print("Table country_origin_trade_stats does not exist, returning empty list")
-            return []
-        
         query = "SELECT * FROM country_origin_trade_stats WHERE 1=1"
         params = {}
         
@@ -90,18 +71,8 @@ def get_shipments(
             query += f" LIMIT :limit"
             params['limit'] = limit
         
-        try:
-            result = db.execute(text(query), params)
-            rows = result.fetchall()
-        except Exception as query_error:
-            # 如果查询出错（可能是表不存在），记录错误并返回空列表
-            error_msg = str(query_error)
-            if "does not exist" in error_msg or "UndefinedTable" in error_msg or "relation" in error_msg.lower():
-                print(f"Table does not exist or query failed: {error_msg}")
-                return []
-            # 其他查询错误也返回空列表
-            print(f"Query error: {error_msg}")
-            return []
+        result = db.execute(text(query), params)
+        rows = result.fetchall()
         
         # 转换为字典列表（适配新的 Schema）
         shipments = []
@@ -132,10 +103,8 @@ def get_shipments(
         
         return shipments
     except Exception as e:
-        # 记录错误并返回空列表，避免 500 错误
-        import traceback
-        print(f"Error in get_shipments: {str(e)}")
-        print(traceback.format_exc())
-        # 返回空列表而不是抛出异常
-        return []
+        if is_missing_table_error(e):
+            print(f"country_origin_trade_stats not available: {e}")
+            return []
+        raise HTTPException(status_code=500, detail=f"数据库查询错误: {str(e)}")
 

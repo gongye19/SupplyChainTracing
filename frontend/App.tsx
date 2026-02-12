@@ -34,7 +34,7 @@ const App: React.FC = () => {
   };
   const defaultMapFilters: Filters = {
     ...defaultFilters,
-    selectedCountries: ['China', 'United States'],
+    selectedCountries: ['CHN', 'USA'],
   };
   const [mapFilters, setMapFilters] = useState<Filters>(defaultMapFilters);
   const [statsFilters, setStatsFilters] = useState<Filters>(defaultFilters);
@@ -219,25 +219,15 @@ const App: React.FC = () => {
   // 国家名称到国家代码的映射函数
   const getCountryCode = useCallback((countryName: string): string => {
     if (!countryName) return '';
-    
-    // 特殊映射（处理数据中的特殊情况）
-    const specialMappings: Record<string, string> = {
-      'Dubai': 'AE',
-      'United Arab Emirates': 'AE',
-      'UAE': 'AE',
-    };
-    
-    if (specialMappings[countryName]) {
-      return specialMappings[countryName];
-    }
-    
+
     // 从 countries 列表中查找匹配的国家
     const country = countries.find(c => 
       c.countryName.toLowerCase() === countryName.toLowerCase() ||
       c.countryName === countryName
     );
-    
-    return country?.countryCode || countryName; // 如果找不到，返回原名称（作为后备）
+
+    // 统一使用国家代码，不回退到国家名称
+    return country?.countryCode || '';
   }, [countries]);
 
   // 加载原始交易数据
