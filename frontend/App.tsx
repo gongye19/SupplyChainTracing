@@ -719,6 +719,7 @@ const App: React.FC = () => {
                       stats={countryTradeStats}
                       countries={countries}
                       selectedHSCodes={countryTradeFilters.hsCode}
+                        filters={countryTradeFilters}
                     />
                   </div>
                 </div>

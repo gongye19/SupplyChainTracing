@@ -31,7 +31,7 @@ const CountryTradeSidebar: React.FC<CountryTradeSidebarProps> = ({
 
   return (
     <div className="flex flex-col gap-10 p-1">
-      <div className="flex items-center justify-between">
+      <div className="sticky top-0 z-20 -mx-1 px-1 py-2 bg-white/95 backdrop-blur-sm border-b border-black/5 flex items-center justify-between">
         <div className="flex items-center gap-2 text-[#007AFF]">
           <Filter className="w-4 h-4" />
           <span className="text-[12px] font-bold uppercase tracking-widest text-[#1D1D1F]">{t('filters.filterControl')}</span>
