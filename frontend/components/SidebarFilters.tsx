@@ -23,6 +23,7 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
   const [countriesOpen, setCountriesOpen] = useState(false);
   const [hsCodeCategoriesOpen, setHsCodeCategoriesOpen] = useState(false);
   const [hsCodeSubcategoriesOpen, setHsCodeSubcategoriesOpen] = useState(false);
+  const [continentExpanded, setContinentExpanded] = useState<Record<string, boolean>>({});
   
   const countriesRef = useRef<HTMLDivElement>(null);
   const hsCodeCategoriesRef = useRef<HTMLDivElement>(null);
@@ -80,6 +81,57 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
         : [...prev.selectedCountries, countryCode]
     }));
   };
+
+  const countriesByContinent = useMemo(() => {
+    const groups = new Map<string, CountryLocation[]>();
+    countries.forEach((country) => {
+      const continent = country.continent?.trim() || 'Other';
+      if (!groups.has(continent)) {
+        groups.set(continent, []);
+      }
+      groups.get(continent)!.push(country);
+    });
+
+    const continentPriority = [
+      'Asia',
+      'Europe',
+      'North America',
+      'South America',
+      'Africa',
+      'Oceania',
+      'Antarctica',
+      'Other',
+    ];
+
+    const orderedEntries = Array.from(groups.entries())
+      .map(([continent, items]) => [
+        continent,
+        [...items].sort((a, b) => a.countryName.localeCompare(b.countryName)),
+      ] as const)
+      .sort((a, b) => {
+        const ai = continentPriority.indexOf(a[0]);
+        const bi = continentPriority.indexOf(b[0]);
+        if (ai === -1 && bi === -1) return a[0].localeCompare(b[0]);
+        if (ai === -1) return 1;
+        if (bi === -1) return -1;
+        return ai - bi;
+      });
+
+    return orderedEntries;
+  }, [countries]);
+
+  useEffect(() => {
+    if (countriesByContinent.length === 0) return;
+    setContinentExpanded((prev) => {
+      const next = { ...prev };
+      countriesByContinent.forEach(([continent]) => {
+        if (next[continent] === undefined) {
+          next[continent] = true;
+        }
+      });
+      return next;
+    });
+  }, [countriesByContinent]);
 
   const toggleHSCodeCategory = (hsCode: string) => {
     setFilters(prev => {
@@ -185,18 +237,45 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
               {countries.length === 0 ? (
                 <div className="px-3 py-2 text-[12px] text-[#86868B]">{t('filters.loading')}</div>
               ) : (
-                countries.map(country => (
-                <div 
-                  key={country.countryCode}
-                  onClick={() => toggleCountry(country.countryCode)}
-                  className={`px-3 py-2 text-[12px] flex items-center justify-between cursor-pointer rounded-[8px] transition-colors mb-0.5 last:mb-0 ${filters.selectedCountries.includes(country.countryCode) ? 'bg-[#007AFF] text-white font-bold' : 'text-[#1D1D1F] hover:bg-black/5'}`}
-                >
-                  <div className="flex flex-col">
-                    <span>{country.countryName}</span>
-                    <span className={`text-[9px] uppercase font-bold opacity-60`}>{country.countryCode}</span>
+                countriesByContinent.map(([continent, continentCountries]) => (
+                  <div key={continent} className="mb-1 last:mb-0">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setContinentExpanded((prev) => ({
+                          ...prev,
+                          [continent]: !prev[continent],
+                        }));
+                      }}
+                      className="w-full px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-[#86868B] flex items-center justify-between rounded-[8px] hover:bg-black/5 transition-colors"
+                    >
+                      <span>{continent}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-semibold normal-case">{continentCountries.length}</span>
+                        <ChevronDown className={`w-3 h-3 transition-transform ${continentExpanded[continent] ? 'rotate-180' : ''}`} />
+                      </div>
+                    </button>
+                    {continentExpanded[continent] && (
+                      <div className="mt-1 space-y-0.5">
+                        {continentCountries.map((country) => (
+                          <div
+                            key={country.countryCode}
+                            onClick={() => toggleCountry(country.countryCode)}
+                            className={`ml-2 px-3 py-2 text-[12px] flex items-center justify-between cursor-pointer rounded-[8px] transition-colors ${
+                              filters.selectedCountries.includes(country.countryCode) ? 'bg-[#007AFF] text-white font-bold' : 'text-[#1D1D1F] hover:bg-black/5'
+                            }`}
+                          >
+                            <div className="flex flex-col">
+                              <span>{country.countryName}</span>
+                              <span className="text-[9px] uppercase font-bold opacity-60">{country.countryCode}</span>
+                            </div>
+                            {filters.selectedCountries.includes(country.countryCode) && <Check className="w-3.5 h-3.5" />}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  {filters.selectedCountries.includes(country.countryCode) && <Check className="w-3.5 h-3.5" />}
-                </div>
                 ))
               )}
             </div>
