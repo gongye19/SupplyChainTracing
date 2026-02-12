@@ -735,13 +735,14 @@ const App: React.FC = () => {
             </div>
           )}
 
-          {((activeView === 'map' && filterLoading) || (activeView === 'country-trade' && countryTradeLoading)) && (
-            <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
-              <div className="w-12 h-12 rounded-full border-[3px] border-[#D1D1D6] border-t-[#007AFF] animate-spin bg-white/40 backdrop-blur-[1px]" />
-            </div>
-          )}
         </section>
       </main>
+
+      {((activeView === 'map' && filterLoading) || (activeView === 'country-trade' && countryTradeLoading)) && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center pointer-events-none">
+          <div className="w-12 h-12 rounded-full border-[3px] border-[#D1D1D6] border-t-[#007AFF] animate-spin bg-white/40 backdrop-blur-[1px]" />
+        </div>
+      )}
 
       {/* AI 助手 */}
       <AIAssistant 
