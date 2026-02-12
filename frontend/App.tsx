@@ -670,19 +670,13 @@ const App: React.FC = () => {
         <section className="flex-1 flex flex-col p-6 relative">
           {activeView === 'map' ? (
             <div className="h-full flex flex-col relative">
-              {/* 只在初始加载时显示 loading，筛选更新时不显示 */}
+              {/* 地图内容 */}
               {initialLoading ? (
                 <div className="flex items-center justify-center h-full absolute inset-0 bg-white/80 backdrop-blur-sm z-10">
-                  <div className="text-[#86868B]">{t('app.loading')}</div>
+                  <div className="w-10 h-10 rounded-full border-2 border-[#D1D1D6] border-t-[#007AFF] animate-spin" />
                 </div>
               ) : (
                 <>
-                  {/* 筛选更新时的轻微提示（可选） */}
-                  {filterLoading && (
-                    <div className="absolute top-4 right-4 z-20 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs text-[#86868B] shadow-sm">
-                      更新中...
-                    </div>
-                  )}
                   <SupplyMap 
                     shipments={shipmentsForMap}
                     transactions={[]}
@@ -717,28 +711,15 @@ const App: React.FC = () => {
                 <p className="text-[#86868B] text-[16px] font-medium mt-1">{t('countryTrade.subtitle')}</p>
               </div>
 
-              {/* 非阻塞加载提示：保留当前内容，仅提示正在更新 */}
-              {countryTradeLoading && (
-                <div className="self-end -mt-2 mb-2 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs text-[#86868B] shadow-sm border border-black/5">
-                  {t('countryTrade.loading')}
-                </div>
-              )}
-
               <>
                 <div className="bg-white border border-black/5 rounded-[28px] p-6 shadow-sm h-[600px]">
                   <h3 className="text-[18px] font-bold text-[#1D1D1F] mb-4">{t('countryTrade.tradeMap')}</h3>
                   <div className="h-[550px]">
-                    {countryTradeSummary === null ? (
-                      <div className="flex items-center justify-center h-full text-[#86868B]">
-                        {t('countryTrade.loading')}
-                      </div>
-                    ) : (
-                      <CountryTradeMap
-                        stats={countryTradeStats}
-                        countries={countries}
-                        selectedHSCodes={countryTradeFilters.hsCode}
-                      />
-                    )}
+                    <CountryTradeMap
+                      stats={countryTradeStats}
+                      countries={countries}
+                      selectedHSCodes={countryTradeFilters.hsCode}
+                    />
                   </div>
                 </div>
 
@@ -751,6 +732,12 @@ const App: React.FC = () => {
                   />
                 )}
               </>
+            </div>
+          )}
+
+          {((activeView === 'map' && filterLoading) || (activeView === 'country-trade' && countryTradeLoading)) && (
+            <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
+              <div className="w-12 h-12 rounded-full border-[3px] border-[#D1D1D6] border-t-[#007AFF] animate-spin bg-white/40 backdrop-blur-[1px]" />
             </div>
           )}
         </section>
