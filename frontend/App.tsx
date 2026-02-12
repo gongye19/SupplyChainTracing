@@ -12,7 +12,8 @@ import { shipmentsAPI, hsCodeCategoriesAPI, countryLocationsAPI, chatAPI, ChatMe
 import { Globe, BarChart3, Map as MapIcon, Package, TrendingUp, Users, ChevronRight } from 'lucide-react';
 import { useLanguage } from './contexts/LanguageContext';
 import { getHSCodeColorCached } from './utils/hsCodeColors';
-import { COUNTRY_COORDINATES, getCountriesFromCodes } from './utils/countryCoordinates';
+import { getCountriesFromCodes } from './utils/countryCoordinates';
+import { logger } from './utils/logger';
 
 const App: React.FC = () => {
   const { language, setLanguage, t } = useLanguage();
@@ -64,6 +65,7 @@ const App: React.FC = () => {
     endYearMonth: endDate,
   });
   const [countryTradeLoading, setCountryTradeLoading] = useState(false);
+  const [availableHSCodes, setAvailableHSCodes] = useState<string[]>([]);
   
   // Refs for preview/final scheduling
   const filtersRef = useRef(mapFilters);
@@ -78,7 +80,6 @@ const App: React.FC = () => {
     const loadInitialData = async () => {
       try {
         setInitialLoading(true);
-        console.log('Loading HS Code categories, countries, companies...');
         const [hsCodeCatsData, locationsData] = await Promise.all([
           hsCodeCategoriesAPI.getAll(),
           countryLocationsAPI.getAll(),
@@ -94,9 +95,7 @@ const App: React.FC = () => {
             selectedCountries: defaultMapFilters.selectedCountries,
           });
         }
-        console.log('HS Code Categories loaded:', hsCodeCatsData);
-        console.log('Countries loaded:', locationsData);
-        console.log('Shipments (raw):', allShipmentsData.length);
+        logger.debug('[Init] HS categories:', hsCodeCatsData.length, 'countries:', locationsData.length, 'shipments:', allShipmentsData.length);
         
         // 处理 HS Code Categories
         let finalHsCodeCats = hsCodeCatsData;
@@ -112,7 +111,7 @@ const App: React.FC = () => {
             hsCode: code,
             chapterName: `Chapter ${code}` // 默认名称，可以后续改进
           }));
-          console.log('Generated HS Code Categories from shipments:', finalHsCodeCats.length);
+          logger.debug('[Init] Generated HS categories from shipments:', finalHsCodeCats.length);
         }
         setHsCodeCategories(finalHsCodeCats);
         
@@ -146,21 +145,35 @@ const App: React.FC = () => {
             region: coord.region,
             continent: coord.continent
           }));
-          console.log('Generated Countries from shipments:', finalCountries.length);
+          logger.debug('[Init] Generated countries from shipments:', finalCountries.length);
         }
         setCountries(finalCountries);
         
         // 注意：聚合数据不包含公司信息，所以公司列表为空
         setCompanies([]);
-        console.log('Companies list cleared (aggregated data has no company info)');
+        logger.debug('[Init] Company dimension disabled for aggregated dataset');
       } catch (error) {
-        console.error('Failed to load initial data:', error);
+        logger.error('Failed to load initial data:', error);
         alert(t('app.loadDataError') + (error as Error).message);
       } finally {
         setInitialLoading(false);
       }
     };
     loadInitialData();
+  }, []);
+
+  useEffect(() => {
+    const loadAvailableHSCodes = async () => {
+      try {
+        const codes = await countryTradeStatsAPI.getAvailableHSCodes();
+        setAvailableHSCodes(codes);
+      } catch (error) {
+        logger.warn('[HS Codes] fallback to local defaults:', error);
+        setAvailableHSCodes([]);
+      }
+    };
+
+    loadAvailableHSCodes();
   }, []);
 
   // 加载国家贸易统计数据
@@ -194,7 +207,7 @@ const App: React.FC = () => {
           }),
           shipmentsAPI.getAll(shipmentsFilters),
         ]);
-        console.log('Country trade data loaded:', {
+        logger.debug('[Country Trade] loaded', {
           stats: statsData.length,
           summary: summaryData,
           trends: trendsData.length,
@@ -208,7 +221,7 @@ const App: React.FC = () => {
         setTopCountries(topCountriesData);
         setShipments(shipmentsData); // 更新 shipments 用于显示流向
       } catch (error) {
-        console.error('Failed to load country trade data:', error);
+        logger.error('Failed to load country trade data:', error);
         // 显示错误信息给用户
         alert(`加载国家贸易数据失败: ${error instanceof Error ? error.message : String(error)}\n\n请检查：\n1. 数据库是否已导入数据\n2. 后端服务是否正常运行\n3. 网络连接是否正常`);
       } finally {
@@ -218,7 +231,7 @@ const App: React.FC = () => {
 
     // 确保 countries 数据已加载
     if (countries.length === 0) {
-      console.warn('Countries data not loaded yet, waiting...');
+      logger.warn('Countries data not loaded yet, waiting...');
       return;
     }
 
@@ -255,11 +268,7 @@ const App: React.FC = () => {
         }, 100);
       }
 
-      console.log(`Loading shipments (${mode}) with filters:`, filtersToUse);
-      if (filtersToUse.selectedHSCodeSubcategories?.length > 0) {
-        console.log(`  - HS Code 大类:`, filtersToUse.selectedHSCodeCategories);
-        console.log(`  - HS Code 小类:`, filtersToUse.selectedHSCodeSubcategories);
-      }
+      logger.debug(`[Shipments] Loading (${mode})`, filtersToUse);
       const startTime = performance.now();
       const data = await shipmentsAPI.getAll(filtersToUse);
       const duration = performance.now() - startTime;
@@ -273,11 +282,7 @@ const App: React.FC = () => {
         window.clearTimeout(loadingTimer);
       }
 
-      console.log(`Shipments loaded (${mode}) in ${duration.toFixed(0)}ms:`, data.length);
-      if (data.length > 0) {
-        const hsCodes = new Set(data.map(s => s.hsCode).filter(Boolean));
-        console.log(`  - 包含的 HS Codes:`, Array.from(hsCodes).sort());
-      }
+      logger.debug(`[Shipments] Loaded (${mode}) in ${duration.toFixed(0)}ms:`, data.length);
       setShipments(data);
       
       // 注意：不再从筛选结果中更新公司列表
@@ -320,7 +325,7 @@ const App: React.FC = () => {
       }
     } catch (e: any) {
       if (e?.name === 'AbortError') return;
-      console.error('Failed to load shipments:', e);
+      logger.error('Failed to load shipments:', e);
       if (mode === 'final') {
         alert('无法加载数据。错误: ' + (e as Error).message);
       }
@@ -451,18 +456,6 @@ const App: React.FC = () => {
     });
   }, [shipments, hsCodeCategories, countries, getCountryCode]);
 
-  // 调试信息
-  useEffect(() => {
-    console.log('Shipments (raw):', shipments.length);
-    console.log('Shipments for map (按国家对聚合):', shipmentsForMap.length);
-    if (shipmentsForMap.length > 0) {
-      console.log('  - 国家对:', shipmentsForMap.map(s => `${s.originId} → ${s.destinationId}`));
-      console.log('  - 总价值:', shipmentsForMap.map(s => `$${s.value.toFixed(2)}M`));
-    }
-    console.log('Countries for map:', countries.length);
-    console.log('HS Code Categories:', hsCodeCategories.length);
-  }, [shipments, shipmentsForMap, countries, hsCodeCategories]);
-
   return (
     <div className="min-h-screen flex flex-col bg-[#F5F5F7] text-[#1D1D1F]">
       {/* Header */}
@@ -527,6 +520,7 @@ const App: React.FC = () => {
             <CountryTradeSidebar
               filters={countryTradeFilters}
               setFilters={setCountryTradeFilters}
+              availableHSCodes={availableHSCodes}
             />
           ) : activeView === 'map' ? (
             <SidebarFilters 

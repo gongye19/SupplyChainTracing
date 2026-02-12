@@ -229,7 +229,7 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
               ) : (() => {
                 // 始终显示所有可用的 HS Code 大类选项，支持多选
                 // 排序后显示
-                const chaptersToShow = hsCodeCategories.sort((a, b) => a.hsCode.localeCompare(b.hsCode));
+                const chaptersToShow = [...hsCodeCategories].sort((a, b) => a.hsCode.localeCompare(b.hsCode));
                 
                 return chaptersToShow.map(cat => (
                   <div 

@@ -5,6 +5,9 @@ import { Shipment, CountryLocation, Category, Transaction, CompanyWithLocation, 
 import { translateMaterials } from '../utils/materialTranslations';
 import { useLanguage } from '../contexts/LanguageContext';
 import { getPortLocation } from '../utils/portLocations';
+import { loadWorldGeoJson } from '../utils/worldGeoJson';
+import { areSupplyMapPropsEqual } from './supplyMapComparator';
+import { logger } from '../utils/logger';
 
 interface SupplyMapProps {
   shipments: Shipment[];
@@ -15,15 +18,6 @@ interface SupplyMapProps {
   categories: Category[];
   filters?: Filters; // 添加 filters 属性
   isPreview?: boolean;
-}
-
-// GeoJSON 缓存
-let worldGeoJsonPromise: Promise<any> | null = null;
-function loadWorldGeoJson() {
-  if (!worldGeoJsonPromise) {
-    worldGeoJsonPromise = d3.json('https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson');
-  }
-  return worldGeoJsonPromise;
 }
 
 const SupplyMap: React.FC<SupplyMapProps> = React.memo(({ 
@@ -137,7 +131,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
         .attr('stroke', '#FFFFFF')
         .attr('stroke-width', 1);
     }).catch((error) => {
-      console.error('SupplyMap: Error loading world map:', error);
+      logger.error('SupplyMap: Error loading world map:', error);
     });
 
     // 设置缩放
@@ -717,37 +711,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
       <svg ref={svgRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
     </div>
   );
-}, (prevProps, nextProps) => {
-  // 自定义比较函数
-  const filtersEqual = prevProps.filters === nextProps.filters || (
-    prevProps.filters && nextProps.filters &&
-    prevProps.filters.startDate === nextProps.filters.startDate &&
-    prevProps.filters.endDate === nextProps.filters.endDate &&
-    prevProps.filters.selectedCountries.length === nextProps.filters.selectedCountries.length &&
-    prevProps.filters.selectedCountries.every((c, i) => c === nextProps.filters.selectedCountries[i]) &&
-    prevProps.filters.selectedCompanies.length === nextProps.filters.selectedCompanies.length &&
-    prevProps.filters.selectedCompanies.every((c, i) => c === nextProps.filters.selectedCompanies[i]) &&
-    prevProps.filters.selectedHSCodeCategories.length === nextProps.filters.selectedHSCodeCategories.length &&
-    prevProps.filters.selectedHSCodeCategories.every((c, i) => c === nextProps.filters.selectedHSCodeCategories[i]) &&
-    prevProps.filters.selectedHSCodeSubcategories.length === nextProps.filters.selectedHSCodeSubcategories.length &&
-    prevProps.filters.selectedHSCodeSubcategories.every((c, i) => c === nextProps.filters.selectedHSCodeSubcategories[i])
-  );
-  
-  return (
-    prevProps.shipments.length === nextProps.shipments.length &&
-    prevProps.shipments.every((s, i) => s.id === nextProps.shipments[i]?.id) &&
-    prevProps.transactions.length === nextProps.transactions.length &&
-    prevProps.transactions.every((t, i) => t.id === nextProps.transactions[i]?.id) &&
-    prevProps.selectedCountries.length === nextProps.selectedCountries.length &&
-    prevProps.selectedCountries.every((c, i) => c === nextProps.selectedCountries[i]) &&
-    prevProps.countries.length === nextProps.countries.length &&
-    prevProps.companies.length === nextProps.companies.length &&
-    prevProps.companies.every((c, i) => c.id === nextProps.companies[i]?.id) &&
-    prevProps.categories.length === nextProps.categories.length &&
-    prevProps.isPreview === nextProps.isPreview &&
-    filtersEqual
-  );
-});
+}, areSupplyMapPropsEqual);
 
 SupplyMap.displayName = 'SupplyMap';
 

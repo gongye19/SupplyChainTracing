@@ -5,22 +5,17 @@ import { useLanguage } from '../contexts/LanguageContext';
 interface HSCodeSelectorProps {
   selectedHSCodes: string[];
   onHSCodeChange: (hsCodes: string[]) => void;
-  availableHSCodes?: string[];
+  availableHSCodes: string[];
 }
 
 const HSCodeSelector: React.FC<HSCodeSelectorProps> = ({
   selectedHSCodes,
   onHSCodeChange,
-  availableHSCodes = [],
+  availableHSCodes,
 }) => {
   const { t } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-
-  // 如果没有提供可用HS编码列表，使用常见的半导体相关HS编码
-  const defaultHSCodes = availableHSCodes.length > 0 
-    ? availableHSCodes 
-    : ['381800', '848610', '848620', '848630', '848640', '848690', '854231', '854232', '854233', '854239', '903082', '903141'];
 
   // 点击外部关闭下拉框
   useEffect(() => {
@@ -68,7 +63,9 @@ const HSCodeSelector: React.FC<HSCodeSelectorProps> = ({
 
         {isOpen && (
           <div className="absolute top-full left-0 right-0 mt-2 bg-white/90 backdrop-blur-xl border border-black/5 rounded-[16px] shadow-2xl z-50 max-h-72 overflow-y-auto custom-scrollbar p-1.5 animate-in fade-in zoom-in-95 duration-200">
-            {defaultHSCodes.map((hsCode) => (
+            {availableHSCodes.length === 0 ? (
+              <div className="px-3 py-2 text-[12px] text-[#86868B]">{t('countryTrade.noData')}</div>
+            ) : availableHSCodes.map((hsCode) => (
               <div
                 key={hsCode}
                 onClick={(e) => {

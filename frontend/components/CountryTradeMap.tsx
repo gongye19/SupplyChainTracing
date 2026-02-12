@@ -2,78 +2,15 @@ import React, { useEffect, useRef, useMemo, useState } from 'react';
 import * as d3 from 'd3';
 import { CountryMonthlyTradeStat, CountryLocation } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
+import { resolveCountryIso3 } from '../utils/countryCodeMapping';
+import { logger } from '../utils/logger';
+import { loadWorldGeoJson } from '../utils/worldGeoJson';
 
 interface CountryTradeMapProps {
   stats: CountryMonthlyTradeStat[];
   countries: CountryLocation[];
   selectedHSCodes?: string[];
 }
-
-// GeoJSON 缓存（模块级）
-let worldGeoJsonPromise: Promise<any> | null = null;
-function loadWorldGeoJson() {
-  if (!worldGeoJsonPromise) {
-    worldGeoJsonPromise = d3.json('https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson');
-  }
-  return worldGeoJsonPromise;
-}
-
-// 2位代码到3位代码的映射（ISO 3166-1 alpha-2 到 alpha-3）
-const ISO2_TO_ISO3: Record<string, string> = {
-  'AU': 'AUS', 'BD': 'BGD', 'BR': 'BRA', 'CN': 'CHN', 'EG': 'EGY',
-  'FR': 'FRA', 'DE': 'DEU', 'IN': 'IND', 'ID': 'IDN', 'IT': 'ITA',
-  'JP': 'JPN', 'MY': 'MYS', 'MX': 'MEX', 'NL': 'NLD', 'PK': 'PAK',
-  'PH': 'PHL', 'SG': 'SGP', 'KR': 'KOR', 'ES': 'ESP', 'TH': 'THA',
-  'TR': 'TUR', 'AE': 'ARE', 'GB': 'GBR', 'US': 'USA', 'VN': 'VNM',
-  'TW': 'TWN', 'IS': 'ISR', 'IE': 'IRL'
-};
-
-// 国家名称到3位代码的映射（处理常见变体和特殊情况，如台湾）
-const COUNTRY_NAME_TO_ISO3: Record<string, string> = {
-  // 台湾的常见名称变体
-  'Taiwan': 'TWN',
-  'Taiwan, Province of China': 'TWN',
-  'Taiwan Province of China': 'TWN',
-  'Republic of China': 'TWN',
-  // 其他常见变体
-  'United States': 'USA',
-  'United States of America': 'USA',
-  'USA': 'USA',
-  'United Kingdom': 'GBR',
-  'UK': 'GBR',
-  'Great Britain': 'GBR',
-  'China': 'CHN',
-  "People's Republic of China": 'CHN',
-  'South Korea': 'KOR',
-  'Korea, South': 'KOR',
-  'Republic of Korea': 'KOR',
-  'Netherlands': 'NLD',
-  'Holland': 'NLD',
-  'United Arab Emirates': 'ARE',
-  'UAE': 'ARE',
-  'Dubai': 'ARE',
-  // 其他常见国家
-  'Japan': 'JPN',
-  'Germany': 'DEU',
-  'France': 'FRA',
-  'Italy': 'ITA',
-  'Spain': 'ESP',
-  'Brazil': 'BRA',
-  'Mexico': 'MEX',
-  'India': 'IND',
-  'Thailand': 'THA',
-  'Vietnam': 'VNM',
-  'Philippines': 'PHL',
-  'Indonesia': 'IDN',
-  'Malaysia': 'MYS',
-  'Singapore': 'SGP',
-  'Bangladesh': 'BGD',
-  'Pakistan': 'PAK',
-  'Egypt': 'EGY',
-  'Turkey': 'TUR',
-  'Australia': 'AUS',
-  'Korea': 'KOR'
-};
 
 const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({ 
   stats,
@@ -84,7 +21,7 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
   
   // 组件挂载和props变化时的调试
   useEffect(() => {
-    console.log('[CountryTradeMap] Component rendered/updated:', {
+    logger.debug('[CountryTradeMap] Component rendered/updated:', {
       statsCount: stats.length,
       countriesCount: countries.length,
       selectedHSCodes,
@@ -109,7 +46,7 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
   const countryTradeData = useMemo(() => {
     const tradeMap = new Map<string, { sumOfUsd: number; tradeCount: number }>();
     
-    console.log('[CountryTradeMap] Processing stats:', {
+    logger.debug('[CountryTradeMap] Processing stats:', {
       statsCount: stats.length,
       selectedHSCodes,
       sampleStats: stats.slice(0, 3).map(s => ({ countryCode: s.countryCode, hsCode: s.hsCode, sumOfUsd: s.sumOfUsd }))
@@ -128,7 +65,7 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
       });
     });
     
-    console.log('[CountryTradeMap] Country trade data computed:', {
+    logger.debug('[CountryTradeMap] Country trade data computed:', {
       tradeMapSize: tradeMap.size,
       tradeMapEntries: Array.from(tradeMap.entries()).slice(0, 10).map(([code, data]) => ({ 
         code, 
@@ -167,7 +104,7 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
     const width = svgRef.current.clientWidth;
     const height = svgRef.current.clientHeight;
     if (width === 0 || height === 0) {
-      console.warn('[CountryTradeMap] SVG container has zero dimensions:', { width, height, 'parentHeight': svgRef.current.parentElement?.clientHeight });
+      logger.warn('[CountryTradeMap] SVG container has zero dimensions:', { width, height, parentHeight: svgRef.current.parentElement?.clientHeight });
       return;
     }
 
@@ -223,7 +160,7 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
       geoJsonDataRef.current = data;
       setGeoJsonLoaded(true);
       
-      console.log('[CountryTradeMap] GeoJSON loaded');
+      logger.debug('[CountryTradeMap] GeoJSON loaded');
       
       const filteredFeatures = data.features.filter((f: any) => 
         f.properties.name !== "Antarctica"
@@ -245,26 +182,7 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
         const countryName = d.properties.name;
         const props = d.properties;
         
-        // 优先通过国家名称在 countryLocationMap 中查找对应的 countryCode
-        let countryCode: string | undefined;
-        let matchedCountry: CountryLocation | undefined;
-        
-        if (countryName) {
-          matchedCountry = Array.from(countryLocationMap.values()).find(
-            loc => loc.countryName && loc.countryName.toLowerCase() === countryName.toLowerCase()
-          );
-          if (matchedCountry) {
-            const code2 = matchedCountry.countryCode;
-            countryCode = ISO2_TO_ISO3[code2] || code2;
-          }
-        }
-        
-        // 如果通过名称没找到，尝试从 GeoJSON 属性中获取 ISO_A3
-        if (!countryCode) {
-          countryCode = props.ISO_A3 || props.iso_a3 || props.ISO3 || props.iso3 || 
-                        props.ISO_A3_EH || props.ISO_A3_TL || props.ADM0_A3 || props.adm0_a3 ||
-                        props.ISO_A3_ || props.iso_a3_ || props.ADM0_A3_IS || props.adm0_a3_is;
-        }
+        const countryCode = resolveCountryIso3(props, countryLocationMap);
         
         // 从ref获取最新的tradeData
         const tradeData = countryCode ? countryTradeDataRef.current.get(countryCode) : null;
@@ -310,7 +228,7 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
         d3Tooltip.style('visibility', 'hidden');
       });
     }).catch((error) => {
-      console.error('CountryTradeMap: Error loading world map:', error);
+      logger.error('CountryTradeMap: Error loading world map:', error);
     });
 
     // 设置缩放
@@ -328,7 +246,7 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
   // 更新：只更新国家颜色和节点（筛选时执行）
   useEffect(() => {
     if (!gMapRef.current || !projectionRef.current || !geoJsonLoaded || countries.length === 0) {
-      console.log('[CountryTradeMap] Update skipped:', {
+      logger.debug('[CountryTradeMap] Update skipped:', {
         hasGMap: !!gMapRef.current,
         hasProjection: !!projectionRef.current,
         hasGeoJson: geoJsonLoaded,
@@ -338,7 +256,7 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
     }
     
     if (!geoJsonDataRef.current) {
-      console.log('[CountryTradeMap] GeoJSON data not available yet');
+      logger.debug('[CountryTradeMap] GeoJSON data not available yet');
       return;
     }
 
@@ -346,7 +264,7 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
     const gMap = gMapRef.current;
     const countryLocationMap = countryLocationMapRef.current;
 
-    console.log('[CountryTradeMap] Updating map colors:', {
+    logger.debug('[CountryTradeMap] Updating map colors:', {
       countryTradeDataSize: countryTradeData.size,
       countryLocationMapSize: countryLocationMap.size,
       maxTradeValue,
@@ -360,7 +278,7 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
     // 首先打印所有可用的国家代码用于调试
     const allTradeCountryCodes = Array.from(countryTradeData.keys());
     const allLocationCountryCodes = Array.from(countryLocationMap.keys());
-    console.log('[CountryTradeMap] Matching countries:', {
+    logger.debug('[CountryTradeMap] Matching countries:', {
       tradeDataCodes: allTradeCountryCodes.slice(0, 20),
       locationCodes: allLocationCountryCodes.slice(0, 20),
       commonCodes: allTradeCountryCodes.filter(code => allLocationCountryCodes.includes(code)).slice(0, 10),
@@ -379,7 +297,7 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
         // 打印所有属性名，看看实际有什么
         const allPropKeys = Object.keys(props);
         // 尝试所有可能的 ISO_A3 属性名
-        const isoA3 = props.ISO_A3 || props.iso_a3 || props.ISO3 || props.iso3 || props.ISO_A3_EH || props.ISO_A3_TL || props.ADM0_A3 || props.adm0_a3;
+        const isoA3 = resolveCountryIso3(props, countryLocationMap);
         const isoA2 = props.ISO_A2 || props.iso_a2 || props.ISO2 || props.iso2;
         const hasInTradeData = isoA3 ? countryTradeData.has(isoA3) : false;
         const tradeData = isoA3 ? countryTradeData.get(isoA3) : null;
@@ -398,51 +316,15 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
         });
       }
     });
-    console.log('[CountryTradeMap] Sample GeoJSON countries check:', JSON.stringify(sampleGeoJsonCountries, null, 2));
-    console.log('[CountryTradeMap] First 10 tradeDataCodes:', Array.from(countryTradeData.keys()).slice(0, 10));
+    logger.debug('[CountryTradeMap] Sample GeoJSON countries check:', JSON.stringify(sampleGeoJsonCountries, null, 2));
+    logger.debug('[CountryTradeMap] First 10 tradeDataCodes:', Array.from(countryTradeData.keys()).slice(0, 10));
 
     // 更新国家颜色，同时更新鼠标悬停事件（确保能正确显示tooltip）
     gMap.selectAll('path.country')
       .attr('fill', (d: any) => {
         const props = d.properties;
         const countryName = props.name;
-        
-        // 优先通过国家名称在 countryLocationMap 中查找对应的 countryCode
-        let countryCode: string | undefined;
-        if (countryName) {
-          // 1. 先尝试通过国家名称在 countryLocationMap 中查找
-          const country = Array.from(countryLocationMap.values()).find(
-            loc => loc.countryName && loc.countryName.toLowerCase() === countryName.toLowerCase()
-          );
-          if (country) {
-            // country.countryCode 可能是2位代码（如 "JP", "US"），需要转换为3位代码
-            const code2 = country.countryCode;
-            countryCode = ISO2_TO_ISO3[code2] || code2; // 如果是2位代码，转换为3位；如果已经是3位，直接使用
-          }
-          
-          // 2. 如果 countryLocationMap 中没找到，尝试通过国家名称映射表直接匹配（处理台湾等特殊情况）
-          if (!countryCode && COUNTRY_NAME_TO_ISO3[countryName]) {
-            countryCode = COUNTRY_NAME_TO_ISO3[countryName];
-          }
-          
-          // 3. 尝试模糊匹配（处理名称变体，如 "Taiwan, Province of China"）
-          if (!countryCode) {
-            const countryNameLower = countryName.toLowerCase();
-            for (const [name, code] of Object.entries(COUNTRY_NAME_TO_ISO3)) {
-              if (countryNameLower.includes(name.toLowerCase()) || name.toLowerCase().includes(countryNameLower)) {
-                countryCode = code;
-                break;
-              }
-            }
-          }
-        }
-        
-        // 4. 如果通过名称没找到，尝试从 GeoJSON 属性中获取 ISO_A3
-        if (!countryCode) {
-          countryCode = props.ISO_A3 || props.iso_a3 || props.ISO3 || props.iso3 || 
-                        props.ISO_A3_EH || props.ISO_A3_TL || props.ADM0_A3 || props.adm0_a3 ||
-                        props.ISO_A3_ || props.iso_a3_ || props.ADM0_A3_IS || props.adm0_a3_is;
-        }
+        const countryCode = resolveCountryIso3(props, countryLocationMap);
         
         // 用 countryCode（3位代码）直接匹配 tradeData
         if (countryCode && countryTradeData.has(countryCode)) {
@@ -452,7 +334,7 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
             coloredCount++;
             // 只在第一个成功着色时打印调试信息
             if (coloredCount === 1) {
-              console.log('[CountryTradeMap] First colored country:', {
+              logger.debug('[CountryTradeMap] First colored country:', {
                 countryName,
                 countryCode,
                 tradeData: { sumOfUsd: tradeData.sumOfUsd, tradeCount: tradeData.tradeCount },
@@ -469,42 +351,7 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
       .on('mouseover', function(event: MouseEvent, d: any) {
         const countryName = d.properties.name;
         const props = d.properties;
-        
-        // 优先通过国家名称在 countryLocationMap 中查找对应的 countryCode
-        let countryCode: string | undefined;
-        if (countryName) {
-          // 1. 先尝试通过国家名称在 countryLocationMap 中查找
-          const country = Array.from(countryLocationMap.values()).find(
-            loc => loc.countryName && loc.countryName.toLowerCase() === countryName.toLowerCase()
-          );
-          if (country) {
-            const code2 = country.countryCode;
-            countryCode = ISO2_TO_ISO3[code2] || code2;
-          }
-          
-          // 2. 如果 countryLocationMap 中没找到，尝试通过国家名称映射表直接匹配（处理台湾等特殊情况）
-          if (!countryCode && COUNTRY_NAME_TO_ISO3[countryName]) {
-            countryCode = COUNTRY_NAME_TO_ISO3[countryName];
-          }
-          
-          // 3. 尝试模糊匹配（处理名称变体，如 "Taiwan, Province of China"）
-          if (!countryCode) {
-            const countryNameLower = countryName.toLowerCase();
-            for (const [name, code] of Object.entries(COUNTRY_NAME_TO_ISO3)) {
-              if (countryNameLower.includes(name.toLowerCase()) || name.toLowerCase().includes(countryNameLower)) {
-                countryCode = code;
-                break;
-              }
-            }
-          }
-        }
-        
-        // 4. 如果通过名称没找到，尝试从 GeoJSON 属性中获取 ISO_A3
-        if (!countryCode) {
-          countryCode = props.ISO_A3 || props.iso_a3 || props.ISO3 || props.iso3 || 
-                        props.ISO_A3_EH || props.ISO_A3_TL || props.ADM0_A3 || props.adm0_a3 ||
-                        props.ISO_A3_ || props.iso_a3_ || props.ADM0_A3_IS || props.adm0_a3_is;
-        }
+        const countryCode = resolveCountryIso3(props, countryLocationMap);
         
         // 从ref获取最新的tradeData
         const tradeData = countryCode ? countryTradeDataRef.current.get(countryCode) : null;
@@ -550,7 +397,7 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
         tooltipRef.current!.style('visibility', 'hidden');
       });
 
-    console.log('[CountryTradeMap] Color update complete:', {
+    logger.debug('[CountryTradeMap] Color update complete:', {
       matchedCount,
       coloredCount,
       totalCountries: countryTradeData.size

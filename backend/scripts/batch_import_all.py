@@ -97,18 +97,6 @@ def create_tables(engine):
     
     print("✓ 表创建完成\n")
 
-def clear_tables(engine):
-    """清空表数据"""
-    print("=" * 60)
-    print("清空表数据...")
-    print("=" * 60)
-    
-    with engine.begin() as conn:
-        conn.execute(text("TRUNCATE TABLE country_origin_trade_stats"))
-        conn.execute(text("TRUNCATE TABLE country_monthly_trade_stats"))
-    
-    print("✓ 表已清空\n")
-
 def clean_database_for_fresh_import(engine):
     """--clear 模式：清理旧表并重置目标表"""
     print("=" * 60)
@@ -466,11 +454,6 @@ def main():
     # 创建目标表
     create_tables(engine)
 
-    # 兼容已有数据场景：如仅希望保留结构并清空，可继续沿用 clear_tables
-    # 这里在 --clear 模式下再次执行 TRUNCATE 可确保行为一致（无副作用）
-    if clear_first:
-        clear_tables(engine)
-    
     # 导入数据
     start_time = datetime.now()
     

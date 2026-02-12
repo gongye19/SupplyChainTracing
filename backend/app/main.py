@@ -10,8 +10,10 @@ import re
 
 from .routes import chat, hs_code_categories, country_locations as port_locations_route, country_locations_compat, shipments, country_trade_stats
 from .database import get_db
+from .utils.logger import get_logger
 
 app = FastAPI(title="Supply Chain API", version="1.0.0")
+logger = get_logger(__name__)
 
 # CORS配置 - 支持多域名（开发和生产环境）
 # 从环境变量读取，如果没有设置则使用空列表（生产环境必须设置）
@@ -25,8 +27,8 @@ cors_origins = [origin.strip() for origin in cors_origins_str.split(",") if orig
 vercel_origin_regex = r"https://supply-chain-tracing(-[a-z0-9-]+)?\.vercel\.app"
 
 # 调试：打印 CORS 配置
-print(f"[CORS] 允许的域名列表: {cors_origins}")
-print(f"[CORS] Vercel 正则表达式: {vercel_origin_regex}")
+logger.info("[CORS] allow_origins=%s", cors_origins)
+logger.info("[CORS] allow_origin_regex=%s", vercel_origin_regex)
 
 # 配置 CORS：如果 cors_origins 为空，只使用正则表达式
 if cors_origins:
@@ -108,7 +110,6 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
     """处理所有其他异常，确保包含 CORS 头"""
-    import traceback
     origin = request.headers.get("origin")
     
     is_allowed = False
@@ -119,8 +120,7 @@ async def general_exception_handler(request: Request, exc: Exception):
             is_allowed = True
     
     error_detail = str(exc)
-    print(f"[ERROR] 未处理的异常: {error_detail}")
-    print(traceback.format_exc())
+    logger.exception("[ERROR] 未处理的异常: %s", error_detail)
     
     response = JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -141,7 +141,7 @@ class CORSDebugMiddleware(BaseHTTPMiddleware):
         origin = request.headers.get("origin")
         if origin:
             is_allowed = origin in cors_origins or (re.match(vercel_origin_regex, origin) if vercel_origin_regex else False)
-            print(f"[CORS Debug] Origin: {origin}, Allowed: {is_allowed}")
+            logger.debug("[CORS Debug] Origin=%s Allowed=%s", origin, is_allowed)
         
         response = await call_next(request)
         return response

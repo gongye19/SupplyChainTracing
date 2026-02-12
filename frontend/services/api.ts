@@ -1,13 +1,22 @@
-import { Category, Transaction, Company, CompanyWithLocation, Location, Filters, MonthlyCompanyFlow, HSCodeCategory, Shipment, CountryMonthlyTradeStat, CountryTradeStatSummary, CountryTradeTrend, TopCountry, CountryTradeFilters } from '../types';
+import {
+  Filters,
+  HSCodeCategory,
+  Shipment,
+  CountryMonthlyTradeStat,
+  CountryTradeStatSummary,
+  CountryTradeTrend,
+  TopCountry,
+  CountryTradeFilters,
+  Location,
+} from '../types';
+import { logger } from '../utils/logger';
 
-// 前端在浏览器中运行，所以使用localhost（通过Vite代理或直接连接）
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
 
 async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
-  console.log('Fetching:', url);
-  console.log('API_BASE_URL:', API_BASE_URL);
-  
+  logger.debug('[API] Fetching', url);
+
   try {
     const response = await fetch(url, {
       ...options,
@@ -19,123 +28,22 @@ async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> 
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('API Error:', response.status, response.statusText, errorText);
+      logger.error('[API] Error', response.status, response.statusText, errorText);
       throw new Error(`API error (${response.status}): ${response.statusText}`);
     }
 
-    const data = await response.json();
-    console.log('API Response:', endpoint, data);
-    return data;
+    return await response.json();
   } catch (error) {
-    // 处理网络错误
     if (error instanceof TypeError && error.message.includes('fetch')) {
-      console.error('Network error:', error);
-      throw new Error(`无法连接到后端服务。请检查：\n1. 后端服务是否运行\n2. VITE_API_URL 环境变量是否正确设置\n当前 API URL: ${API_BASE_URL}`);
+      logger.error('[API] Network error', error);
+      throw new Error(
+        `无法连接到后端服务。请检查：\n1. 后端服务是否运行\n2. VITE_API_URL 环境变量是否正确设置\n当前 API URL: ${API_BASE_URL}`
+      );
     }
     throw error;
   }
 }
 
-// 品类API
-export const categoriesAPI = {
-  getAll: async (activeOnly: boolean = true): Promise<Category[]> => {
-    const data = await fetchAPI<any[]>(`/api/categories?active_only=${activeOnly}`);
-    // 转换字段名从下划线格式到驼峰格式
-    return data.map((cat: any) => ({
-      id: cat.id,
-      name: cat.name,
-      displayName: cat.display_name || cat.displayName || cat.name,
-      color: cat.color,
-      icon: cat.icon,
-      description: cat.description,
-      sortOrder: cat.sort_order || cat.sortOrder || 0,
-      isActive: cat.is_active !== undefined ? cat.is_active : (cat.isActive !== undefined ? cat.isActive : true)
-    }));
-  },
-  getById: async (id: string): Promise<Category> => {
-    const data = await fetchAPI<any>(`/api/categories/${id}`);
-    // 转换字段名从下划线格式到驼峰格式
-    return {
-      id: data.id,
-      name: data.name,
-      displayName: data.display_name || data.displayName || data.name,
-      color: data.color,
-      icon: data.icon,
-      description: data.description,
-      sortOrder: data.sort_order || data.sortOrder || 0,
-      isActive: data.is_active !== undefined ? data.is_active : (data.isActive !== undefined ? data.isActive : true)
-    };
-  },
-};
-
-// 交易API
-export interface TransactionListResponse {
-  transactions: Transaction[];
-  pagination: {
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-  };
-}
-
-export interface TransactionStats {
-  totalTransactions: number;
-  totalValue: number;
-  activeCountries: number;
-  activeCompanies: number;
-  categoryBreakdown: Array<{
-    categoryId: string;
-    categoryName: string;
-    count: number;
-    totalValue: number;
-  }>;
-  topRoutes: Array<{
-    originCountry: string;
-    destinationCountry: string;
-    transactionCount: number;
-    totalValue: number;
-  }>;
-}
-
-// 月度公司流量API（聚合表）
-export const monthlyCompanyFlowsAPI = {
-  getAll: async (filters?: Partial<Filters>): Promise<MonthlyCompanyFlow[]> => {
-    const params = new URLSearchParams();
-    if (filters?.startYearMonth) params.append('start_year_month', filters.startYearMonth);
-    if (filters?.endYearMonth) params.append('end_year_month', filters.endYearMonth);
-    if (filters?.selectedCountries?.length) {
-      filters.selectedCountries.forEach(name => params.append('country', name));
-    }
-    if (filters?.selectedCompanies?.length) {
-      filters.selectedCompanies.forEach(name => params.append('company', name));
-    }
-    if (filters?.selectedHSCodeCategories?.length) {
-      // 使用 hs_code 参数（2位大类），而不是 category_id
-      filters.selectedHSCodeCategories.forEach(hsCode => params.append('hs_code', hsCode));
-    }
-
-    const data = await fetchAPI<any[]>(`/api/monthly-company-flows?${params.toString()}`);
-    return data.map((item: any) => ({
-      yearMonth: item.year_month,
-      exporterName: item.exporter_name,
-      importerName: item.importer_name,
-      originCountry: item.origin_country,
-      destinationCountry: item.destination_country,
-      hsCodes: item.hs_codes,
-      transportMode: item.transport_mode,
-      tradeTerm: item.trade_term,
-      transactionCount: parseInt(item.transaction_count) || 0,
-      totalValueUsd: parseFloat(item.total_value_usd) || 0,
-      totalWeightKg: parseFloat(item.total_weight_kg) || 0,
-      totalQuantity: parseFloat(item.total_quantity) || 0,
-      firstTransactionDate: item.first_transaction_date,
-      lastTransactionDate: item.last_transaction_date,
-    }));
-  },
-};
-
-// Shipments API（国家原产地贸易统计数据）
 export const shipmentsAPI = {
   getAll: async (filters?: Partial<Filters>): Promise<Shipment[]> => {
     const params = new URLSearchParams();
@@ -209,260 +117,20 @@ export const hsCodeCategoriesAPI = {
   },
 };
 
-// 港口位置API（使用 port_locations 表）
-export const portLocationsAPI = {
-  getAll: async (countryCode?: string): Promise<Location[]> => {
-    const url = countryCode 
-      ? `/api/port-locations?country_code=${countryCode}`
-      : `/api/port-locations`;
-    const data = await fetchAPI<any[]>(url);
-    return data.map((item: any) => ({
-      id: `${item.port_name}_${item.country_code}`,
-      type: 'city' as const,
-      countryCode: item.country_code,
-      countryName: item.country_name,
-      latitude: parseFloat(item.latitude),
-      longitude: parseFloat(item.longitude),
-      region: item.region,
-      continent: item.continent,
-    }));
-  },
-};
-
-// 国家位置API（从 port_locations 表中提取唯一的国家信息）
+// 国家位置API（直接使用后端 country-locations 端点，避免前端全量去重）
 export const countryLocationsAPI = {
   getAll: async (): Promise<Location[]> => {
-    // 获取所有港口位置，然后提取唯一的国家信息
-    const portData = await portLocationsAPI.getAll();
-    
-    // 使用 Map 去重，以 countryCode 为键
-    const countryMap = new Map<string, Location>();
-    portData.forEach(port => {
-      if (!countryMap.has(port.countryCode)) {
-        countryMap.set(port.countryCode, {
-          id: port.countryCode,
-          type: 'country' as const,
-          countryCode: port.countryCode,
-          countryName: port.countryName,
-          latitude: port.latitude,
-          longitude: port.longitude,
-          region: port.region,
-          continent: port.continent,
-        });
-      }
-    });
-    
-    return Array.from(countryMap.values());
-  },
-};
-
-export const transactionsAPI = {
-  getTransactions: async (
-    filters?: Partial<Filters>,
-    page: number = 1,
-    limit: number = 1000,
-    options?: { signal?: AbortSignal }
-  ): Promise<TransactionListResponse> => {
-    const params = new URLSearchParams();
-    if (filters?.startYearMonth) params.append('start_year_month', filters.startYearMonth);
-    if (filters?.endYearMonth) params.append('end_year_month', filters.endYearMonth);
-    if (filters?.selectedCountries?.length) {
-      filters.selectedCountries.forEach(name => params.append('country', name));
-    }
-    if (filters?.selectedHSCodeCategories?.length) {
-      // 使用 hs_code 参数（2位大类），而不是 category_id
-      filters.selectedHSCodeCategories.forEach(hsCode => params.append('hs_code', hsCode));
-    }
-    if (filters?.selectedCompanies?.length) {
-      filters.selectedCompanies.forEach(name => params.append('company', name));
-    }
-
-    params.append('page', page.toString());
-    params.append('limit', limit.toString());
-
-    const response = await fetchAPI<any>(`/api/monthly-company-flows?${params.toString()}`, {
-      signal: options?.signal
-    });
-    
-    // 将聚合数据转换为 Transaction 格式（用于兼容）
-    const transactions: Transaction[] = (response as MonthlyCompanyFlow[]).flatMap((flow: MonthlyCompanyFlow) => {
-      // 这里可以根据需要展开聚合数据，或者直接返回聚合数据
-      return [{
-        id: `${flow.yearMonth}-${flow.exporterName}-${flow.importerName}`,
-        exporterCompanyName: flow.exporterName,
-        exporterCountryCode: flow.originCountry,
-        exporterCountryName: flow.originCountry,
-        importerCompanyName: flow.importerName,
-        importerCountryCode: flow.destinationCountry,
-        importerCountryName: flow.destinationCountry,
-        material: flow.hsCodes,
-        categoryId: '', // 需要从 HS Code 映射
-        categoryName: '',
-        categoryColor: '',
-        quantity: flow.totalQuantity,
-        totalValue: flow.totalValueUsd,
-        transactionDate: flow.firstTransactionDate,
-        status: 'completed' as const,
-      }];
-    });
-
-    return {
-      transactions,
-      pagination: {
-        total: transactions.length,
-        page: 1,
-        limit: transactions.length,
-        totalPages: 1,
-      }
-    };
-  },
-  getStats: async (filters?: Partial<Filters>): Promise<TransactionStats> => {
-    // 简化版统计，基于聚合表
-    const flows = await monthlyCompanyFlowsAPI.getAll(filters);
-    const totalValue = flows.reduce((sum, f) => sum + f.totalValueUsd, 0);
-    const totalTransactions = flows.reduce((sum, f) => sum + f.transactionCount, 0);
-    const countries = new Set<string>();
-    flows.forEach(f => {
-      countries.add(f.originCountry);
-      countries.add(f.destinationCountry);
-    });
-    
-    return {
-      totalTransactions,
-      totalValue,
-      activeCountries: countries.size,
-      activeCompanies: 0,
-      categoryBreakdown: [],
-      topRoutes: [],
-    };
-  },
-};
-
-// 位置API
-export const locationsAPI = {
-  getAll: async (type?: 'country' | 'city', countryCode?: string): Promise<Location[]> => {
-    const params = new URLSearchParams();
-    if (type) params.append('type', type);
-    if (countryCode) params.append('country_code', countryCode);
-    
-    const data = await fetchAPI<Location[]>(`/api/locations?${params.toString()}`);
+    const data = await fetchAPI<any[]>(`/api/country-locations`);
     return data.map((item: any) => ({
-      id: item.id,
-      type: item.type,
+      id: item.country_code,
+      type: 'country' as const,
       countryCode: item.country_code,
       countryName: item.country_name,
-      city: item.city,
       latitude: parseFloat(item.latitude),
       longitude: parseFloat(item.longitude),
       region: item.region,
       continent: item.continent,
-      address: item.address,
     }));
-  },
-  getCountries: async (): Promise<Location[]> => {
-    const data = await fetchAPI<Location[]>(`/api/locations/countries`);
-    return data.map((item: any) => ({
-      id: item.id,
-      type: item.type,
-      countryCode: item.country_code,
-      countryName: item.country_name,
-      city: item.city,
-      latitude: parseFloat(item.latitude),
-      longitude: parseFloat(item.longitude),
-      region: item.region,
-      continent: item.continent,
-      address: item.address,
-    }));
-  },
-  getCities: async (countryCode?: string): Promise<Location[]> => {
-    const params = new URLSearchParams();
-    if (countryCode) params.append('country_code', countryCode);
-    
-    const data = await fetchAPI<Location[]>(`/api/locations/cities?${params.toString()}`);
-    return data.map((item: any) => ({
-      id: item.id,
-      type: item.type,
-      countryCode: item.country_code,
-      countryName: item.country_name,
-      city: item.city,
-      latitude: parseFloat(item.latitude),
-      longitude: parseFloat(item.longitude),
-      region: item.region,
-      continent: item.continent,
-      address: item.address,
-    }));
-  },
-  getById: async (id: string): Promise<Location> => {
-    const data = await fetchAPI<any>(`/api/locations/${id}`);
-    return {
-      id: data.id,
-      type: data.type,
-      countryCode: data.country_code,
-      countryName: data.country_name,
-      city: data.city,
-      latitude: parseFloat(data.latitude),
-      longitude: parseFloat(data.longitude),
-      region: data.region,
-      continent: data.continent,
-      address: data.address,
-    };
-  },
-  getByCity: async (countryCode: string, city: string): Promise<Location> => {
-    const data = await fetchAPI<any>(`/api/locations/country/${countryCode}/city/${city}`);
-    return {
-      id: data.id,
-      type: data.type,
-      countryCode: data.country_code,
-      countryName: data.country_name,
-      city: data.city,
-      latitude: parseFloat(data.latitude),
-      longitude: parseFloat(data.longitude),
-      region: data.region,
-      continent: data.continent,
-      address: data.address,
-    };
-  },
-};
-
-// 公司API - 添加获取带位置的公司列表
-export const companiesAPI = {
-  getAll: async (countryCode?: string, city?: string, type?: string, search?: string): Promise<Company[]> => {
-    const params = new URLSearchParams();
-    if (countryCode) params.append('country_code', countryCode);
-    if (city) params.append('city', city);
-    if (type) params.append('type', type);
-    if (search) params.append('search', search);
-    
-    return fetchAPI<Company[]>(`/api/companies?${params.toString()}`);
-  },
-  getById: async (id: string): Promise<Company> => {
-    return fetchAPI<Company>(`/api/companies/${id}`);
-  },
-  getWithLocations: async (countryCode?: string, city?: string, type?: string): Promise<CompanyWithLocation[]> => {
-    const params = new URLSearchParams();
-    if (countryCode) params.append('country_code', countryCode);
-    if (city) params.append('city', city);
-    if (type) params.append('type', type);
-    
-    const data = await fetchAPI<any[]>(`/api/companies/with-locations?${params.toString()}`);
-    // 转换字段名从下划线格式到驼峰格式
-    return data.map((item: any) => ({
-      id: item.id,
-      name: item.name,
-      countryCode: item.country_code,
-      countryName: item.country_name,
-      city: item.city,
-      type: item.type,
-      industry: item.industry,
-      website: item.website,
-      latitude: parseFloat(item.latitude),
-      longitude: parseFloat(item.longitude),
-      region: item.region,
-      continent: item.continent
-    }));
-  },
-  getLocation: async (id: string): Promise<CompanyWithLocation> => {
-    return fetchAPI<CompanyWithLocation>(`/api/companies/${id}/location`);
   },
 };
 
@@ -497,7 +165,7 @@ export const chatAPI = {
     const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
     const url = `${API_BASE_URL}/api/chat`;
     
-    console.log('Sending chat request to:', url);
+    logger.debug('[Chat] Sending request to:', url);
     
     try {
       const response = await fetch(url, {
@@ -510,7 +178,7 @@ export const chatAPI = {
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Chat API error:', response.status, errorText);
+        logger.error('[Chat] API error:', response.status, errorText);
         onError(`HTTP error! status: ${response.status}`);
         return;
       }
@@ -519,7 +187,7 @@ export const chatAPI = {
       const decoder = new TextDecoder();
       
       if (!reader) {
-        console.error('Response body is not readable');
+        logger.error('[Chat] Response body is not readable');
         onError('Response body is not readable');
         return;
       }
@@ -527,14 +195,14 @@ export const chatAPI = {
       let buffer = '';
       let hasReceivedContent = false;
       
-      console.log('Starting to read stream...');
+      logger.debug('[Chat] Start reading stream');
       
       try {
         while (true) {
           const { done, value } = await reader.read();
           
           if (done) {
-            console.log('Stream done, buffer:', buffer.substring(0, 100));
+            logger.debug('[Chat] Stream done');
             // 处理剩余的 buffer
             if (buffer.trim()) {
               const lines = buffer.split('\n');
@@ -542,18 +210,15 @@ export const chatAPI = {
                 if (line.trim() && line.startsWith('data: ')) {
                   try {
                     const data = JSON.parse(line.slice(6));
-                    console.log('Parsed final data:', data);
-                    
                     if (data.error) {
-                      console.error('Server error:', data.error);
+                      logger.error('[Chat] Server error:', data.error);
                       onError(data.error);
                       return;
                     }
                     
                     if (data.done) {
-                      console.log('Received done marker');
                       if (!hasReceivedContent) {
-                        console.warn('Stream completed without content');
+                        logger.warn('[Chat] Stream completed without content');
                       }
                       onComplete();
                       return;
@@ -561,11 +226,10 @@ export const chatAPI = {
                     
                     if (data.content) {
                       hasReceivedContent = true;
-                      console.log('Received content chunk:', data.content.substring(0, 50));
                       onChunk(data.content);
                     }
                   } catch (e) {
-                    console.error('Failed to parse SSE data:', e, line);
+                    logger.warn('[Chat] Failed to parse SSE data:', e, line);
                   }
                 }
               }
@@ -584,15 +248,14 @@ export const chatAPI = {
                 const data = JSON.parse(line.slice(6));
                 
                 if (data.error) {
-                  console.error('Server error:', data.error);
+                  logger.error('[Chat] Server error:', data.error);
                   onError(data.error);
                   return;
                 }
                 
                 if (data.done) {
-                  console.log('Received done marker');
                   if (!hasReceivedContent) {
-                    console.warn('Stream completed without content');
+                    logger.warn('[Chat] Stream completed without content');
                   }
                   onComplete();
                   return;
@@ -603,24 +266,24 @@ export const chatAPI = {
                   onChunk(data.content);
                 }
               } catch (e) {
-                console.error('Failed to parse SSE data:', e, line);
+                logger.warn('[Chat] Failed to parse SSE data:', e, line);
               }
             }
           }
         }
         
         // 如果流结束但没有收到 done 标记，也调用 onComplete
-        console.log('Stream ended, hasReceivedContent:', hasReceivedContent);
+        logger.debug('[Chat] Stream ended. hasReceivedContent=', hasReceivedContent);
         if (!hasReceivedContent) {
-          console.warn('Stream ended without content or done marker');
+          logger.warn('[Chat] Stream ended without content or done marker');
         }
         onComplete();
       } catch (error) {
-        console.error('Error reading stream:', error);
+        logger.error('[Chat] Error reading stream:', error);
         onError(error instanceof Error ? error.message : 'Unknown error while reading stream');
       }
     } catch (error) {
-      console.error('Error in sendMessage:', error);
+      logger.error('[Chat] Error in sendMessage:', error);
       onError(error instanceof Error ? error.message : 'Unknown error');
     }
   },
@@ -653,9 +316,7 @@ export const countryTradeStatsAPI = {
     }
     params.append('limit', '10000');
 
-    console.log('Fetching country trade stats with params:', params.toString());
     const data = await fetchAPI<any[]>(`/api/country-trade-stats?${params.toString()}`);
-    console.log('Received country trade stats:', data.length, 'records');
     return data.map((item: any) => ({
       hsCode: item.hs_code,
       year: item.year,
@@ -674,7 +335,6 @@ export const countryTradeStatsAPI = {
 
   getSummary: async (filters?: CountryTradeFilters): Promise<CountryTradeStatSummary> => {
     const params = new URLSearchParams();
-    console.log('Fetching country trade summary with filters:', filters);
     if (filters?.hsCode?.length) {
       filters.hsCode.forEach(code => params.append('hs_code', code));
     }
@@ -775,6 +435,10 @@ export const countryTradeStatsAPI = {
       tradeCount: parseInt(item.trade_count) || 0,
       amountSharePct: parseFloat(item.amount_share_pct) || 0,
     }));
+  },
+
+  getAvailableHSCodes: async (): Promise<string[]> => {
+    return fetchAPI<string[]>(`/api/country-trade-stats/hs-codes`);
   },
 };
 

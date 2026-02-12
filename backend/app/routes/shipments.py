@@ -7,8 +7,10 @@ from typing import List, Optional
 from ..database import get_db
 from ..schemas import Shipment
 from ..utils.db_helpers import is_missing_table_error
+from ..utils.logger import get_logger
 
 router = APIRouter()
+logger = get_logger(__name__)
 
 @router.get("", response_model=List[Shipment])
 def get_shipments(
@@ -104,7 +106,7 @@ def get_shipments(
         return shipments
     except Exception as e:
         if is_missing_table_error(e):
-            print(f"country_origin_trade_stats not available: {e}")
+            logger.warning("country_origin_trade_stats not available: %s", e)
             return []
         raise HTTPException(status_code=500, detail=f"数据库查询错误: {str(e)}")
 

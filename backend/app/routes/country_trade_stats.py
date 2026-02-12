@@ -251,3 +251,17 @@ def get_top_countries(
         return []
     return rows_to_dicts(result, result.fetchall())
 
+
+@router.get("/hs-codes", response_model=List[str])
+def get_available_hs_codes(db: Session = Depends(get_db)):
+    query = """
+        SELECT DISTINCT hs_code
+        FROM country_monthly_trade_stats
+        WHERE hs_code IS NOT NULL AND hs_code <> ''
+        ORDER BY hs_code
+    """
+    result = _safe_query(db, query, params={}, default_value=[])
+    if result == []:
+        return []
+    return [row[0] for row in result.fetchall()]
+

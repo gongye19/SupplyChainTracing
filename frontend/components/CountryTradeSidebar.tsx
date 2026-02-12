@@ -8,11 +8,13 @@ import MonthRangeSlider from './MonthRangeSlider';
 interface CountryTradeSidebarProps {
   filters: CountryTradeFilters;
   setFilters: React.Dispatch<React.SetStateAction<CountryTradeFilters>>;
+  availableHSCodes: string[];
 }
 
 const CountryTradeSidebar: React.FC<CountryTradeSidebarProps> = ({
   filters,
   setFilters,
+  availableHSCodes,
 }) => {
   const { t } = useLanguage();
   const now = new Date();
@@ -59,6 +61,7 @@ const CountryTradeSidebar: React.FC<CountryTradeSidebarProps> = ({
         <HSCodeSelector
           selectedHSCodes={filters.hsCode || []}
           onHSCodeChange={(hsCodes) => setFilters({ ...filters, hsCode: hsCodes })}
+          availableHSCodes={availableHSCodes}
         />
       </div>
     </div>

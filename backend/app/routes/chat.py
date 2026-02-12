@@ -6,10 +6,12 @@ import os
 import json
 from dotenv import load_dotenv
 from openai import OpenAI
+from ..utils.logger import get_logger
 
 load_dotenv()
 
 router = APIRouter()
+logger = get_logger(__name__)
 
 # 从环境变量读取配置
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-2024-08-06")
@@ -71,7 +73,7 @@ async def chat(request: ChatRequest):
     
     def generate():
         try:
-            print(f"Chat request received. Model: {MODEL_NAME}, Message: {request.message[:50]}...")
+            logger.debug("Chat request received. model=%s message=%s", MODEL_NAME, request.message[:50])
             # 构建消息历史
             messages = []
             
@@ -95,7 +97,7 @@ async def chat(request: ChatRequest):
                 "content": request.message
             })
             
-            print(f"Calling OpenAI API with {len(messages)} messages")
+            logger.debug("Calling OpenAI API with %s messages", len(messages))
             
             # 调用 OpenAI API（流式）
             try:
@@ -105,13 +107,11 @@ async def chat(request: ChatRequest):
                     temperature=0.7,
                     stream=True
                 )
-                print("OpenAI API stream created successfully")
+                logger.debug("OpenAI API stream created successfully")
             except Exception as e:
                 # OpenAI API 调用失败
-                import traceback
                 error_msg = f"OpenAI API error: {str(e)}"
-                print(f"Error calling OpenAI API: {error_msg}")
-                print(traceback.format_exc())
+                logger.exception("Error calling OpenAI API: %s", error_msg)
                 error_data = json.dumps({"error": error_msg}, ensure_ascii=False)
                 yield f"data: {error_data}\n\n"
                 return
@@ -120,7 +120,7 @@ async def chat(request: ChatRequest):
             has_content = False
             chunk_count = 0
             try:
-                print(f"Starting to stream response for model: {MODEL_NAME}")
+                logger.debug("Starting to stream response for model=%s", MODEL_NAME)
                 for chunk in stream:
                     chunk_count += 1
                     if chunk.choices and len(chunk.choices) > 0:
@@ -131,30 +131,26 @@ async def chat(request: ChatRequest):
                             # 使用 SSE 格式返回
                             data = json.dumps({"content": content}, ensure_ascii=False)
                             yield f"data: {data}\n\n"
-                            if chunk_count <= 3 or chunk_count % 10 == 0:  # 前3个和每10个chunk打印一次日志
-                                print(f"Sent chunk {chunk_count}, content: {content[:50]}")
+                            if chunk_count <= 3 or chunk_count % 10 == 0:
+                                logger.debug("Sent chunk %s content=%s", chunk_count, content[:50])
                 
-                print(f"Stream completed. Total chunks: {chunk_count}, Has content: {has_content}")
+                logger.debug("Stream completed. total_chunks=%s has_content=%s", chunk_count, has_content)
             except Exception as e:
                 # 流式读取过程中出错
-                import traceback
                 error_msg = f"Stream reading error: {str(e)}"
-                print(f"Error reading stream: {error_msg}")
-                print(traceback.format_exc())
+                logger.exception("Error reading stream: %s", error_msg)
                 error_data = json.dumps({"error": error_msg}, ensure_ascii=False)
                 yield f"data: {error_data}\n\n"
                 return
             
             # 发送结束标记
-            print("Sending done marker")
+            logger.debug("Sending done marker")
             yield f"data: {json.dumps({'done': True}, ensure_ascii=False)}\n\n"
             
         except Exception as e:
             # 其他未预期的错误
-            import traceback
             error_msg = f"Unexpected error: {str(e)}"
-            print(f"Unexpected error in generate(): {error_msg}")
-            print(traceback.format_exc())
+            logger.exception("Unexpected error in generate(): %s", error_msg)
             error_data = json.dumps({"error": error_msg}, ensure_ascii=False)
             yield f"data: {error_data}\n\n"
     
