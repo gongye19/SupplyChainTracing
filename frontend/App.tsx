@@ -717,44 +717,40 @@ const App: React.FC = () => {
                 <p className="text-[#86868B] text-[16px] font-medium mt-1">{t('countryTrade.subtitle')}</p>
               </div>
 
-              {/* 地图和统计面板 */}
-              {countryTradeLoading ? (
-                <div className="flex items-center justify-center h-[600px]">
-                  <div className="text-[#86868B]">{t('countryTrade.loading')}</div>
+              {/* 非阻塞加载提示：保留当前内容，仅提示正在更新 */}
+              {countryTradeLoading && (
+                <div className="self-end -mt-2 mb-2 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs text-[#86868B] shadow-sm border border-black/5">
+                  {t('countryTrade.loading')}
                 </div>
-              ) : countryTradeSummary === null ? (
-                <div className="flex flex-col items-center justify-center h-[600px] text-center">
-                  <div className="text-[#86868B] mb-4">
-                    {t('countryTrade.noData')}
-                  </div>
-                  <div className="text-[12px] text-[#86868B] max-w-md">
-                    可能的原因：<br />
-                    1. 数据库尚未导入国家贸易统计数据<br />
-                    2. 当前筛选条件无匹配数据<br />
-                    3. 后端服务连接失败
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <div className="bg-white border border-black/5 rounded-[28px] p-6 shadow-sm h-[600px]">
-                    <h3 className="text-[18px] font-bold text-[#1D1D1F] mb-4">{t('countryTrade.tradeMap')}</h3>
-                    <div className="h-[550px]">
+              )}
+
+              <>
+                <div className="bg-white border border-black/5 rounded-[28px] p-6 shadow-sm h-[600px]">
+                  <h3 className="text-[18px] font-bold text-[#1D1D1F] mb-4">{t('countryTrade.tradeMap')}</h3>
+                  <div className="h-[550px]">
+                    {countryTradeSummary === null ? (
+                      <div className="flex items-center justify-center h-full text-[#86868B]">
+                        {t('countryTrade.loading')}
+                      </div>
+                    ) : (
                       <CountryTradeMap
                         stats={countryTradeStats}
                         countries={countries}
                         selectedHSCodes={countryTradeFilters.hsCode}
                       />
-                    </div>
+                    )}
                   </div>
+                </div>
 
+                {countryTradeSummary !== null && (
                   <CountryTradeStatsPanel
                     stats={countryTradeStats}
                     summary={countryTradeSummary}
                     trends={countryTradeTrends}
                     topCountries={topCountries}
                   />
-                </>
-              )}
+                )}
+              </>
             </div>
           )}
         </section>
