@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useMemo, useState } from 'react';
 import * as d3 from 'd3';
-import { CountryMonthlyTradeStat, CountryLocation, CountryTradeFilters } from '../types';
+import { CountryMonthlyTradeStat, CountryLocation } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
 import { resolveCountryIso3 } from '../utils/countryCodeMapping';
 import { logger } from '../utils/logger';
@@ -10,18 +10,14 @@ interface CountryTradeMapProps {
   stats: CountryMonthlyTradeStat[];
   countries: CountryLocation[];
   selectedHSCodes?: string[];
-  filters?: CountryTradeFilters;
 }
 
 const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({ 
   stats,
   countries,
   selectedHSCodes = [],
-  filters,
 }) => {
   const { t } = useLanguage();
-  const containerRef = useRef<HTMLDivElement>(null);
-  const filterCardRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const projectionRef = useRef<d3.GeoProjection | null>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
@@ -254,85 +250,13 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
 
   }, [countryTradeData, colorScale, countries.length, geoJsonLoaded]);
 
-  useEffect(() => {
-    const updateFilterCardPosition = () => {
-      const container = containerRef.current;
-      const card = filterCardRef.current;
-      if (!container || !card) return;
-
-      const rect = container.getBoundingClientRect();
-      const stickyTop = 80;
-      const targetTop = Math.max(stickyTop, rect.top + 24);
-      const targetLeft = Math.max(16, rect.left + 24);
-      const isVisible = rect.bottom > stickyTop + 40 && rect.top < window.innerHeight - 40;
-
-      card.style.top = `${targetTop}px`;
-      card.style.left = `${targetLeft}px`;
-      card.style.opacity = isVisible ? '1' : '0';
-      card.style.visibility = isVisible ? 'visible' : 'hidden';
-    };
-
-    updateFilterCardPosition();
-    window.addEventListener('scroll', updateFilterCardPosition, { passive: true });
-    window.addEventListener('resize', updateFilterCardPosition);
-    return () => {
-      window.removeEventListener('scroll', updateFilterCardPosition);
-      window.removeEventListener('resize', updateFilterCardPosition);
-    };
-  }, []);
-
   return (
-    <div ref={containerRef} className="w-full h-full relative" style={{ minHeight: '400px' }}>
+    <div className="w-full h-full relative" style={{ minHeight: '400px' }}>
       <svg
         ref={svgRef}
         className="w-full h-full"
         style={{ background: '#FAFAFA', minHeight: '400px' }}
       />
-      {filters && (
-        <div ref={filterCardRef} className="fixed z-20 transition-opacity duration-150">
-          <div className="bg-white/95 backdrop-blur-xl p-4 rounded-[18px] border border-black/[0.05] shadow-lg min-w-[200px] max-w-[280px] pointer-events-auto">
-            <div className="mb-3 pb-2.5 border-b border-black/10">
-              <span className="text-[12px] text-[#1D1D1F] font-bold uppercase tracking-widest">
-                {t('map.activeFilters') || 'Filter Control'}
-              </span>
-            </div>
-            <div className="flex flex-col gap-2.5 text-[11px]">
-              <div className="flex items-start gap-2">
-                <span className="text-[#86868B] font-semibold min-w-[60px]">Time:</span>
-                <span className="text-[#1D1D1F]">{filters.startYearMonth || '2021-01'} ~ {filters.endYearMonth || '--'}</span>
-              </div>
-              {selectedHSCodes.length > 0 ? (
-                <div className="flex items-start gap-2">
-                  <span className="text-[#86868B] font-semibold min-w-[60px]">HS Code:</span>
-                  <span className="text-[#1D1D1F]">
-                    {selectedHSCodes.length <= 3
-                      ? selectedHSCodes.join(', ')
-                      : `${selectedHSCodes.slice(0, 3).join(', ')} +${selectedHSCodes.length - 3}`}
-                  </span>
-                </div>
-              ) : (
-                <div className="text-[#86868B] text-[10px] italic">No filters selected</div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-      {/* 图例 */}
-      <div className="absolute bottom-4 right-4 bg-white/90 backdrop-blur-sm border border-black/10 rounded-lg p-4 shadow-lg">
-        <div className="text-xs font-semibold text-[#1D1D1F] mb-2">{t('countryTrade.tradeValue')}</div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded" style={{ background: colorScale(0) }}></div>
-          <span className="text-xs text-[#86868B]">{t('countryTrade.low')}</span>
-          <div className="flex-1 h-2 bg-gradient-to-r rounded" style={{ 
-            background: `linear-gradient(to right, ${colorScale(0)}, ${colorScale(maxTradeValue)})` 
-          }}></div>
-          <div className="w-4 h-4 rounded" style={{ background: colorScale(maxTradeValue) }}></div>
-          <span className="text-xs text-[#86868B]">{t('countryTrade.high')}</span>
-        </div>
-        <div className="text-xs text-[#86868B] mt-2">
-          {t('countryTrade.maxValue')}: ${(maxTradeValue / 1000000).toFixed(2)}M
-        </div>
-      </div>
     </div>
   );
 });
