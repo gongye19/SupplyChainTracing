@@ -92,24 +92,6 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
     const gNodes = g.append('g').attr('class', 'nodes-layer');
     const gFlows = g.append('g').attr('class', 'flows-layer');
 
-    const defs = svg.append('defs');
-    const addArrowMarker = (id: string) => {
-      defs.append('marker')
-        .attr('id', id)
-        .attr('viewBox', '0 -4 8 8')
-        .attr('refX', 7)
-        .attr('refY', 0)
-        .attr('markerWidth', 8)
-        .attr('markerHeight', 8)
-        .attr('orient', 'auto')
-        .append('path')
-        .attr('d', 'M0,-3L8,0L0,3Z')
-        // 跟随线条颜色，不额外占用方向配色通道
-        .attr('fill', 'context-stroke')
-        .attr('opacity', 0.95);
-    };
-    addArrowMarker('flow-arrow');
-    
     gMapRef.current = gMap;
     gNodesRef.current = gNodes;
     gFlowsRef.current = gFlows;
@@ -184,16 +166,11 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
           const scaledStrokeWidth = Math.max(0.2, baseStrokeWidth / scale);
           d3.select(this).attr('stroke-width', scaledStrokeWidth);
         });
-        
-        // 调整粒子大小
-        gFlows.selectAll('.shipment-particle').each(function() {
-          const baseRadius = parseFloat(d3.select(this).attr('data-base-radius') || '1.8');
-          const baseStrokeWidth = parseFloat(d3.select(this).attr('data-base-stroke-width') || '0.5');
-          const scaledRadius = Math.max(0.3, baseRadius / scale);
-          const scaledStrokeWidth = Math.max(0.1, baseStrokeWidth / scale);
-          d3.select(this)
-            .attr('r', scaledRadius)
-            .attr('stroke-width', scaledStrokeWidth);
+
+        gFlows.selectAll('.shipment-highlight').each(function() {
+          const baseStrokeWidth = parseFloat(d3.select(this).attr('data-base-stroke-width') || '1.2');
+          const scaledStrokeWidth = Math.max(0.2, baseStrokeWidth / scale);
+          d3.select(this).attr('stroke-width', scaledStrokeWidth);
         });
         
         // 调整港口图标大小
@@ -544,19 +521,13 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
         const cy = (sy + ty) / 2 + normalY * curvature;
         const lineData = `M${sx},${sy} Q${cx},${cy} ${tx},${ty}`;
           
-        const color = routeGroup.mainColor || '#007AFF';
+        const color = '#007AFF';
         const directionText =
           routeGroup.flowType === 'inbound'
             ? (language === 'zh' ? '流入' : 'Inbound')
             : routeGroup.flowType === 'outbound'
               ? (language === 'zh' ? '流出' : 'Outbound')
               : (language === 'zh' ? '中转' : 'Transit');
-        const dashArray =
-          routeGroup.flowType === 'inbound'
-            ? '10 8'
-            : routeGroup.flowType === 'transit'
-              ? '3 7'
-              : null;
         const thickness = strokeScale(routeGroup.totalValue); // 根据交易价值计算粗细
 
         // 底层光晕，增强层次感
@@ -577,11 +548,9 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
           .attr('data-base-stroke-width', thickness)
             .attr('stroke-linecap', 'round')
             .attr('opacity', 0.28)
-          .attr('marker-end', 'url(#flow-arrow)')
-          .attr('stroke-dasharray', dashArray)
           .attr('class', 'shipment-path');
 
-        if (!isDenseMode && routeIndex < 160) {
+        if (!isDenseMode && routeIndex < 180) {
           const breath = () => {
             const up = arc.transition()
               .duration(1300 + Math.random() * 500)
@@ -604,18 +573,33 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
           breath();
         }
 
-        // 用虚线偏移方向表达流动感，不依赖颜色区分流入/流出
-        if (!isDenseMode && routeIndex < 180 && dashArray) {
-          const isInbound = routeGroup.flowType === 'inbound';
+        // 线内流光：通过沿路径移动的高亮段表达方向（起点 -> 终点）
+        const pathLength = (arc.node() as SVGPathElement).getTotalLength();
+        const glowLength = Math.max(16, Math.min(72, pathLength * 0.22));
+        const glowStrokeWidth = Math.max(1.0, thickness * 0.72);
+        const highlight = gFlows.append('path')
+          .attr('d', lineData)
+          .attr('fill', 'none')
+          .attr('stroke', '#A7DEFF')
+          .attr('stroke-width', glowStrokeWidth)
+          .attr('data-base-stroke-width', glowStrokeWidth)
+          .attr('stroke-linecap', 'round')
+          .attr('opacity', 0.92)
+          .attr('stroke-dasharray', `${glowLength} ${Math.max(8, pathLength)}`)
+          .attr('stroke-dashoffset', pathLength)
+          .attr('class', 'shipment-highlight')
+          .style('pointer-events', 'none');
+
+        if (!isDenseMode && !isPreview && routeIndex < 220) {
           const flow = () => {
-            const transition = arc.transition()
-              .duration(1800 + Math.random() * 700)
+            const transition = highlight.transition()
+              .duration(2200 + Math.random() * 1100)
               .ease(d3.easeLinear)
-              .attr('stroke-dashoffset', isInbound ? -26 : 26)
+              .attr('stroke-dashoffset', 0)
               .on('end', () => {
                 particleAnimationsRef.current.delete(transition);
                 if (!isPreview) {
-                  arc.attr('stroke-dashoffset', 0);
+                  highlight.attr('stroke-dashoffset', pathLength);
                   flow();
                 }
               });
@@ -700,51 +684,6 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
           }
         });
 
-        // 只在 final 模式且未超过粒子限制时画粒子
-        // 粒子数量根据交易价值，但限制总数
-        if (!isPreview && routeIndex < maxParticles) {
-          // 密集模式下降级粒子数量，保证交互流畅
-          const particleCountForRoute = isDenseMode
-            ? 1
-            : Math.min(Math.max(1, Math.floor(routeGroup.totalValue / 12)), 3);
-          
-          for (let p = 0; p < particleCountForRoute; p++) {
-          const particleBaseRadius = Math.max(1.8, thickness / 1.8);
-          const particleBaseStrokeWidth = 0.5;
-            const particle = gFlows.append('circle')
-            .attr('r', particleBaseRadius)
-              .attr('data-base-radius', particleBaseRadius)
-              .attr('data-base-stroke-width', particleBaseStrokeWidth)
-            .attr('fill', '#FFFFFF')
-            .attr('stroke', '#007AFF')
-            .attr('stroke-width', particleBaseStrokeWidth)
-              .attr('class', 'shipment-particle')
-            .style('filter', 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))');
-
-          const animate = () => {
-              const anim = particle.transition()
-                .duration(3200 + Math.random() * 1800 + p * 180)
-              .ease(d3.easeLinear)
-              .attrTween('transform', () => {
-                const node = arc.node() as SVGPathElement;
-                const l = node.getTotalLength();
-                return (t) => {
-                  const p = node.getPointAtLength(t * l);
-                  return `translate(${p.x},${p.y})`;
-                };
-              })
-                .on('end', () => {
-                  particleAnimationsRef.current.delete(anim);
-                  if (!isPreview) {
-                    animate();
-                  }
-                });
-              
-              particleAnimationsRef.current.add(anim);
-          };
-          animate();
-        }
-        }
       });
       }
   }, [shipments, selectedCountries, activeCompanies, companies, countries, categoryColors, categories, isPreview, countryCodeToName]);
