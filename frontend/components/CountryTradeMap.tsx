@@ -18,17 +18,6 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
   selectedHSCodes = [],
 }) => {
   const { t } = useLanguage();
-  
-  // 组件挂载和props变化时的调试
-  useEffect(() => {
-    logger.debug('[CountryTradeMap] Component rendered/updated:', {
-      statsCount: stats.length,
-      countriesCount: countries.length,
-      selectedHSCodes,
-      sampleStats: stats.slice(0, 2).map(s => ({ countryCode: s.countryCode, hsCode: s.hsCode, sumOfUsd: s.sumOfUsd })),
-      sampleCountries: countries.slice(0, 2).map(c => ({ code: c.countryCode, name: c.countryName }))
-    });
-  }, [stats.length, countries.length, selectedHSCodes]);
   const svgRef = useRef<SVGSVGElement>(null);
   const projectionRef = useRef<d3.GeoProjection | null>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
@@ -46,12 +35,6 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
   const countryTradeData = useMemo(() => {
     const tradeMap = new Map<string, { sumOfUsd: number; tradeCount: number }>();
     
-    logger.debug('[CountryTradeMap] Processing stats:', {
-      statsCount: stats.length,
-      selectedHSCodes,
-      sampleStats: stats.slice(0, 3).map(s => ({ countryCode: s.countryCode, hsCode: s.hsCode, sumOfUsd: s.sumOfUsd }))
-    });
-    
     stats.forEach(stat => {
       // 如果指定了HS编码筛选，只统计匹配的
       if (selectedHSCodes.length > 0 && !selectedHSCodes.includes(stat.hsCode)) {
@@ -63,17 +46,6 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
         sumOfUsd: existing.sumOfUsd + stat.sumOfUsd,
         tradeCount: existing.tradeCount + stat.tradeCount,
       });
-    });
-    
-    logger.debug('[CountryTradeMap] Country trade data computed:', {
-      tradeMapSize: tradeMap.size,
-      tradeMapEntries: Array.from(tradeMap.entries()).slice(0, 10).map(([code, data]) => ({ 
-        code, 
-        codeLength: code.length,
-        codeType: typeof code,
-        sumOfUsd: data.sumOfUsd 
-      })),
-      allCodes: Array.from(tradeMap.keys()).slice(0, 20)
     });
     
     // 更新ref，供事件监听器使用
@@ -96,6 +68,14 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
       return d3.interpolateRgb('#E3F2FD', '#1565C0')(Math.pow(t, 0.6)); // 使用幂函数增强低值的颜色深度
     }).domain([0, maxTradeValue]);
   }, [maxTradeValue]);
+
+  useEffect(() => {
+    const countryLocationMap = new Map<string, CountryLocation>();
+    countries.forEach(country => {
+      countryLocationMap.set(country.countryCode, country);
+    });
+    countryLocationMapRef.current = countryLocationMap;
+  }, [countries]);
 
   // 初始化：只执行一次（创建 SVG 结构、底图、zoom、tooltip、事件绑定）
   useEffect(() => {
@@ -147,20 +127,14 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
       .style('box-shadow', '0 10px 30px rgba(0,0,0,0.15)');
     tooltipRef.current = d3Tooltip;
 
-    // 更新国家位置映射
-    const countryLocationMap = new Map<string, CountryLocation>();
-    countries.forEach(country => {
-      countryLocationMap.set(country.countryCode, country);
-    });
-    countryLocationMapRef.current = countryLocationMap;
+    // 使用 ref 持有最新国家映射，确保 hover 逻辑稳定
+    const countryLocationMap = countryLocationMapRef.current;
 
     // 加载并绘制底图（只画一次）
     loadWorldGeoJson().then((data: any) => {
       // 缓存GeoJSON数据
       geoJsonDataRef.current = data;
       setGeoJsonLoaded(true);
-      
-      logger.debug('[CountryTradeMap] GeoJSON loaded');
       
       const filteredFeatures = data.features.filter((f: any) => 
         f.properties.name !== "Antarctica"
@@ -177,12 +151,19 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
         .attr('stroke', '#FFFFFF')
         .attr('stroke-width', 1);
 
+      countryPaths.each(function(d: any) {
+        const code = resolveCountryIso3(d.properties, countryLocationMap);
+        if (code) {
+          d3.select(this).attr('data-country-code', code);
+        }
+      });
+
       // 绑定事件监听器（只绑定一次）
       countryPaths.on('mouseover', function(event: MouseEvent, d: any) {
         const countryName = d.properties.name;
-        const props = d.properties;
-        
-        const countryCode = resolveCountryIso3(props, countryLocationMap);
+        const countryCode =
+          d3.select(this).attr('data-country-code') ||
+          resolveCountryIso3(d.properties, countryLocationMap);
         
         // 从ref获取最新的tradeData
         const tradeData = countryCode ? countryTradeDataRef.current.get(countryCode) : null;
@@ -241,166 +222,24 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
     svg.call(zoom);
     zoomRef.current = zoom;
 
-  }, [countries, t]);
+  }, [countries.length, t]);
 
   // 更新：只更新国家颜色和节点（筛选时执行）
   useEffect(() => {
     if (!gMapRef.current || !projectionRef.current || !geoJsonLoaded || countries.length === 0) {
-      logger.debug('[CountryTradeMap] Update skipped:', {
-        hasGMap: !!gMapRef.current,
-        hasProjection: !!projectionRef.current,
-        hasGeoJson: geoJsonLoaded,
-        countriesCount: countries.length
-      });
       return;
     }
     
-    if (!geoJsonDataRef.current) {
-      logger.debug('[CountryTradeMap] GeoJSON data not available yet');
-      return;
-    }
-
-    const projection = projectionRef.current;
+    if (!geoJsonDataRef.current) return;
     const gMap = gMapRef.current;
-    const countryLocationMap = countryLocationMapRef.current;
-
-    logger.debug('[CountryTradeMap] Updating map colors:', {
-      countryTradeDataSize: countryTradeData.size,
-      countryLocationMapSize: countryLocationMap.size,
-      maxTradeValue,
-      sampleCountries: Array.from(countryLocationMap.entries()).slice(0, 3).map(([code, loc]) => ({ code, name: loc.countryName }))
-    });
-
-    let matchedCount = 0;
-    let coloredCount = 0;
-
-    // 更新国家颜色（只更新fill属性，不重新绑定事件）
-    // 首先打印所有可用的国家代码用于调试
-    const allTradeCountryCodes = Array.from(countryTradeData.keys());
-    const allLocationCountryCodes = Array.from(countryLocationMap.keys());
-    logger.debug('[CountryTradeMap] Matching countries:', {
-      tradeDataCodes: allTradeCountryCodes.slice(0, 20),
-      locationCodes: allLocationCountryCodes.slice(0, 20),
-      commonCodes: allTradeCountryCodes.filter(code => allLocationCountryCodes.includes(code)).slice(0, 10),
-      tradeDataSize: allTradeCountryCodes.length,
-      locationSize: allLocationCountryCodes.length,
-      // 打印一些示例数据
-      sampleTradeData: Array.from(countryTradeData.entries()).slice(0, 3).map(([code, data]) => ({ code, sumOfUsd: data.sumOfUsd })),
-      sampleLocations: Array.from(countryLocationMap.entries()).slice(0, 3).map(([code, loc]) => ({ code, name: loc.countryName }))
-    });
-
-    // 先检查前几个国家的匹配情况，打印所有属性
-    const sampleGeoJsonCountries: any[] = [];
-    gMap.selectAll('path.country').each(function(d: any) {
-      if (sampleGeoJsonCountries.length < 3) {
-        const props = d.properties;
-        // 打印所有属性名，看看实际有什么
-        const allPropKeys = Object.keys(props);
-        // 尝试所有可能的 ISO_A3 属性名
-        const isoA3 = resolveCountryIso3(props, countryLocationMap);
-        const isoA2 = props.ISO_A2 || props.iso_a2 || props.ISO2 || props.iso2;
-        const hasInTradeData = isoA3 ? countryTradeData.has(isoA3) : false;
-        const tradeData = isoA3 ? countryTradeData.get(isoA3) : null;
-        sampleGeoJsonCountries.push({
-          name: props.name,
-          allPropKeys: allPropKeys,
-          // 只打印前几个属性的值，避免日志过长
-          sampleProps: allPropKeys.slice(0, 10).reduce((acc: any, key: string) => {
-            acc[key] = props[key];
-            return acc;
-          }, {}),
-          isoA3: isoA3,
-          isoA2: isoA2,
-          hasInTradeData: hasInTradeData,
-          tradeData: tradeData ? { sumOfUsd: tradeData.sumOfUsd } : null
-        });
+    gMap.selectAll<SVGPathElement, any>('path.country').each(function() {
+      const selection = d3.select(this);
+      const countryCode = selection.attr('data-country-code');
+      const tradeData = countryCode ? countryTradeData.get(countryCode) : undefined;
+      const nextFill = tradeData && tradeData.sumOfUsd > 0 ? colorScale(tradeData.sumOfUsd) : '#EBEBEB';
+      if (selection.attr('fill') !== nextFill) {
+        selection.attr('fill', nextFill);
       }
-    });
-    logger.debug('[CountryTradeMap] Sample GeoJSON countries check:', JSON.stringify(sampleGeoJsonCountries, null, 2));
-    logger.debug('[CountryTradeMap] First 10 tradeDataCodes:', Array.from(countryTradeData.keys()).slice(0, 10));
-
-    // 更新国家颜色，同时更新鼠标悬停事件（确保能正确显示tooltip）
-    gMap.selectAll('path.country')
-      .attr('fill', (d: any) => {
-        const props = d.properties;
-        const countryName = props.name;
-        const countryCode = resolveCountryIso3(props, countryLocationMap);
-        
-        // 用 countryCode（3位代码）直接匹配 tradeData
-        if (countryCode && countryTradeData.has(countryCode)) {
-          const tradeData = countryTradeData.get(countryCode);
-          if (tradeData && tradeData.sumOfUsd > 0) {
-            matchedCount++;
-            coloredCount++;
-            // 只在第一个成功着色时打印调试信息
-            if (coloredCount === 1) {
-              logger.debug('[CountryTradeMap] First colored country:', {
-                countryName,
-                countryCode,
-                tradeData: { sumOfUsd: tradeData.sumOfUsd, tradeCount: tradeData.tradeCount },
-                color: colorScale(tradeData.sumOfUsd)
-              });
-            }
-            return colorScale(tradeData.sumOfUsd);
-          }
-        }
-        
-        return '#EBEBEB';
-      })
-      // 更新鼠标悬停事件，确保能正确显示tooltip
-      .on('mouseover', function(event: MouseEvent, d: any) {
-        const countryName = d.properties.name;
-        const props = d.properties;
-        const countryCode = resolveCountryIso3(props, countryLocationMap);
-        
-        // 从ref获取最新的tradeData
-        const tradeData = countryCode ? countryTradeDataRef.current.get(countryCode) : null;
-        
-        // 添加视觉特效：高亮当前国家
-        d3.select(this)
-          .attr('stroke', '#007AFF')
-          .attr('stroke-width', 2.5)
-          .attr('opacity', 0.9)
-          .style('filter', 'brightness(1.2) drop-shadow(0 0 8px rgba(0, 122, 255, 0.6))');
-        
-        // 显示tooltip
-        if (tradeData && tradeData.sumOfUsd > 0) {
-          tooltipRef.current!
-            .style('visibility', 'visible')
-            .html(`
-              <div style="font-weight: 600; margin-bottom: 6px; font-size: 14px;">${countryName || 'Unknown'}</div>
-              <div style="margin-bottom: 4px;">${t('countryTrade.tradeValue')}: <strong>$${(tradeData.sumOfUsd / 1000000).toFixed(2)}M</strong></div>
-              <div>${t('countryTrade.transactionCount')}: <strong>${tradeData.tradeCount.toLocaleString()}</strong></div>
-            `);
-        } else if (countryName) {
-          tooltipRef.current!
-            .style('visibility', 'visible')
-            .html(`
-              <div style="font-weight: 600; margin-bottom: 6px; font-size: 14px;">${countryName}</div>
-              <div style="color: #86868B;">${t('countryTrade.noData')}</div>
-            `);
-        }
-      })
-      .on('mousemove', function(event: MouseEvent) {
-        tooltipRef.current!
-          .style('left', (event.pageX + 10) + 'px')
-          .style('top', (event.pageY - 10) + 'px');
-      })
-      .on('mouseout', function() {
-        // 移除视觉特效
-        d3.select(this)
-          .attr('stroke', '#FFFFFF')
-          .attr('stroke-width', 1)
-          .attr('opacity', 1)
-          .style('filter', null);
-        
-        tooltipRef.current!.style('visibility', 'hidden');
-      });
-
-    logger.debug('[CountryTradeMap] Color update complete:', {
-      matchedCount,
-      coloredCount,
-      totalCountries: countryTradeData.size
     });
 
     // 更新国家节点（使用D3 data join模式，只更新变化的部分）
@@ -409,7 +248,7 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
       gNodesRef.current.selectAll('circle.country-node').remove();
     }
 
-  }, [countryTradeData, maxTradeValue, colorScale, countries, geoJsonLoaded]);
+  }, [countryTradeData, colorScale, countries.length, geoJsonLoaded]);
 
   return (
     <div className="w-full h-full relative" style={{ minHeight: '400px' }}>

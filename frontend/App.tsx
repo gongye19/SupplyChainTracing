@@ -72,6 +72,19 @@ const App: React.FC = () => {
   useEffect(() => { filtersRef.current = mapFilters; }, [mapFilters]);
   const abortRef = useRef<AbortController | null>(null);
   const finalTimerRef = useRef<number | null>(null);
+  const countryTradeTimerRef = useRef<number | null>(null);
+  const countryTradeCacheRef = useRef<
+    Map<
+      string,
+      {
+        statsData: CountryMonthlyTradeStat[];
+        summaryData: CountryTradeStatSummary;
+        trendsData: CountryTradeTrend[];
+        topCountriesData: TopCountry[];
+      }
+    >
+  >(new Map());
+  const lastCountryTradeKeyRef = useRef<string>('');
   const shipmentsCacheRef = useRef<Map<string, Shipment[]>>(new Map());
   const lastRequestedKeyRef = useRef<string>('');
   // 标记是否正在拖动（用于时间滑块）
@@ -193,8 +206,37 @@ const App: React.FC = () => {
   useEffect(() => {
     if (activeView !== 'country-trade') return;
 
+    const buildCountryTradeKey = () => {
+      const hsCodes = [...(countryTradeFilters.hsCode || [])].sort().join(',');
+      const countriesFilter = [...(countryTradeFilters.country || [])].sort().join(',');
+      return [
+        hsCodes,
+        countriesFilter,
+        countryTradeFilters.industry || '',
+        countryTradeFilters.year || '',
+        countryTradeFilters.month || '',
+        countryTradeFilters.startYearMonth || '',
+        countryTradeFilters.endYearMonth || '',
+      ].join('|');
+    };
+
     const loadCountryTradeData = async () => {
       try {
+        const requestKey = buildCountryTradeKey();
+        if (lastCountryTradeKeyRef.current === requestKey) {
+          return;
+        }
+        lastCountryTradeKeyRef.current = requestKey;
+
+        const cached = countryTradeCacheRef.current.get(requestKey);
+        if (cached) {
+          setCountryTradeStats(cached.statsData);
+          setCountryTradeSummary(cached.summaryData);
+          setCountryTradeTrends(cached.trendsData);
+          setTopCountries(cached.topCountriesData);
+          return;
+        }
+
         setCountryTradeLoading(true);
 
         const [statsData, summaryData, trendsData, topCountriesData] = await Promise.all([
@@ -218,6 +260,13 @@ const App: React.FC = () => {
           trends: trendsData.length,
           topCountries: topCountriesData.length,
         });
+
+        countryTradeCacheRef.current.set(requestKey, {
+          statsData,
+          summaryData,
+          trendsData,
+          topCountriesData,
+        });
         
         setCountryTradeStats(statsData);
         setCountryTradeSummary(summaryData);
@@ -238,7 +287,13 @@ const App: React.FC = () => {
       return;
     }
 
-    loadCountryTradeData();
+    if (countryTradeTimerRef.current) window.clearTimeout(countryTradeTimerRef.current);
+    countryTradeTimerRef.current = window.setTimeout(() => {
+      loadCountryTradeData();
+    }, 120);
+    return () => {
+      if (countryTradeTimerRef.current) window.clearTimeout(countryTradeTimerRef.current);
+    };
   }, [activeView, countryTradeFilters, countries.length]);
 
   // 国家名称到国家代码的映射函数
