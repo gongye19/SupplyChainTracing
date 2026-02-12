@@ -28,6 +28,8 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
   const countriesRef = useRef<HTMLDivElement>(null);
   const hsCodeCategoriesRef = useRef<HTMLDivElement>(null);
   const hsCodeSubcategoriesRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const stickyHeaderRef = useRef<HTMLDivElement>(null);
 
   // 点击外部关闭下拉框
   useEffect(() => {
@@ -51,6 +53,30 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [countriesOpen, hsCodeCategoriesOpen, hsCodeSubcategoriesOpen]);
+
+  useEffect(() => {
+    const updateStickyHeaderPosition = () => {
+      const panel = panelRef.current;
+      const header = stickyHeaderRef.current;
+      if (!panel || !header) return;
+
+      const rect = panel.getBoundingClientRect();
+      const visible = rect.bottom > 100 && rect.top < window.innerHeight;
+      header.style.visibility = visible ? 'visible' : 'hidden';
+      header.style.opacity = visible ? '1' : '0';
+      header.style.left = `${Math.max(8, rect.left)}px`;
+      header.style.top = '76px';
+      header.style.width = `${Math.max(180, rect.width)}px`;
+    };
+
+    updateStickyHeaderPosition();
+    window.addEventListener('scroll', updateStickyHeaderPosition, { passive: true });
+    window.addEventListener('resize', updateStickyHeaderPosition);
+    return () => {
+      window.removeEventListener('scroll', updateStickyHeaderPosition);
+      window.removeEventListener('resize', updateStickyHeaderPosition);
+    };
+  }, []);
   
   // 从实际数据中提取可选的小类（HS Code 后2位）
   // 只显示已选择大类下实际出现的小类
@@ -177,8 +203,9 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
 
 
   return (
-    <div className="flex flex-col gap-10 p-1">
-      <div className="sticky top-0 z-20 -mx-1 px-1 py-2 bg-white/95 backdrop-blur-sm border-b border-black/5 flex items-center justify-between">
+    <div ref={panelRef} className="flex flex-col gap-10 p-1">
+      <div className="h-10" />
+      <div ref={stickyHeaderRef} className="fixed z-40 px-1 py-2 bg-white/95 backdrop-blur-sm border-b border-black/5 flex items-center justify-between transition-opacity duration-150">
         <div className="flex items-center gap-2 text-[#007AFF]">
           <Filter className="w-4 h-4" />
           <span className="text-[12px] font-bold uppercase tracking-widest text-[#1D1D1F]">{t('filters.filterControl')}</span>
