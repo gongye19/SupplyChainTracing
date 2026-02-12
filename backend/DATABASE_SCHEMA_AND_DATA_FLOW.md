@@ -96,8 +96,7 @@
 
 导入脚本：
 
-- `backend/scripts/import_country_origin.py`
-- 或统一批量脚本 `backend/scripts/batch_import_all.py`
+- `backend/scripts/batch_import_all.py`
 
 映射关系（JSON -> 表）：
 
@@ -112,7 +111,7 @@
 - `tradeCount` -> `trade_count`
 - `amountSharePct` -> `amount_share_pct`
 
-过滤规则（`import_country_origin.py`）：
+过滤规则（`batch_import_all.py`）：
 
 - `weight == 0` 或 `quantity == 0` 或 `countryCode == 'N/A'` 过滤
 - 原产国/目的国代码为 `N/A` 过滤
@@ -135,8 +134,7 @@
 
 导入脚本：
 
-- `backend/scripts/import_country_trade_stats.py`
-- 或统一批量脚本 `backend/scripts/batch_import_all.py`
+- `backend/scripts/batch_import_all.py`
 
 映射关系（JSON -> 表）：
 
@@ -194,21 +192,15 @@
 
 ## 6) 清理与重建
 
-清理旧表脚本：
+使用单入口脚本：
 
-- `backend/scripts/clean_old_tables.py`
+- `backend/scripts/batch_import_all.py --clear`
 
-会删除旧表：
+`--clear` 会在导入前：
 
-- `shipments_raw`
-- `monthly_company_flows`
-- `hs_code_categories`
-- `port_locations`
-
-并可清空新表：
-
-- `country_origin_trade_stats`
-- `country_monthly_trade_stats`
+- 删除旧表：`shipments_raw`、`monthly_company_flows`、`hs_code_categories`、`port_locations`
+- 删除历史链路表：`transactions`、`companies`、`locations`、`categories`
+- 删除并重建新表：`country_origin_trade_stats`、`country_monthly_trade_stats`
 
 ## 7) 一键批量导入建议
 
@@ -219,10 +211,10 @@
 特点：
 
 - 自动建表
-- 可选 `--clear` 清空后重导
+- 可选 `--clear` 全量重建后重导
 - 批量写入（默认较大 batch）
 - 同时导入两类新数据
-- 与 `import_country_origin.py` 使用相同过滤规则（`weight=0` 或 `quantity=0` 或 `countryCode='N/A'` 过滤）
+- 使用统一过滤规则（`weight=0` 或 `quantity=0` 或 `countryCode='N/A'` 过滤）
 
 ## 8) 注意事项
 

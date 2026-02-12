@@ -109,6 +109,39 @@ def clear_tables(engine):
     
     print("✓ 表已清空\n")
 
+def clean_database_for_fresh_import(engine):
+    """--clear 模式：清理旧表并重置目标表"""
+    print("=" * 60)
+    print("清理数据库（--clear）...")
+    print("=" * 60)
+
+    old_tables = [
+        'shipments_raw',
+        'monthly_company_flows',
+        'hs_code_categories',
+        'port_locations',
+        # 历史链路表（已弃用）
+        'transactions',
+        'companies',
+        'locations',
+        'categories',
+    ]
+
+    target_tables = [
+        'country_origin_trade_stats',
+        'country_monthly_trade_stats',
+    ]
+
+    with engine.begin() as conn:
+        for table in old_tables:
+            conn.execute(text(f'DROP TABLE IF EXISTS "{table}" CASCADE'))
+
+        # 先删除目标表，确保是全新导入（而不是增量覆盖）
+        for table in target_tables:
+            conn.execute(text(f'DROP TABLE IF EXISTS "{table}" CASCADE'))
+
+    print("✓ 数据库清理完成\n")
+
 def should_filter_record(data):
     """判断是否应该过滤记录"""
     weight = data.get('weight')
@@ -403,7 +436,7 @@ def main():
     print("=" * 60)
     print(f"批量大小: {BATCH_SIZE}")
     if clear_first:
-        print("模式: 清空后重新导入\n")
+        print("模式: 全量重建导入（先清理数据库）\n")
     else:
         print("模式: 增量导入（冲突时更新）\n")
     
@@ -426,10 +459,15 @@ def main():
         print(f"❌ 数据库连接失败: {e}")
         sys.exit(1)
     
-    # 创建表
+    # --clear：导入前清理数据库（旧表+目标表）
+    if clear_first:
+        clean_database_for_fresh_import(engine)
+
+    # 创建目标表
     create_tables(engine)
-    
-    # 清空表（如果需要）
+
+    # 兼容已有数据场景：如仅希望保留结构并清空，可继续沿用 clear_tables
+    # 这里在 --clear 模式下再次执行 TRUNCATE 可确保行为一致（无副作用）
     if clear_first:
         clear_tables(engine)
     

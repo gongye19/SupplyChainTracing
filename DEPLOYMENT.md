@@ -82,7 +82,7 @@ A: 确保后端 `CORS_ORIGINS` 环境变量包含前端域名，或者使用代�
 
 **Q: 数据加载失败**
 A: 
-1. 检查数据库是否已导入数据（运行 `import_country_trade_stats.py`）
+1. 检查数据库是否已导入数据（运行 `python backend/scripts/batch_import_all.py --clear`）
 2. 检查后端日志查看具体错误
 3. 检查 API 端点是否正确
 
