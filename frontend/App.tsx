@@ -16,7 +16,7 @@ import { COUNTRY_COORDINATES, getCountriesFromCodes } from './utils/countryCoord
 
 const App: React.FC = () => {
   const { language, setLanguage, t } = useLanguage();
-  const [activeView, setActiveView] = useState<'map' | 'stats' | 'country-trade'>('map');
+  const [activeView, setActiveView] = useState<'map' | 'stats' | 'country-trade'>('country-trade');
   
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -24,14 +24,16 @@ const App: React.FC = () => {
   const startDate = '2003-01';
   const endDate = `${currentYear}-${currentMonth}`; // YYYY-MM
 
-  const [filters, setFilters] = useState<Filters>({
+  const defaultFilters: Filters = {
     startDate,
     endDate,
     selectedCountries: [],
     selectedHSCodeCategories: [],
     selectedHSCodeSubcategories: [],
     selectedCompanies: []
-  });
+  };
+  const [mapFilters, setMapFilters] = useState<Filters>(defaultFilters);
+  const [statsFilters, setStatsFilters] = useState<Filters>(defaultFilters);
 
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [hsCodeCategories, setHsCodeCategories] = useState<HSCodeCategory[]>([]);
@@ -58,8 +60,8 @@ const App: React.FC = () => {
   const [countryTradeLoading, setCountryTradeLoading] = useState(false);
   
   // Refs for preview/final scheduling
-  const filtersRef = useRef(filters);
-  useEffect(() => { filtersRef.current = filters; }, [filters]);
+  const filtersRef = useRef(mapFilters);
+  useEffect(() => { filtersRef.current = mapFilters; }, [mapFilters]);
   const abortRef = useRef<AbortController | null>(null);
   const finalTimerRef = useRef<number | null>(null);
   // 标记是否正在拖动（用于时间滑块）
@@ -324,7 +326,7 @@ const App: React.FC = () => {
     }
   }, [getCountryCode]);
 
-  // 调度器：任何 filters 变化 => 立刻 preview + 延迟 final
+  // 调度器：map filters 变化 => 立刻 preview + 延迟 final
   const scheduleFetch = useCallback((nextFilters: Filters, reason: 'drag' | 'click') => {
     setIsInteracting(true);
     loadShipments(nextFilters, 'preview');
@@ -341,19 +343,22 @@ const App: React.FC = () => {
     setIsInteracting(dragging); // 拖动时 SupplyMap 进入 preview mode
   }, []);
 
-  // 统一监听 filters 变化：触发 scheduleFetch
+  // 统一监听 map filters 变化：触发 scheduleFetch（仅在 Trade Map 视图）
   useEffect(() => {
+    if (activeView !== 'map') {
+      return;
+    }
     if (hsCodeCategories.length === 0 || countries.length === 0) {
       return;
     }
     
     const reason: 'drag' | 'click' = isDraggingRef.current ? 'drag' : 'click';
-    scheduleFetch(filters, reason);
+    scheduleFetch(mapFilters, reason);
 
     return () => {
       if (finalTimerRef.current) window.clearTimeout(finalTimerRef.current);
     };
-  }, [filters, hsCodeCategories.length, countries.length, scheduleFetch]);
+  }, [activeView, mapFilters, hsCodeCategories.length, countries.length, scheduleFetch]);
 
   // 将聚合统计数据按国家对聚合，转换为地图组件格式
   // 每个国家对（原产国 → 目的地国家）合并成一条线
@@ -481,6 +486,16 @@ const App: React.FC = () => {
         <aside className="w-[250px] border-r border-black/5 bg-white flex flex-col p-5 gap-8 overflow-y-auto custom-scrollbar">
            <div className="flex flex-col gap-1.5">
              <button 
+               onClick={() => setActiveView('country-trade')}
+               className={`flex items-center justify-between px-4 py-3 rounded-[12px] transition-all text-[14px] font-semibold ${activeView === 'country-trade' ? 'bg-[#007AFF] text-white shadow-lg shadow-blue-500/20' : 'text-[#86868B] hover:bg-black/5'}`}
+             >
+               <div className="flex items-center gap-3">
+                 <Globe className="w-4 h-4" />
+                 {t('countryTrade.title')}
+               </div>
+               {activeView === 'country-trade' && <ChevronRight className="w-3.5 h-3.5" />}
+             </button>
+             <button 
                onClick={() => setActiveView('map')}
                className={`flex items-center justify-between px-4 py-3 rounded-[12px] transition-all text-[14px] font-semibold ${activeView === 'map' ? 'bg-[#007AFF] text-white shadow-lg shadow-blue-500/20' : 'text-[#86868B] hover:bg-black/5'}`}
              >
@@ -500,16 +515,6 @@ const App: React.FC = () => {
                </div>
                {activeView === 'stats' && <ChevronRight className="w-3.5 h-3.5" />}
              </button>
-             <button 
-               onClick={() => setActiveView('country-trade')}
-               className={`flex items-center justify-between px-4 py-3 rounded-[12px] transition-all text-[14px] font-semibold ${activeView === 'country-trade' ? 'bg-[#007AFF] text-white shadow-lg shadow-blue-500/20' : 'text-[#86868B] hover:bg-black/5'}`}
-             >
-               <div className="flex items-center gap-3">
-                 <Globe className="w-4 h-4" />
-                 {t('countryTrade.title')}
-               </div>
-               {activeView === 'country-trade' && <ChevronRight className="w-3.5 h-3.5" />}
-             </button>
            </div>
 
           {activeView === 'country-trade' ? (
@@ -517,13 +522,25 @@ const App: React.FC = () => {
               filters={countryTradeFilters}
               setFilters={setCountryTradeFilters}
             />
+          ) : activeView === 'map' ? (
+            <>
+              <div className="h-[0.5px] bg-black/5"></div>
+
+              <SidebarFilters 
+                filters={mapFilters} 
+                setFilters={setMapFilters}
+                hsCodeCategories={hsCodeCategories}
+                countries={countries}
+                shipments={shipments}
+              />
+            </>
           ) : (
             <>
               <div className="h-[0.5px] bg-black/5"></div>
 
               <SidebarFilters 
-                filters={filters} 
-                setFilters={setFilters}
+                filters={statsFilters} 
+                setFilters={setStatsFilters}
                 hsCodeCategories={hsCodeCategories}
                 countries={countries}
                 shipments={shipments}
@@ -580,11 +597,11 @@ const App: React.FC = () => {
                   <SupplyMap 
                     shipments={shipmentsForMap}
                     transactions={[]}
-                    selectedCountries={filters.selectedCountries}
+                    selectedCountries={mapFilters.selectedCountries}
                     countries={countries}
                     companies={[]}
                     categories={[]}
-                    filters={filters}
+                    filters={mapFilters}
                     isPreview={isInteracting}
                   />
                 </>

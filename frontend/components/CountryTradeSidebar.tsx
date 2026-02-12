@@ -14,14 +14,31 @@ const CountryTradeSidebar: React.FC<CountryTradeSidebarProps> = ({
 }) => {
   const { t } = useLanguage();
 
+  const handleReset = () => {
+    setFilters({
+      hsCode: [],
+      industry: 'SemiConductor',
+      startYearMonth: '2021-01',
+      endYearMonth: '2025-12',
+    });
+  };
+
   return (
     <div className="flex flex-col gap-6">
       <div className="h-[0.5px] bg-black/5"></div>
       
       {/* Filter Control Section */}
       <div className="flex flex-col gap-4">
-        <div className="flex items-center gap-2 text-[#86868B]">
-          <span className="text-[10px] uppercase font-bold tracking-wider">Filter Control</span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-[#86868B]">
+            <span className="text-[10px] uppercase font-bold tracking-wider">{t('filters.filterControl')}</span>
+          </div>
+          <button
+            onClick={handleReset}
+            className="text-[12px] text-[#007AFF] hover:underline font-semibold"
+          >
+            {t('filters.reset')}
+          </button>
         </div>
 
         {/* HS Code Filter */}
