@@ -79,12 +79,21 @@ const App: React.FC = () => {
       try {
         setInitialLoading(true);
         console.log('Loading HS Code categories, countries, companies...');
-        const [hsCodeCatsData, locationsData, allShipmentsData] = await Promise.all([
+        const [hsCodeCatsData, locationsData] = await Promise.all([
           hsCodeCategoriesAPI.getAll(),
           countryLocationsAPI.getAll(),
-          // 获取所有公司（不带任何筛选，只获取公司列表）
-          shipmentsAPI.getAll({ startDate: '2003-01', endDate: '2099-12' })
         ]);
+        let allShipmentsData: Shipment[] = [];
+
+        // 仅在分类或国家坐标接口为空时，才回退读取 shipments；
+        // 且初始化时只加载 Trade Map 默认国家（CHN/USA），避免全量预加载。
+        if (hsCodeCatsData.length === 0 || locationsData.length === 0) {
+          allShipmentsData = await shipmentsAPI.getAll({
+            startDate,
+            endDate,
+            selectedCountries: defaultMapFilters.selectedCountries,
+          });
+        }
         console.log('HS Code Categories loaded:', hsCodeCatsData);
         console.log('Countries loaded:', locationsData);
         console.log('Shipments (raw):', allShipmentsData.length);
