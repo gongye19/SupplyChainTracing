@@ -29,8 +29,6 @@ const CountryTradeSidebar: React.FC<CountryTradeSidebarProps> = ({
 
   return (
     <div className="flex flex-col gap-10 p-1">
-      <div className="h-[0.5px] bg-black/5"></div>
-      
       {/* Filter Control Section */}
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
@@ -56,8 +54,8 @@ const CountryTradeSidebar: React.FC<CountryTradeSidebarProps> = ({
 
         <MonthRangeSlider
           title={t('countryTrade.timeRange')}
-          startLabel={t('countryTrade.startMonth')}
-          endLabel={t('countryTrade.endMonth')}
+          startLabel={t('filters.start')}
+          endLabel={t('filters.end')}
           minMonth="2021-01"
           startMonth={filters.startYearMonth || '2021-01'}
           endMonth={filters.endYearMonth || currentMonth}

@@ -519,35 +519,28 @@ const App: React.FC = () => {
              </button>
            </div>
 
+          <div className="h-[0.5px] bg-black/5"></div>
           {activeView === 'country-trade' ? (
             <CountryTradeSidebar
               filters={countryTradeFilters}
               setFilters={setCountryTradeFilters}
             />
           ) : activeView === 'map' ? (
-            <>
-              <div className="h-[0.5px] bg-black/5"></div>
-
-              <SidebarFilters 
-                filters={mapFilters} 
-                setFilters={setMapFilters}
-                hsCodeCategories={hsCodeCategories}
-                countries={countries}
-                shipments={shipments}
-              />
-            </>
+            <SidebarFilters 
+              filters={mapFilters} 
+              setFilters={setMapFilters}
+              hsCodeCategories={hsCodeCategories}
+              countries={countries}
+              shipments={shipments}
+            />
           ) : (
-            <>
-              <div className="h-[0.5px] bg-black/5"></div>
-
-              <SidebarFilters 
-                filters={statsFilters} 
-                setFilters={setStatsFilters}
-                hsCodeCategories={hsCodeCategories}
-                countries={countries}
-                shipments={shipments}
-              />
-            </>
+            <SidebarFilters 
+              filters={statsFilters} 
+              setFilters={setStatsFilters}
+              hsCodeCategories={hsCodeCategories}
+              countries={countries}
+              shipments={shipments}
+            />
           )}
           
           {activeView !== 'country-trade' && (
