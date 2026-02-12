@@ -38,7 +38,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
   const gNodesRef = useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
   const gFlowsRef = useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
   const tooltipRef = useRef<d3.Selection<HTMLDivElement, unknown, null, undefined> | null>(null);
-  const particleAnimationsRef = useRef<Set<d3.Transition<SVGCircleElement, unknown, null, undefined>>>(new Set());
+  const particleAnimationsRef = useRef<Set<d3.Transition<any, unknown, null, undefined>>>(new Set());
 
   // 构建品类颜色映射
   const categoryColors = useMemo(() => {
@@ -91,6 +91,25 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
     const gMap = g.append('g').attr('class', 'map-layer');
     const gNodes = g.append('g').attr('class', 'nodes-layer');
     const gFlows = g.append('g').attr('class', 'flows-layer');
+
+    const defs = svg.append('defs');
+    const addArrowMarker = (id: string, color: string) => {
+      defs.append('marker')
+        .attr('id', id)
+        .attr('viewBox', '0 -4 8 8')
+        .attr('refX', 7)
+        .attr('refY', 0)
+        .attr('markerWidth', 8)
+        .attr('markerHeight', 8)
+        .attr('orient', 'auto')
+        .append('path')
+        .attr('d', 'M0,-3L8,0L0,3Z')
+        .attr('fill', color)
+        .attr('opacity', 0.95);
+    };
+    addArrowMarker('flow-arrow-inbound', '#34C759');
+    addArrowMarker('flow-arrow-outbound', '#FF6B6B');
+    addArrowMarker('flow-arrow-transit', '#007AFF');
     
     gMapRef.current = gMap;
     gNodesRef.current = gNodes;
@@ -427,6 +446,14 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
         const originCountry = countries.find(c => c.countryCode === originCountryCode)?.countryName || originCountryCode;
         const destinationCountry = countries.find(c => c.countryCode === destCountryCode)?.countryName || destCountryCode;
         
+        const focusCountry = selectedCountries[0];
+        const flowType =
+          focusCountry && originCountryCode === focusCountry
+            ? 'outbound'
+            : focusCountry && destCountryCode === focusCountry
+              ? 'inbound'
+              : 'transit';
+
         return {
           originId: originCountryCode,
           destinationId: destCountryCode,
@@ -436,7 +463,8 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
           count: shipment.tradeCount || 1, // 交易次数
           totalValue: shipment.value || (shipment.totalValueUsd ? shipment.totalValueUsd / 1000000 : 0),
           mainCategory: shipment.category,
-          mainColor: (shipment as any).categoryColor || '#8E8E93'
+          mainColor: (shipment as any).categoryColor || '#8E8E93',
+          flowType,
         };
       });
 
@@ -517,8 +545,18 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
         const cy = (sy + ty) / 2 + normalY * curvature;
         const lineData = `M${sx},${sy} Q${cx},${cy} ${tx},${ty}`;
           
-        // 使用固定的蓝色
-        const color = '#007AFF';
+        const color =
+          routeGroup.flowType === 'inbound'
+            ? '#34C759'
+            : routeGroup.flowType === 'outbound'
+              ? '#FF6B6B'
+              : '#007AFF';
+        const directionText =
+          routeGroup.flowType === 'inbound'
+            ? (language === 'zh' ? '流入' : 'Inbound')
+            : routeGroup.flowType === 'outbound'
+              ? (language === 'zh' ? '流出' : 'Outbound')
+              : (language === 'zh' ? '中转' : 'Transit');
         const thickness = strokeScale(routeGroup.totalValue); // 根据交易价值计算粗细
 
         // 底层光晕，增强层次感
@@ -539,7 +577,31 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
           .attr('data-base-stroke-width', thickness)
             .attr('stroke-linecap', 'round')
             .attr('opacity', 0.28)
+          .attr('marker-end', `url(#flow-arrow-${routeGroup.flowType})`)
           .attr('class', 'shipment-path');
+
+        if (!isDenseMode && routeIndex < 160) {
+          const breath = () => {
+            const up = arc.transition()
+              .duration(1300 + Math.random() * 500)
+              .attr('opacity', 0.5)
+              .on('end', () => {
+                particleAnimationsRef.current.delete(up);
+                const down = arc.transition()
+                  .duration(1300 + Math.random() * 500)
+                  .attr('opacity', 0.22)
+                  .on('end', () => {
+                    particleAnimationsRef.current.delete(down);
+                    if (!isPreview) {
+                      breath();
+                    }
+                  });
+                particleAnimationsRef.current.add(down);
+              });
+            particleAnimationsRef.current.add(up);
+          };
+          breath();
+        }
 
           arc.on('mouseover', function(event) {
           const svgNode = svgRef.current;
@@ -581,6 +643,10 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
                 <div class="flex flex-col gap-1">
                   <span class="text-[#86868B] text-[10px] font-bold uppercase">${directionLabel}</span>
                   <span class="text-[#007AFF] font-semibold text-[13px]">${origin.name} &rarr; ${dest.name}</span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-[#86868B] text-[10px] font-bold uppercase">${language === 'zh' ? '方向类型' : 'Flow Type'}</span>
+                  <span style="color:${color}" class="font-bold">${directionText}</span>
                 </div>
                 <div class="flex justify-between items-center">
                   <span class="text-[#86868B] text-[10px] font-bold uppercase">${transactionCountLabel}</span>

@@ -35,7 +35,7 @@ const App: React.FC = () => {
   };
   const defaultMapFilters: Filters = {
     ...defaultFilters,
-    selectedCountries: ['CHN', 'USA'],
+    selectedCountries: ['CHN'],
   };
   const [mapFilters, setMapFilters] = useState<Filters>(defaultMapFilters);
   const [statsFilters, setStatsFilters] = useState<Filters>(defaultFilters);
