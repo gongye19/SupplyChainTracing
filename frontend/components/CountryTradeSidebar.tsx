@@ -30,33 +30,31 @@ const CountryTradeSidebar: React.FC<CountryTradeSidebarProps> = ({
   };
 
   return (
-    <div className="flex flex-col gap-6 p-1">
-      <div className="sticky top-20 z-30 bg-white rounded-[16px] border border-black/5 p-3 shadow-sm space-y-5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-[#007AFF]">
-            <Filter className="w-4 h-4" />
-            <span className="text-[12px] font-bold uppercase tracking-widest text-[#1D1D1F]">{t('filters.filterControl')}</span>
-          </div>
-          <button
-            onClick={handleReset}
-            className="text-[12px] text-[#007AFF] hover:underline font-semibold"
-          >
-            {t('filters.reset')}
-          </button>
+    <div className="flex flex-col gap-10 p-1">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-[#007AFF]">
+          <Filter className="w-4 h-4" />
+          <span className="text-[12px] font-bold uppercase tracking-widest text-[#1D1D1F]">{t('filters.filterControl')}</span>
         </div>
-
-        <MonthRangeSlider
-          title="Time Range"
-          startLabel="START"
-          endLabel="END"
-          minMonth="2021-01"
-          startMonth={filters.startYearMonth || '2021-01'}
-          endMonth={filters.endYearMonth || currentMonth}
-          onChange={(startMonth, endMonth) => {
-            setFilters({ ...filters, startYearMonth: startMonth, endYearMonth: endMonth });
-          }}
-        />
+        <button
+          onClick={handleReset}
+          className="text-[12px] text-[#007AFF] hover:underline font-semibold"
+        >
+          {t('filters.reset')}
+        </button>
       </div>
+
+      <MonthRangeSlider
+        title="Time Range"
+        startLabel="START"
+        endLabel="END"
+        minMonth="2021-01"
+        startMonth={filters.startYearMonth || '2021-01'}
+        endMonth={filters.endYearMonth || currentMonth}
+        onChange={(startMonth, endMonth) => {
+          setFilters({ ...filters, startYearMonth: startMonth, endYearMonth: endMonth });
+        }}
+      />
 
       {/* HS Code Filter */}
       <div>

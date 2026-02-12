@@ -4,7 +4,6 @@ import SupplyMap from './components/SupplyMap';
 import StatsPanel from './components/StatsPanel';
 import SidebarFilters from './components/SidebarFilters';
 import CountryTradeSidebar from './components/CountryTradeSidebar';
-import PinnedPrimaryFilters from './components/PinnedPrimaryFilters';
 import AIAssistant from './components/AIAssistant';
 import CountryTradeMap from './components/CountryTradeMap';
 import CountryTradeStatsPanel from './components/CountryTradeStatsPanel';
@@ -738,14 +737,6 @@ const App: React.FC = () => {
 
         </section>
       </main>
-
-      {activeView !== 'country-trade' && (
-        <PinnedPrimaryFilters
-          filters={activeView === 'map' ? mapFilters : statsFilters}
-          setFilters={activeView === 'map' ? setMapFilters : setStatsFilters}
-          countries={countries}
-        />
-      )}
 
       {((activeView === 'map' && filterLoading) || (activeView === 'country-trade' && countryTradeLoading)) && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center pointer-events-none">
