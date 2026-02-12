@@ -151,9 +151,9 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
       </div>
 
       <MonthRangeSlider
-        title={t('filters.dateRange')}
-        startLabel={t('filters.start')}
-        endLabel={t('filters.end')}
+        title="Time Range"
+        startLabel="start"
+        endLabel="end"
         minMonth="2021-01"
         startMonth={filters.startDate || '2021-01'}
         endMonth={filters.endDate}

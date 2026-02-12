@@ -78,14 +78,14 @@ const MonthRangeSlider: React.FC<MonthRangeSliderProps> = ({
       <div className="bg-[#F5F5F7] border border-black/5 rounded-[16px] p-4 shadow-sm">
         <h3 className="text-[14px] font-bold text-[#1D1D1F] mb-4">{title}</h3>
 
-        <div className="space-y-2 mb-3">
-          <div className="flex items-center justify-between text-[11px] text-[#86868B]">
-            <span className="uppercase font-bold tracking-wider">{startLabel}</span>
-            <span className="text-[12px] text-[#1D1D1F] font-semibold">{formatMonth(safeStart)}</span>
+        <div className="space-y-1.5 mb-3">
+          <div className="grid grid-cols-2 text-[11px] text-[#86868B]">
+            <span className="font-bold tracking-wider lowercase">{startLabel}</span>
+            <span className="font-bold tracking-wider lowercase text-right">{endLabel}</span>
           </div>
-          <div className="flex items-center justify-between text-[11px] text-[#86868B]">
-            <span className="uppercase font-bold tracking-wider">{endLabel}</span>
-            <span className="text-[12px] text-[#1D1D1F] font-semibold">{formatMonth(safeEnd)}</span>
+          <div className="grid grid-cols-2 text-[12px] text-[#1D1D1F]">
+            <span className="font-semibold">{formatMonth(safeStart)}</span>
+            <span className="font-semibold text-right">{formatMonth(safeEnd)}</span>
           </div>
         </div>
 

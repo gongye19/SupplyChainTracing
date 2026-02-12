@@ -44,18 +44,10 @@ const CountryTradeSidebar: React.FC<CountryTradeSidebarProps> = ({
           </button>
         </div>
 
-        {/* HS Code Filter */}
-        <div>
-          <HSCodeSelector
-            selectedHSCodes={filters.hsCode || []}
-            onHSCodeChange={(hsCodes) => setFilters({ ...filters, hsCode: hsCodes })}
-          />
-        </div>
-
         <MonthRangeSlider
-          title={t('countryTrade.timeRange')}
-          startLabel={t('filters.start')}
-          endLabel={t('filters.end')}
+          title="Time Range"
+          startLabel="start"
+          endLabel="end"
           minMonth="2021-01"
           startMonth={filters.startYearMonth || '2021-01'}
           endMonth={filters.endYearMonth || currentMonth}
@@ -63,6 +55,14 @@ const CountryTradeSidebar: React.FC<CountryTradeSidebarProps> = ({
             setFilters({ ...filters, startYearMonth: startMonth, endYearMonth: endMonth });
           }}
         />
+
+        {/* HS Code Filter */}
+        <div>
+          <HSCodeSelector
+            selectedHSCodes={filters.hsCode || []}
+            onHSCodeChange={(hsCodes) => setFilters({ ...filters, hsCode: hsCodes })}
+          />
+        </div>
       </div>
     </div>
   );
