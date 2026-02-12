@@ -1,4 +1,6 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
+
+type ActiveThumb = 'start' | 'end' | null;
 
 interface MonthRangeSliderProps {
   startMonth: string;
@@ -25,6 +27,8 @@ const MonthRangeSlider: React.FC<MonthRangeSliderProps> = ({
   endLabel,
   minMonth = '2021-01',
 }) => {
+  const [activeThumb, setActiveThumb] = useState<ActiveThumb>(null);
+
   const maxMonth = useMemo(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -53,6 +57,9 @@ const MonthRangeSlider: React.FC<MonthRangeSliderProps> = ({
 
   const left = maxIndex > 0 ? (Math.min(startIndex, endIndex) / maxIndex) * 100 : 0;
   const right = maxIndex > 0 ? 100 - (Math.max(startIndex, endIndex) / maxIndex) * 100 : 0;
+  const isOverlap = startIndex === endIndex;
+  const startZ = isOverlap ? 30 : activeThumb === 'start' ? 30 : 20;
+  const endZ = isOverlap ? 10 : activeThumb === 'end' ? 30 : 20;
 
   return (
     <section className="space-y-2.5">
@@ -84,12 +91,17 @@ const MonthRangeSlider: React.FC<MonthRangeSliderProps> = ({
             max={maxIndex}
             step={1}
             value={startIndex}
+            onMouseDown={() => setActiveThumb('start')}
+            onTouchStart={() => setActiveThumb('start')}
             onChange={(e) => {
               const nextStartIndex = Number(e.target.value);
               const clampedStartIndex = Math.min(nextStartIndex, endIndex);
               onChange(monthOptions[clampedStartIndex], monthOptions[endIndex]);
             }}
+            onMouseUp={() => setActiveThumb(null)}
+            onTouchEnd={() => setActiveThumb(null)}
             className="absolute inset-0 w-full appearance-none bg-transparent pointer-events-auto"
+            style={{ zIndex: startZ }}
           />
           <input
             type="range"
@@ -97,12 +109,17 @@ const MonthRangeSlider: React.FC<MonthRangeSliderProps> = ({
             max={maxIndex}
             step={1}
             value={endIndex}
+            onMouseDown={() => setActiveThumb('end')}
+            onTouchStart={() => setActiveThumb('end')}
             onChange={(e) => {
               const nextEndIndex = Number(e.target.value);
               const clampedEndIndex = Math.max(nextEndIndex, startIndex);
               onChange(monthOptions[startIndex], monthOptions[clampedEndIndex]);
             }}
+            onMouseUp={() => setActiveThumb(null)}
+            onTouchEnd={() => setActiveThumb(null)}
             className="absolute inset-0 w-full appearance-none bg-transparent pointer-events-auto"
+            style={{ zIndex: endZ }}
           />
         </div>
       </div>
