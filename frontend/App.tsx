@@ -21,7 +21,7 @@ const App: React.FC = () => {
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
-  const startDate = '2003-01';
+  const startDate = '2021-01';
   const endDate = `${currentYear}-${currentMonth}`; // YYYY-MM
 
   const defaultFilters: Filters = {
@@ -56,6 +56,8 @@ const App: React.FC = () => {
   const [countryTradeFilters, setCountryTradeFilters] = useState<CountryTradeFilters>({
     hsCode: [],
     industry: 'SemiConductor',
+    startYearMonth: '2021-01',
+    endYearMonth: endDate,
   });
   const [countryTradeLoading, setCountryTradeLoading] = useState(false);
   

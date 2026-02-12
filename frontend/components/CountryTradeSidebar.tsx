@@ -2,6 +2,8 @@ import React from 'react';
 import { CountryTradeFilters } from '../types';
 import HSCodeSelector from './HSCodeSelector';
 import { useLanguage } from '../contexts/LanguageContext';
+import { Filter } from 'lucide-react';
+import MonthRangeSlider from './MonthRangeSlider';
 
 interface CountryTradeSidebarProps {
   filters: CountryTradeFilters;
@@ -13,25 +15,28 @@ const CountryTradeSidebar: React.FC<CountryTradeSidebarProps> = ({
   setFilters,
 }) => {
   const { t } = useLanguage();
+  const now = new Date();
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
   const handleReset = () => {
     setFilters({
       hsCode: [],
       industry: 'SemiConductor',
       startYearMonth: '2021-01',
-      endYearMonth: '2025-12',
+      endYearMonth: currentMonth,
     });
   };
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-10 p-1">
       <div className="h-[0.5px] bg-black/5"></div>
       
       {/* Filter Control Section */}
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-[#86868B]">
-            <span className="text-[10px] uppercase font-bold tracking-wider">{t('filters.filterControl')}</span>
+          <div className="flex items-center gap-2 text-[#007AFF]">
+            <Filter className="w-4 h-4" />
+            <span className="text-[12px] font-bold uppercase tracking-widest text-[#1D1D1F]">{t('filters.filterControl')}</span>
           </div>
           <button
             onClick={handleReset}
@@ -49,32 +54,17 @@ const CountryTradeSidebar: React.FC<CountryTradeSidebarProps> = ({
           />
         </div>
 
-        {/* Time Range Filter */}
-        <div className="bg-white border border-black/5 rounded-[16px] p-4 shadow-sm">
-          <h3 className="text-[14px] font-bold text-[#1D1D1F] mb-4">{t('countryTrade.timeRange')}</h3>
-          <div className="flex flex-col gap-4">
-            <div>
-              <label className="text-[11px] text-[#86868B] mb-2 block">{t('countryTrade.startMonth')}</label>
-              <input
-                type="month"
-                value={filters.startYearMonth || '2021-01'}
-                onChange={(e) => setFilters({ ...filters, startYearMonth: e.target.value })}
-                className="w-full px-3 py-2 border border-black/10 rounded-lg text-[13px] font-mono focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
-                lang="en"
-              />
-            </div>
-            <div>
-              <label className="text-[11px] text-[#86868B] mb-2 block">{t('countryTrade.endMonth')}</label>
-              <input
-                type="month"
-                value={filters.endYearMonth || '2025-12'}
-                onChange={(e) => setFilters({ ...filters, endYearMonth: e.target.value })}
-                className="w-full px-3 py-2 border border-black/10 rounded-lg text-[13px] font-mono focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
-                lang="en"
-              />
-            </div>
-          </div>
-        </div>
+        <MonthRangeSlider
+          title={t('countryTrade.timeRange')}
+          startLabel={t('countryTrade.startMonth')}
+          endLabel={t('countryTrade.endMonth')}
+          minMonth="2021-01"
+          startMonth={filters.startYearMonth || '2021-01'}
+          endMonth={filters.endYearMonth || currentMonth}
+          onChange={(startMonth, endMonth) => {
+            setFilters({ ...filters, startYearMonth: startMonth, endYearMonth: endMonth });
+          }}
+        />
       </div>
     </div>
   );

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Filters, HSCodeCategory, CountryLocation, Shipment } from '../types';
-import { Calendar, Building2, Package, Filter, ChevronDown, Check } from 'lucide-react';
+import { Building2, Package, Filter, ChevronDown, Check } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import MonthRangeSlider from './MonthRangeSlider';
 
 interface SidebarFiltersProps {
   filters: Filters;
@@ -19,14 +20,10 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
   shipments
 }) => {
   const { t } = useLanguage();
-  const [startDateOpen, setStartDateOpen] = useState(false);
-  const [endDateOpen, setEndDateOpen] = useState(false);
   const [countriesOpen, setCountriesOpen] = useState(false);
   const [hsCodeCategoriesOpen, setHsCodeCategoriesOpen] = useState(false);
   const [hsCodeSubcategoriesOpen, setHsCodeSubcategoriesOpen] = useState(false);
   
-  const startDateRef = useRef<HTMLDivElement>(null);
-  const endDateRef = useRef<HTMLDivElement>(null);
   const countriesRef = useRef<HTMLDivElement>(null);
   const hsCodeCategoriesRef = useRef<HTMLDivElement>(null);
   const hsCodeSubcategoriesRef = useRef<HTMLDivElement>(null);
@@ -34,12 +31,6 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
   // 点击外部关闭下拉框
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (startDateRef.current && !startDateRef.current.contains(event.target as Node)) {
-        setStartDateOpen(false);
-      }
-      if (endDateRef.current && !endDateRef.current.contains(event.target as Node)) {
-        setEndDateOpen(false);
-      }
       if (countriesRef.current && !countriesRef.current.contains(event.target as Node)) {
         setCountriesOpen(false);
       }
@@ -51,33 +42,14 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
       }
     };
 
-    if (startDateOpen || endDateOpen || countriesOpen || hsCodeCategoriesOpen || hsCodeSubcategoriesOpen) {
+    if (countriesOpen || hsCodeCategoriesOpen || hsCodeSubcategoriesOpen) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [startDateOpen, endDateOpen, countriesOpen, hsCodeCategoriesOpen, hsCodeSubcategoriesOpen]);
-
-  // 生成日期选项（从2003-01-01到当前）
-  const generateDateOptions = () => {
-    const options: string[] = [];
-    const startDate = new Date('2003-01-01');
-    const endDate = new Date();
-    const currentDate = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
-    const endMonth = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
-    
-    while (currentDate <= endMonth) {
-      const year = currentDate.getFullYear();
-      const month = String(currentDate.getMonth() + 1).padStart(2, '0');
-      options.push(`${year}-${month}`); // YYYY-MM
-      currentDate.setMonth(currentDate.getMonth() + 1);
-    }
-    return options;
-  };
-
-  const dateOptions = generateDateOptions();
+  }, [countriesOpen, hsCodeCategoriesOpen, hsCodeSubcategoriesOpen]);
   
   // 从实际数据中提取可选的小类（HS Code 后2位）
   // 只显示已选择大类下实际出现的小类
@@ -165,7 +137,7 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
             const currentYear = now.getFullYear();
             const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
             setFilters({ 
-              startDate: '2003-01',
+              startDate: '2021-01',
               endDate: `${currentYear}-${currentMonth}`,
               selectedCountries: [], 
               selectedHSCodeCategories: [],
@@ -178,108 +150,17 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
         </button>
       </div>
 
-      {/* 时间范围 - 日期选择器 */}
-      <section className="space-y-2.5">
-        <label className="text-[11px] font-bold text-[#86868B] uppercase tracking-widest flex items-center gap-2.5">
-          <Calendar className="w-4 h-4" /> {t('filters.dateRange')}
-        </label>
-        
-        <div className="space-y-3">
-          {/* 起始日期 */}
-          <div className="relative" ref={startDateRef}>
-            <div className="flex flex-col mb-1">
-              <span className="text-[9px] text-[#86868B] uppercase font-bold tracking-wider">{t('filters.start')}</span>
-            </div>
-            <button 
-              onClick={() => {
-                setEndDateOpen(false);
-                setStartDateOpen(!startDateOpen);
-              }}
-              className="w-full bg-[#F5F5F7] border border-black/5 rounded-[12px] px-3 py-2.5 flex items-center justify-between text-[12px] text-[#1D1D1F] font-semibold hover:bg-[#EBEBEB] transition-all shadow-sm"
-            >
-              <span className="truncate">{filters.startDate}</span>
-              <ChevronDown className={`w-3.5 h-3.5 text-[#86868B] transition-transform ${startDateOpen ? 'rotate-180' : ''}`} />
-            </button>
-            
-            {startDateOpen && (
-              <div className="absolute top-full left-0 right-0 mt-2 bg-white/90 backdrop-blur-xl border border-black/5 rounded-[16px] shadow-2xl z-50 max-h-72 overflow-y-auto custom-scrollbar p-1.5 animate-in fade-in zoom-in-95 duration-200">
-                {dateOptions.map(date => {
-                  // 比较年月（YYYY-MM格式）
-                  const isDisabled = date > filters.endDate;
-                  return (
-                    <div 
-                      key={date}
-                      onClick={() => {
-                        if (!isDisabled) {
-                          setFilters(prev => ({ ...prev, startDate: date }));
-                          setStartDateOpen(false);
-                        }
-                      }}
-                      className={`px-3 py-2.5 text-[12px] flex items-center justify-between rounded-[8px] transition-colors mb-0.5 last:mb-0 ${
-                        isDisabled 
-                          ? 'text-[#86868B] cursor-not-allowed opacity-50' 
-                          : filters.startDate === date 
-                            ? 'bg-[#007AFF] text-white font-bold cursor-pointer' 
-                            : 'text-[#1D1D1F] hover:bg-black/5 cursor-pointer'
-                      }`}
-                    >
-                      <span>{date}</span>
-                      {filters.startDate === date && !isDisabled && <Check className="w-3.5 h-3.5 flex-shrink-0 ml-2" />}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* 结束日期 */}
-          <div className="relative" ref={endDateRef}>
-            <div className="flex flex-col mb-1">
-              <span className="text-[9px] text-[#86868B] uppercase font-bold tracking-wider">{t('filters.end')}</span>
-            </div>
-            <button 
-              onClick={() => {
-                setStartDateOpen(false);
-                setEndDateOpen(!endDateOpen);
-              }}
-              className="w-full bg-[#F5F5F7] border border-black/5 rounded-[12px] px-3 py-2.5 flex items-center justify-between text-[12px] text-[#1D1D1F] font-semibold hover:bg-[#EBEBEB] transition-all shadow-sm"
-            >
-              <span className="truncate">{filters.endDate}</span>
-              <ChevronDown className={`w-3.5 h-3.5 text-[#86868B] transition-transform ${endDateOpen ? 'rotate-180' : ''}`} />
-            </button>
-            
-            {endDateOpen && (
-              <div className="absolute top-full left-0 right-0 mt-2 bg-white/90 backdrop-blur-xl border border-black/5 rounded-[16px] shadow-2xl z-50 max-h-72 overflow-y-auto custom-scrollbar p-1.5 animate-in fade-in zoom-in-95 duration-200">
-                {dateOptions.map(date => {
-                  // 比较年月（YYYY-MM格式）
-                  const isDisabled = date < filters.startDate;
-                  return (
-                    <div 
-                      key={date}
-                      onClick={() => {
-                        if (!isDisabled) {
-                          setFilters(prev => ({ ...prev, endDate: date }));
-                          setEndDateOpen(false);
-                        }
-                      }}
-                      className={`px-3 py-2.5 text-[12px] flex items-center justify-between rounded-[8px] transition-colors mb-0.5 last:mb-0 ${
-                        isDisabled 
-                          ? 'text-[#86868B] cursor-not-allowed opacity-50' 
-                          : filters.endDate === date 
-                            ? 'bg-[#007AFF] text-white font-bold cursor-pointer' 
-                            : 'text-[#1D1D1F] hover:bg-black/5 cursor-pointer'
-                      }`}
-                    >
-                      <span>{date}</span>
-                      {filters.endDate === date && !isDisabled && <Check className="w-3.5 h-3.5 flex-shrink-0 ml-2" />}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
+      <MonthRangeSlider
+        title={t('filters.dateRange')}
+        startLabel={t('filters.start')}
+        endLabel={t('filters.end')}
+        minMonth="2021-01"
+        startMonth={filters.startDate || '2021-01'}
+        endMonth={filters.endDate}
+        onChange={(startMonth, endMonth) => {
+          setFilters(prev => ({ ...prev, startDate: startMonth, endDate: endMonth }));
+        }}
+      />
 
       {/* 国家筛选 */}
       <section className="space-y-2.5">
