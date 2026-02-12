@@ -576,9 +576,9 @@ const App: React.FC = () => {
         </button>
       </header>
 
-      <main className="flex-1 flex overflow-hidden">
+      <main className="flex-1 flex overflow-y-auto overflow-x-hidden">
         {/* Sidebar - Narrowed from 300px to 250px */}
-        <aside className="w-[250px] border-r border-black/5 bg-white flex flex-col p-5 gap-8 overflow-hidden sticky top-16 self-start h-[calc(100vh-4rem)]">
+        <aside className="w-[250px] border-r border-black/5 bg-white flex flex-col p-5 gap-8 overflow-visible self-start">
            <div className="flex flex-col gap-1.5">
              <button 
                onClick={() => setActiveView('country-trade')}
@@ -691,7 +691,7 @@ const App: React.FC = () => {
               )}
             </div>
           ) : activeView === 'stats' ? (
-            <div className="h-full overflow-y-auto custom-scrollbar pr-4">
+            <div className="pr-4">
               <div className="mb-10">
                 <h2 className="text-[32px] font-bold tracking-tight text-[#1D1D1F]">{t('app.networkInsights')}</h2>
                 <p className="text-[#86868B] text-[16px] font-medium mt-1">{t('app.realTimeMetrics')}</p>
@@ -705,7 +705,7 @@ const App: React.FC = () => {
               )}
             </div>
           ) : (
-            <div className="h-full flex flex-col gap-6 overflow-y-auto custom-scrollbar pr-4">
+            <div className="flex flex-col gap-6 pr-4">
               <div className="mb-4">
                 <h2 className="text-[32px] font-bold tracking-tight text-[#1D1D1F]">{t('countryTrade.title')}</h2>
                 <p className="text-[#86868B] text-[16px] font-medium mt-1">{t('countryTrade.subtitle')}</p>
