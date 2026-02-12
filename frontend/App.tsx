@@ -578,7 +578,7 @@ const App: React.FC = () => {
 
       <main className="flex-1 flex overflow-hidden">
         {/* Sidebar - Narrowed from 300px to 250px */}
-        <aside className="w-[250px] border-r border-black/5 bg-white flex flex-col p-5 gap-8 overflow-y-auto custom-scrollbar">
+        <aside className="w-[250px] border-r border-black/5 bg-white flex flex-col p-5 gap-8 overflow-y-auto custom-scrollbar sticky top-16 self-start h-[calc(100vh-4rem)]">
            <div className="flex flex-col gap-1.5">
              <button 
                onClick={() => setActiveView('country-trade')}
