@@ -446,12 +446,17 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
         .domain(valueExtent[0] !== undefined ? valueExtent : [1, 100])
         .range([1, 5]); // 根据交易价值，范围 1-5（更粗，更明显）
 
-      // preview 模式：只显示前 100 条路径，不画粒子
-      // final 模式：显示所有路径，画粒子（但限制粒子数量）
+      // preview 模式：只显示少量路径，不画粒子
+      // final 模式：限制最大路径数，避免大数据量时 SVG 过载
       const routeGroupsArray = routeGroups
         .sort((a, b) => b.totalValue - a.totalValue); // 按交易价值降序
-      const maxPaths = isPreview ? 100 : routeGroupsArray.length;
-      const maxParticles = isPreview ? 0 : Math.min(50, routeGroupsArray.length); // 最多 50 个粒子
+      const maxPaths = isPreview
+        ? Math.min(120, routeGroupsArray.length)
+        : Math.min(600, routeGroupsArray.length);
+      const isDenseMode = routeGroupsArray.length > 320;
+      const maxParticles = isPreview
+        ? 0
+        : (isDenseMode ? Math.min(10, routeGroupsArray.length) : Math.min(24, routeGroupsArray.length));
 
       // 获取翻译文本（在循环外部）
       const materialNameLabel = t('map.materialName');
@@ -496,12 +501,35 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
         // 如果缺少国家位置，跳过该交易
         if (!sourcePos || !targetPos || !origin || !dest) return;
           
-        // 使用直线连接（之前的形状）
-        const lineData = `M${sourcePos[0]},${sourcePos[1]} L${targetPos[0]},${targetPos[1]}`;
+        // 使用二次贝塞尔曲线连接，视觉更柔和，避免“硬直线”割裂感
+        const sx = sourcePos[0];
+        const sy = sourcePos[1];
+        const tx = targetPos[0];
+        const ty = targetPos[1];
+        const dx = tx - sx;
+        const dy = ty - sy;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        const invDistance = distance > 0 ? 1 / distance : 0;
+        const normalX = -dy * invDistance;
+        const normalY = dx * invDistance;
+        const curvature = Math.min(75, Math.max(18, distance * 0.17));
+        const cx = (sx + tx) / 2 + normalX * curvature;
+        const cy = (sy + ty) / 2 + normalY * curvature;
+        const lineData = `M${sx},${sy} Q${cx},${cy} ${tx},${ty}`;
           
         // 使用固定的蓝色
         const color = '#007AFF';
         const thickness = strokeScale(routeGroup.totalValue); // 根据交易价值计算粗细
+
+        // 底层光晕，增强层次感
+        gFlows.append('path')
+          .attr('d', lineData)
+          .attr('fill', 'none')
+          .attr('stroke', color)
+          .attr('stroke-width', thickness * 2.2)
+          .attr('stroke-linecap', 'round')
+          .attr('opacity', 0.08)
+          .style('pointer-events', 'none');
 
         const arc = gFlows.append('path')
             .attr('d', lineData)
@@ -510,7 +538,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
             .attr('stroke-width', thickness)
           .attr('data-base-stroke-width', thickness)
             .attr('stroke-linecap', 'round')
-            .attr('opacity', 0.3) // 降低默认透明度从 0.5 到 0.3
+            .attr('opacity', 0.28)
           .attr('class', 'shipment-path');
 
           arc.on('mouseover', function(event) {
@@ -518,7 +546,9 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
           const currentScale = svgNode ? d3.zoomTransform(svgNode)?.k || 1 : 1;
             const baseStrokeWidth = parseFloat(d3.select(this).attr('data-base-stroke-width') || thickness.toString());
             const scaledThickness = Math.max(0.2, baseStrokeWidth / currentScale);
-            d3.select(this).attr('opacity', 1.0).attr('stroke-width', scaledThickness + 1.5 / currentScale); // 增加hover透明度从 0.9 到 1.0
+            d3.select(this)
+              .attr('opacity', 0.95)
+              .attr('stroke-width', scaledThickness + 1.2 / currentScale);
           
           if (tooltipRef.current) {
             // 获取所有物料（去重）
@@ -577,7 +607,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
           const currentScale = svgNode ? d3.zoomTransform(svgNode)?.k || 1 : 1;
             const baseStrokeWidth = parseFloat(d3.select(this).attr('data-base-stroke-width') || thickness.toString());
             const scaledThickness = Math.max(0.2, baseStrokeWidth / currentScale);
-            d3.select(this).attr('opacity', 0.3).attr('stroke-width', scaledThickness); // 恢复默认透明度为 0.3
+            d3.select(this).attr('opacity', 0.28).attr('stroke-width', scaledThickness);
           if (tooltipRef.current) {
             tooltipRef.current.style('visibility', 'hidden');
           }
@@ -586,8 +616,10 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
         // 只在 final 模式且未超过粒子限制时画粒子
         // 粒子数量根据交易价值，但限制总数
         if (!isPreview && routeIndex < maxParticles) {
-          // 每个路径组的粒子数量 = min(价值/10M, 5)
-          const particleCountForRoute = Math.min(Math.max(1, Math.floor(routeGroup.totalValue / 10)), 5);
+          // 密集模式下降级粒子数量，保证交互流畅
+          const particleCountForRoute = isDenseMode
+            ? 1
+            : Math.min(Math.max(1, Math.floor(routeGroup.totalValue / 12)), 3);
           
           for (let p = 0; p < particleCountForRoute; p++) {
           const particleBaseRadius = Math.max(1.8, thickness / 1.8);
@@ -604,7 +636,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
 
           const animate = () => {
               const anim = particle.transition()
-                .duration(2500 + Math.random() * 2000 + p * 200) // 错开粒子动画时间
+                .duration(3200 + Math.random() * 1800 + p * 180)
               .ease(d3.easeLinear)
               .attrTween('transform', () => {
                 const node = arc.node() as SVGPathElement;

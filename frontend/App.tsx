@@ -183,15 +183,8 @@ const App: React.FC = () => {
     const loadCountryTradeData = async () => {
       try {
         setCountryTradeLoading(true);
-        
-        // 构建 shipments 筛选条件（用于显示流向）
-        const shipmentsFilters: Partial<Filters> = {
-          startDate: countryTradeFilters.startYearMonth ? `${countryTradeFilters.startYearMonth}-01` : undefined,
-          endDate: countryTradeFilters.endYearMonth ? `${countryTradeFilters.endYearMonth}-31` : undefined,
-          selectedHSCodeCategories: countryTradeFilters.hsCode?.map(code => code.substring(0, 2)) || [],
-        };
-        
-        const [statsData, summaryData, trendsData, topCountriesData, shipmentsData] = await Promise.all([
+
+        const [statsData, summaryData, trendsData, topCountriesData] = await Promise.all([
           countryTradeStatsAPI.getAll(countryTradeFilters),
           countryTradeStatsAPI.getSummary(countryTradeFilters),
           countryTradeStatsAPI.getTrends({
@@ -205,21 +198,18 @@ const App: React.FC = () => {
             industry: countryTradeFilters.industry,
             limit: 10,
           }),
-          shipmentsAPI.getAll(shipmentsFilters),
         ]);
         logger.debug('[Country Trade] loaded', {
           stats: statsData.length,
           summary: summaryData,
           trends: trendsData.length,
           topCountries: topCountriesData.length,
-          shipments: shipmentsData.length,
         });
         
         setCountryTradeStats(statsData);
         setCountryTradeSummary(summaryData);
         setCountryTradeTrends(trendsData);
         setTopCountries(topCountriesData);
-        setShipments(shipmentsData); // 更新 shipments 用于显示流向
       } catch (error) {
         logger.error('Failed to load country trade data:', error);
         // 显示错误信息给用户
