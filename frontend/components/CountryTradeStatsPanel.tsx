@@ -47,7 +47,7 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
   const topCountriesData = useMemo(() => {
     return topCountries.slice(0, 10).map(country => ({
       name: country.countryCode,
-      value: country.sumOfUsd / 1000000, // 转换为百万美元
+      value: country.sumOfUsd / 1000000000, // 转换为十亿美元(B)
       share: country.amountSharePct * 100,
     }));
   }, [topCountries]);
@@ -217,7 +217,7 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
                     fontWeight={600} 
                     axisLine={false} 
                     tickLine={false}
-                    tickFormatter={(value) => `$${value}M`}
+                    tickFormatter={(value) => `$${value.toFixed(2)}B`}
                   />
                   <Tooltip
                     contentStyle={{
@@ -226,7 +226,7 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
                       borderRadius: '12px',
                       padding: '12px',
                     }}
-                    formatter={(value: number) => `$${value.toFixed(2)}M`}
+                    formatter={(value: number) => `$${value.toFixed(2)}B`}
                   />
                   <Bar dataKey="value" fill="#007AFF" radius={[8, 8, 0, 0]} />
                 </BarChart>
