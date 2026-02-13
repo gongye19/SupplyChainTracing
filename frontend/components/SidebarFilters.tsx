@@ -10,6 +10,7 @@ interface SidebarFiltersProps {
   hsCodeCategories: HSCodeCategory[];
   countries: CountryLocation[];
   shipments: Shipment[]; // 实际数据，用于提取出现的品类和小类
+  mode?: 'country' | 'hscode' | 'all';
 }
 
 const SidebarFilters: React.FC<SidebarFiltersProps> = ({ 
@@ -17,7 +18,8 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
   setFilters, 
   hsCodeCategories, 
   countries, 
-  shipments
+  shipments,
+  mode = 'all',
 }) => {
   const { t } = useLanguage();
   const [countriesOpen, setCountriesOpen] = useState(false);
@@ -175,6 +177,9 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
     }));
   };
 
+  const showCountries = mode === 'all' || mode === 'country';
+  const showHsCategories = mode === 'all' || mode === 'hscode';
+  const showHsSubcategories = mode === 'all' || mode === 'hscode';
 
   return (
     <div className="flex flex-col gap-10 p-1">
@@ -216,6 +221,7 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
       />
 
       {/* 国家筛选 */}
+      {showCountries && (
       <section className="space-y-2.5">
         <label className="text-[11px] font-bold text-[#86868B] uppercase tracking-widest flex items-center gap-2.5">
           <Building2 className="w-4 h-4" /> {t('filters.countries')}
@@ -283,8 +289,10 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
           )}
         </div>
       </section>
+      )}
 
       {/* HS Code 品类筛选 - 按品类分组显示 */}
+      {showHsCategories && (
       <section className="space-y-2.5">
         <label className="text-[11px] font-bold text-[#86868B] uppercase tracking-widest flex items-center gap-2.5">
           <Package className="w-4 h-4" /> {t('filters.categories')}
@@ -333,8 +341,10 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
           )}
         </div>
       </section>
+      )}
 
       {/* HS Code 小类筛选 */}
+      {showHsSubcategories && (
       <section className="space-y-2.5">
         <label className="text-[11px] font-bold text-[#86868B] uppercase tracking-widest flex items-center gap-2.5">
           <Package className="w-4 h-4" /> {t('filters.hsCodeSubcategories') || 'HS Code Subcategories'}
@@ -389,6 +399,7 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
           )}
         </div>
       </section>
+      )}
 
     </div>
   );

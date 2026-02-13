@@ -9,7 +9,7 @@ import CountryTradeMap from './components/CountryTradeMap';
 import CountryTradeStatsPanel from './components/CountryTradeStatsPanel';
 import { Transaction, Filters, HSCodeCategory, CountryLocation, Location, Shipment, CountryMonthlyTradeStat, CountryTradeStatSummary, CountryTradeTrend, TopCountry, CountryTradeFilters } from './types';
 import { shipmentsAPI, hsCodeCategoriesAPI, countryLocationsAPI, chatAPI, ChatMessage, countryTradeStatsAPI } from './services/api';
-import { Globe, BarChart3, Map as MapIcon, Package, TrendingUp, Users, ChevronRight } from 'lucide-react';
+import { Globe, Map as MapIcon, Package, TrendingUp, Users, ChevronRight } from 'lucide-react';
 import { useLanguage } from './contexts/LanguageContext';
 import { getHSCodeColorCached } from './utils/hsCodeColors';
 import { getCountriesFromCodes } from './utils/countryCoordinates';
@@ -17,7 +17,7 @@ import { logger } from './utils/logger';
 
 const App: React.FC = () => {
   const { language, setLanguage, t } = useLanguage();
-  const [activeView, setActiveView] = useState<'map' | 'stats' | 'country-trade'>('country-trade');
+  const [activeView, setActiveView] = useState<'map-country' | 'map-hscode' | 'global-stats'>('global-stats');
   
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -37,8 +37,8 @@ const App: React.FC = () => {
     ...defaultFilters,
     selectedCountries: ['CHN'],
   };
-  const [mapFilters, setMapFilters] = useState<Filters>(defaultMapFilters);
-  const [statsFilters, setStatsFilters] = useState<Filters>(defaultFilters);
+  const [mapCountryFilters, setMapCountryFilters] = useState<Filters>(defaultMapFilters);
+  const [mapHsFilters, setMapHsFilters] = useState<Filters>(defaultFilters);
 
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [hsCodeCategories, setHsCodeCategories] = useState<HSCodeCategory[]>([]);
@@ -70,8 +70,9 @@ const App: React.FC = () => {
   const [countryMapYearIndex, setCountryMapYearIndex] = useState(0);
   
   // Refs for preview/final scheduling
-  const filtersRef = useRef(mapFilters);
-  useEffect(() => { filtersRef.current = mapFilters; }, [mapFilters]);
+  const currentMapFilters = activeView === 'map-country' ? mapCountryFilters : mapHsFilters;
+  const filtersRef = useRef(currentMapFilters);
+  useEffect(() => { filtersRef.current = currentMapFilters; }, [currentMapFilters]);
   const abortRef = useRef<AbortController | null>(null);
   const finalTimerRef = useRef<number | null>(null);
   const countryTradeTimerRef = useRef<number | null>(null);
@@ -206,7 +207,7 @@ const App: React.FC = () => {
 
   // 加载国家贸易统计数据
   useEffect(() => {
-    if (activeView !== 'country-trade') return;
+    if (activeView !== 'global-stats') return;
 
     const buildCountryTradeKey = () => {
       const hsCodes = [...(countryTradeFilters.hsCode || [])].sort().join(',');
@@ -457,7 +458,7 @@ const App: React.FC = () => {
 
   // 统一监听 map filters 变化：触发 scheduleFetch（仅在 Trade Map 视图）
   useEffect(() => {
-    if (activeView !== 'map') {
+    if (activeView !== 'map-country' && activeView !== 'map-hscode') {
       return;
     }
     if (hsCodeCategories.length === 0 || countries.length === 0) {
@@ -465,12 +466,12 @@ const App: React.FC = () => {
     }
     
     const reason: 'drag' | 'click' = isDraggingRef.current ? 'drag' : 'click';
-    scheduleFetch(mapFilters, reason);
+    scheduleFetch(currentMapFilters, reason);
 
     return () => {
       if (finalTimerRef.current) window.clearTimeout(finalTimerRef.current);
     };
-  }, [activeView, mapFilters, hsCodeCategories.length, countries.length, scheduleFetch]);
+  }, [activeView, currentMapFilters, hsCodeCategories.length, countries.length, scheduleFetch]);
 
   // 将聚合统计数据按国家对聚合，转换为地图组件格式
   // 每个国家对（原产国 → 目的地国家）合并成一条线
@@ -629,63 +630,65 @@ const App: React.FC = () => {
         <aside className="w-[250px] border-r border-black/5 bg-white flex flex-col p-5 gap-8 overflow-visible self-start">
            <div className="flex flex-col gap-1.5">
              <button 
-               onClick={() => setActiveView('country-trade')}
-               className={`flex items-center justify-between px-4 py-3 rounded-[12px] transition-all text-[14px] font-semibold ${activeView === 'country-trade' ? 'bg-[#007AFF] text-white shadow-lg shadow-blue-500/20' : 'text-[#86868B] hover:bg-black/5'}`}
+               onClick={() => setActiveView('global-stats')}
+               className={`flex items-center justify-between px-4 py-3 rounded-[12px] transition-all text-[14px] font-semibold ${activeView === 'global-stats' ? 'bg-[#007AFF] text-white shadow-lg shadow-blue-500/20' : 'text-[#86868B] hover:bg-black/5'}`}
              >
                <div className="flex items-center gap-3">
                  <Globe className="w-4 h-4" />
                  {t('countryTrade.title')}
                </div>
-               {activeView === 'country-trade' && <ChevronRight className="w-3.5 h-3.5" />}
+               {activeView === 'global-stats' && <ChevronRight className="w-3.5 h-3.5" />}
              </button>
              <button 
-               onClick={() => setActiveView('map')}
-               className={`flex items-center justify-between px-4 py-3 rounded-[12px] transition-all text-[14px] font-semibold ${activeView === 'map' ? 'bg-[#007AFF] text-white shadow-lg shadow-blue-500/20' : 'text-[#86868B] hover:bg-black/5'}`}
+               onClick={() => setActiveView('map-country')}
+               className={`flex items-center justify-between px-4 py-3 rounded-[12px] transition-all text-[14px] font-semibold ${activeView === 'map-country' ? 'bg-[#007AFF] text-white shadow-lg shadow-blue-500/20' : 'text-[#86868B] hover:bg-black/5'}`}
              >
                <div className="flex items-center gap-3">
                  <MapIcon className="w-4 h-4" />
-                 {t('common.map')}
+                 Trade Map by Country
                </div>
-               {activeView === 'map' && <ChevronRight className="w-3.5 h-3.5" />}
+               {activeView === 'map-country' && <ChevronRight className="w-3.5 h-3.5" />}
              </button>
              <button 
-               onClick={() => setActiveView('stats')}
-               className={`flex items-center justify-between px-4 py-3 rounded-[12px] transition-all text-[14px] font-semibold ${activeView === 'stats' ? 'bg-[#007AFF] text-white shadow-lg shadow-blue-500/20' : 'text-[#86868B] hover:bg-black/5'}`}
+               onClick={() => setActiveView('map-hscode')}
+               className={`flex items-center justify-between px-4 py-3 rounded-[12px] transition-all text-[14px] font-semibold ${activeView === 'map-hscode' ? 'bg-[#007AFF] text-white shadow-lg shadow-blue-500/20' : 'text-[#86868B] hover:bg-black/5'}`}
              >
                <div className="flex items-center gap-3">
-                 <BarChart3 className="w-4 h-4" />
-                 {t('common.stats')}
+                 <Package className="w-4 h-4" />
+                 Trade Map by HSCode
                </div>
-               {activeView === 'stats' && <ChevronRight className="w-3.5 h-3.5" />}
+               {activeView === 'map-hscode' && <ChevronRight className="w-3.5 h-3.5" />}
              </button>
            </div>
 
           <div className="h-[0.5px] bg-black/5"></div>
-          {activeView === 'country-trade' ? (
+          {activeView === 'global-stats' ? (
             <CountryTradeSidebar
               filters={countryTradeFilters}
               setFilters={setCountryTradeFilters}
               availableHSCodes={availableHSCodes}
             />
-          ) : activeView === 'map' ? (
+          ) : activeView === 'map-country' ? (
             <SidebarFilters 
-              filters={mapFilters} 
-              setFilters={setMapFilters}
+              filters={mapCountryFilters} 
+              setFilters={setMapCountryFilters}
               hsCodeCategories={hsCodeCategories}
               countries={countries}
               shipments={shipments}
+              mode="country"
             />
           ) : (
             <SidebarFilters 
-              filters={statsFilters} 
-              setFilters={setStatsFilters}
+              filters={mapHsFilters} 
+              setFilters={setMapHsFilters}
               hsCodeCategories={hsCodeCategories}
               countries={countries}
               shipments={shipments}
+              mode="hscode"
             />
           )}
           
-          {activeView !== 'country-trade' && (
+          {activeView !== 'global-stats' && (
             <div className="mt-auto pt-8 border-t border-black/5 space-y-4">
              <div className="bg-[#F5F5F7] p-4 rounded-[20px] space-y-3 border border-black/5">
                <div className="flex items-center justify-between">
@@ -716,7 +719,7 @@ const App: React.FC = () => {
 
         {/* Main Content Area */}
         <section className="flex-1 flex flex-col p-6 relative">
-          {activeView === 'map' ? (
+          {activeView === 'map-country' || activeView === 'map-hscode' ? (
             <div className="h-full flex flex-col relative">
               {/* 地图内容 */}
               {initialLoading ? (
@@ -728,34 +731,20 @@ const App: React.FC = () => {
                   <SupplyMap 
                     shipments={shipmentsForMap}
                     transactions={[]}
-                    selectedCountries={mapFilters.selectedCountries}
+                    selectedCountries={currentMapFilters.selectedCountries}
                     countries={countries}
                     companies={[]}
                     categories={[]}
-                    filters={mapFilters}
+                    filters={currentMapFilters}
                     isPreview={isInteracting}
                   />
                 </>
               )}
             </div>
-          ) : activeView === 'stats' ? (
-            <div className="pr-4">
-              <div className="mb-10">
-                <h2 className="text-[32px] font-bold tracking-tight text-[#1D1D1F]">{t('app.networkInsights')}</h2>
-                <p className="text-[#86868B] text-[16px] font-medium mt-1">{t('app.realTimeMetrics')}</p>
-              </div>
-              {initialLoading ? (
-                <div className="flex items-center justify-center h-full">
-                  <div className="text-[#86868B]">{t('app.loading')}</div>
-                </div>
-              ) : (
-                <StatsPanel transactions={[]} />
-              )}
-            </div>
-          ) : (
+          ) : activeView === 'global-stats' ? (
             <div className="flex flex-col gap-6 pr-4">
               <div className="mb-4">
-                <h2 className="text-[32px] font-bold tracking-tight text-[#1D1D1F]">{t('countryTrade.title')}</h2>
+                <h2 className="text-[32px] font-bold tracking-tight text-[#1D1D1F]">Global Statistics</h2>
                 <p className="text-[#86868B] text-[16px] font-medium mt-1">{t('countryTrade.subtitle')}</p>
               </div>
 
@@ -794,12 +783,26 @@ const App: React.FC = () => {
                 )}
                 </>
             </div>
+          ) : (
+            <div className="pr-4">
+              <div className="mb-10">
+                <h2 className="text-[32px] font-bold tracking-tight text-[#1D1D1F]">{t('app.networkInsights')}</h2>
+                <p className="text-[#86868B] text-[16px] font-medium mt-1">{t('app.realTimeMetrics')}</p>
+              </div>
+              {initialLoading ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-[#86868B]">{t('app.loading')}</div>
+                </div>
+              ) : (
+                <StatsPanel transactions={[]} />
+              )}
+            </div>
           )}
 
         </section>
       </main>
 
-      {((activeView === 'map' && filterLoading) || (activeView === 'country-trade' && countryTradeLoading)) && (
+      {(((activeView === 'map-country' || activeView === 'map-hscode') && filterLoading) || (activeView === 'global-stats' && countryTradeLoading)) && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center pointer-events-none">
           <div className="w-12 h-12 rounded-full border-[3px] border-[#D1D1D6] border-t-[#007AFF] animate-spin bg-white/40 backdrop-blur-[1px]" />
         </div>
