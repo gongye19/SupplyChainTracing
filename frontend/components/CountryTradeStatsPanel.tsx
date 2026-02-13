@@ -95,7 +95,7 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
     if (!marketByYearPlaying || yearlyTopData.length === 0) return;
     const timer = window.setInterval(() => {
       setMarketYearIndex((prev) => (prev + 1) % yearlyTopData.length);
-    }, 1400);
+    }, 2200);
     return () => window.clearInterval(timer);
   }, [marketByYearPlaying, yearlyTopData.length]);
 
@@ -255,7 +255,9 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
                     outerRadius={80}
                     fill="#8884d8"
                     dataKey="value"
-                    isAnimationActive={false}
+                    isAnimationActive={marketByYearPlaying}
+                    animationDuration={850}
+                    animationEasing="ease-in-out"
                   >
                     {displayMarketShareData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
