@@ -24,7 +24,6 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
   const [topByYearPlaying, setTopByYearPlaying] = useState(false);
   const [marketYearIndex, setMarketYearIndex] = useState(0);
   const [topYearIndex, setTopYearIndex] = useState(0);
-  const [marketTransitioning, setMarketTransitioning] = useState(false);
   
   // 格式化货币
   const formatCurrency = (value: number) => {
@@ -115,15 +114,6 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
   }, [marketByYearPlaying, yearlyTopData.length]);
 
   useEffect(() => {
-    if (!marketByYearPlaying) return;
-    setMarketTransitioning(true);
-    const timer = window.setTimeout(() => {
-      setMarketTransitioning(false);
-    }, 420);
-    return () => window.clearTimeout(timer);
-  }, [marketYearIndex, marketByYearPlaying]);
-
-  useEffect(() => {
     if (!topByYearPlaying || yearlyTopData.length === 0) return;
     const timer = window.setInterval(() => {
       setTopYearIndex((prev) => (prev + 1) % yearlyTopData.length);
@@ -148,6 +138,27 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
     : topCountriesData;
   const displayMarketYear = marketByYearPlaying && marketYearData ? marketYearData.year : null;
   const displayTopYear = topByYearPlaying && topYearData ? topYearData.year : null;
+  const marketAroundLabels = useMemo(() => {
+    const total = displayMarketShareData.reduce((acc, item) => acc + item.value, 0) || 1;
+    let accValue = 0;
+    return displayMarketShareData.map((item) => {
+      const midRatio = (accValue + item.value / 2) / total;
+      // 与 Pie 的 startAngle/endAngle 对齐：90 -> -270
+      const angleDeg = 90 - midRatio * 360;
+      const angleRad = (angleDeg * Math.PI) / 180;
+      const radius = 125;
+      const x = 150 + Math.cos(angleRad) * radius;
+      const y = 150 - Math.sin(angleRad) * radius;
+      accValue += item.value;
+      return {
+        key: item.name,
+        text: `${item.name}: ${item.percentage.toFixed(1)}%`,
+        x,
+        y,
+        color: item.color,
+      };
+    });
+  }, [displayMarketShareData]);
 
   return (
     <div className="space-y-6">
@@ -275,25 +286,25 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
               ? `${t('countryTrade.playingYear') || 'Playing year'}: ${displayMarketYear}`
               : (t('countryTrade.totalWithinSelection') || 'Total within selected filter range')}
           </p>
-          <div className="h-[300px]">
+          <div className="h-[300px] relative">
             {displayMarketShareData.length > 0 ? (
-              <div
-                className={`w-full h-full transition-all duration-500 ease-in-out ${
-                  marketTransitioning ? 'opacity-90 scale-[0.99]' : 'opacity-100 scale-100'
-                }`}
-              >
+              <>
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
                       data={displayMarketShareData}
                       cx="50%"
                       cy="50%"
-                      labelLine={false}
-                      label={({ name, percentage }) => `${name}: ${percentage.toFixed(1)}%`}
                       outerRadius={80}
                       fill="#8884d8"
                       dataKey="value"
-                      isAnimationActive={false}
+                      startAngle={90}
+                      endAngle={-270}
+                      label={false}
+                      labelLine={false}
+                      isAnimationActive={marketByYearPlaying}
+                      animationDuration={850}
+                      animationEasing="ease-in-out"
                     >
                       {displayMarketShareData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
@@ -304,7 +315,23 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
                     />
                   </PieChart>
                 </ResponsiveContainer>
-              </div>
+                <div className="absolute inset-0 pointer-events-none">
+                  {marketAroundLabels.map((label) => (
+                    <div
+                      key={label.key}
+                      className="absolute text-[16px] font-semibold whitespace-nowrap"
+                      style={{
+                        left: `${label.x}px`,
+                        top: `${label.y}px`,
+                        transform: 'translate(-50%, -50%)',
+                        color: label.color,
+                      }}
+                    >
+                      {label.text}
+                    </div>
+                  ))}
+                </div>
+              </>
             ) : (
               <div className="flex items-center justify-center h-full text-[#86868B]">
                 暂无数据
