@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
 import { TrendingUp, Globe, DollarSign, Package } from 'lucide-react';
 import { CountryMonthlyTradeStat, CountryTradeStatSummary, CountryTradeTrend, TopCountry } from '../types';
@@ -24,8 +24,6 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
   const [topByYearPlaying, setTopByYearPlaying] = useState(false);
   const [marketYearIndex, setMarketYearIndex] = useState(0);
   const [topYearIndex, setTopYearIndex] = useState(0);
-  const marketChartContainerRef = useRef<HTMLDivElement>(null);
-  const [marketChartSize, setMarketChartSize] = useState({ width: 0, height: 0 });
   
   // 格式化货币
   const formatCurrency = (value: number) => {
@@ -123,24 +121,6 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
     return () => window.clearInterval(timer);
   }, [topByYearPlaying, yearlyTopData.length]);
 
-  useEffect(() => {
-    const node = marketChartContainerRef.current;
-    if (!node) return;
-
-    const updateSize = () => {
-      const rect = node.getBoundingClientRect();
-      setMarketChartSize({
-        width: rect.width,
-        height: rect.height,
-      });
-    };
-
-    updateSize();
-    const observer = new ResizeObserver(updateSize);
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
-
   const marketYearData =
     yearlyTopData.length > 0
       ? (yearlyTopData[marketYearIndex] || yearlyTopData[0])
@@ -158,86 +138,6 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
     : topCountriesData;
   const displayMarketYear = marketByYearPlaying && marketYearData ? marketYearData.year : null;
   const displayTopYear = topByYearPlaying && topYearData ? topYearData.year : null;
-  const pieCx = marketChartSize.width > 0 ? marketChartSize.width / 2 : 150;
-  const pieCy = marketChartSize.height > 0 ? marketChartSize.height / 2 : 150;
-  const pieOuterRadius = marketChartSize.width > 0 && marketChartSize.height > 0
-    ? Math.max(68, Math.min(96, Math.min(marketChartSize.width, marketChartSize.height) * 0.27))
-    : 80;
-  const marketAroundLabels = useMemo(() => {
-    const total = displayMarketShareData.reduce((acc, item) => acc + item.value, 0) || 1;
-    let accValue = 0;
-    const base = displayMarketShareData.map((item) => {
-      const midRatio = (accValue + item.value / 2) / total;
-      // 与 Pie 的 startAngle/endAngle 对齐：90 -> -270
-      const angleDeg = 90 - midRatio * 360;
-      const angleRad = (angleDeg * Math.PI) / 180;
-      const arcX = pieCx + Math.cos(angleRad) * pieOuterRadius;
-      const arcY = pieCy - Math.sin(angleRad) * pieOuterRadius;
-      const bendRadius = pieOuterRadius + 18;
-      const bendX = pieCx + Math.cos(angleRad) * bendRadius;
-      const bendY = pieCy - Math.sin(angleRad) * bendRadius;
-      accValue += item.value;
-      return {
-        key: item.name,
-        text: `${item.name}: ${item.percentage.toFixed(1)}%`,
-        rawY: bendY,
-        arcX,
-        arcY,
-        bendX,
-        bendY,
-        color: item.color,
-        align: bendX >= pieCx ? 'right' as const : 'left' as const,
-      };
-    });
-
-    const topLimit = 18;
-    const bottomLimit = Math.max(topLimit + 1, marketChartSize.height - 18);
-    const spacing = 24;
-    const rightX = Math.min(marketChartSize.width - 8, pieCx + pieOuterRadius + 92);
-    const leftX = Math.max(8, pieCx - pieOuterRadius - 92);
-
-    const layoutSide = (
-      list: typeof base,
-      side: 'left' | 'right'
-    ) => {
-      const sorted = [...list].sort((a, b) => a.rawY - b.rawY);
-      const positioned = sorted.map((item) => ({ ...item, y: Math.max(topLimit, Math.min(bottomLimit, item.rawY)) }));
-
-      // Pass 1: ensure minimum spacing from top to bottom
-      for (let i = 1; i < positioned.length; i += 1) {
-        if (positioned[i].y - positioned[i - 1].y < spacing) {
-          positioned[i].y = positioned[i - 1].y + spacing;
-        }
-      }
-      // Pass 2: if overflow bottom, push back up
-      for (let i = positioned.length - 1; i >= 0; i -= 1) {
-        if (positioned[i].y > bottomLimit) {
-          positioned[i].y = bottomLimit;
-        }
-        if (i > 0 && positioned[i].y - positioned[i - 1].y < spacing) {
-          positioned[i - 1].y = Math.max(topLimit, positioned[i].y - spacing);
-        }
-      }
-
-      return positioned.map((item) => {
-        const x = side === 'right' ? rightX : leftX;
-        const textAnchor = side === 'right' ? 'start' : 'end';
-        const lineEndX = side === 'right' ? x - 6 : x + 6;
-        return {
-          ...item,
-          x,
-          y: item.y,
-          textAnchor,
-          lineEndX,
-          lineEndY: item.y,
-        };
-      });
-    };
-
-    const left = base.filter((item) => item.align === 'left');
-    const right = base.filter((item) => item.align === 'right');
-    return [...layoutSide(left, 'left'), ...layoutSide(right, 'right')];
-  }, [displayMarketShareData, pieOuterRadius, pieCx, pieCy, marketChartSize.height, marketChartSize.width]);
 
   return (
     <div className="space-y-6">
@@ -365,64 +265,56 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
               ? `${t('countryTrade.playingYear') || 'Playing year'}: ${displayMarketYear}`
               : (t('countryTrade.totalWithinSelection') || 'Total within selected filter range')}
           </p>
-          <div ref={marketChartContainerRef} className="h-[300px] relative">
+          <div className="h-[300px] grid grid-cols-[minmax(0,1fr)_170px] gap-2 items-center">
             {displayMarketShareData.length > 0 ? (
               <>
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={displayMarketShareData}
-                      cx={pieCx}
-                      cy={pieCy}
-                      outerRadius={pieOuterRadius}
-                      fill="#8884d8"
-                      dataKey="value"
-                      startAngle={90}
-                      endAngle={-270}
-                      label={false}
-                      labelLine={false}
-                      isAnimationActive={marketByYearPlaying}
-                      animationDuration={850}
-                      animationEasing="ease-in-out"
-                    >
-                      {displayMarketShareData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      formatter={(value: number) => formatCurrency(value)}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="absolute inset-0 pointer-events-none">
-                  <svg className="w-full h-full overflow-visible">
-                    {marketAroundLabels.map((label) => (
-                      <g key={label.key}>
-                        <polyline
-                          points={`${label.arcX},${label.arcY} ${label.bendX},${label.bendY} ${label.lineEndX},${label.lineEndY}`}
-                          fill="none"
-                          stroke={label.color}
-                          strokeWidth="1.3"
-                          opacity="0.65"
-                          style={{ transition: 'all 850ms ease-in-out' }}
-                        />
-                        <text
-                          x={label.x}
-                          y={label.y}
-                          textAnchor={label.textAnchor}
-                          dominantBaseline="middle"
-                          fill={label.color}
-                          style={{ fontSize: '16px', fontWeight: 600, transition: 'all 850ms ease-in-out' }}
-                        >
-                          {label.text}
-                        </text>
-                      </g>
-                    ))}
-                  </svg>
+                <div className="h-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={displayMarketShareData}
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={88}
+                        fill="#8884d8"
+                        dataKey="value"
+                        startAngle={90}
+                        endAngle={-270}
+                        label={false}
+                        labelLine={false}
+                        isAnimationActive={marketByYearPlaying}
+                        animationDuration={850}
+                        animationEasing="ease-in-out"
+                      >
+                        {displayMarketShareData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        formatter={(value: number) => formatCurrency(value)}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="h-full flex flex-col justify-center gap-2 pr-1">
+                  {displayMarketShareData.map((item) => (
+                    <div key={item.name} className="flex items-center gap-2 min-w-0">
+                      <span
+                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                        style={{ backgroundColor: item.color }}
+                      />
+                      <span
+                        className="text-[15px] font-semibold truncate"
+                        style={{ color: item.color }}
+                      >
+                        {item.name}: {item.percentage.toFixed(1)}%
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </>
             ) : (
-              <div className="flex items-center justify-center h-full text-[#86868B]">
+              <div className="col-span-2 flex items-center justify-center h-full text-[#86868B]">
                 暂无数据
               </div>
             )}
