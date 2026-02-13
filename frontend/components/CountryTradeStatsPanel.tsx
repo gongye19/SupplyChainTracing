@@ -115,6 +115,11 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
     : topCountriesData;
   const displayMarketYear = marketByYearPlaying && yearlyTopData.length > 0 ? yearlyTopData[marketYearIndex].year : null;
   const displayTopYear = topByYearPlaying && yearlyTopData.length > 0 ? yearlyTopData[topYearIndex].year : null;
+  const marketShareLabelMap = useMemo(() => {
+    const map = new Map<string, number>();
+    displayMarketShareData.forEach((item) => map.set(item.name, item.percentage));
+    return map;
+  }, [displayMarketShareData]);
 
   return (
     <div className="space-y-6">
@@ -255,11 +260,21 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
                     outerRadius={80}
                     fill="#8884d8"
                     dataKey="value"
+                    isAnimationActive={false}
                   >
                     {displayMarketShareData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
+                  <Legend
+                    layout="vertical"
+                    align="right"
+                    verticalAlign="middle"
+                    formatter={(value: string) => {
+                      const pct = marketShareLabelMap.get(value) ?? 0;
+                      return `${value}: ${pct.toFixed(1)}%`;
+                    }}
+                  />
                   <Tooltip
                     formatter={(value: number) => formatCurrency(value)}
                   />

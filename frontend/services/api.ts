@@ -319,7 +319,8 @@ export const countryTradeStatsAPI = {
     if (filters?.endYearMonth) {
       params.append('end_year_month', filters.endYearMonth);
     }
-    params.append('limit', '10000');
+    // 年度回放需要覆盖完整筛选时间范围，避免默认限制只拿到最近年份
+    params.append('limit', '200000');
 
     const data = await fetchAPI<any[]>(`/api/country-trade-stats?${params.toString()}`);
     return data.map((item: any) => ({
