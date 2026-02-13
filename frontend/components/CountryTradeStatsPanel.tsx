@@ -24,6 +24,7 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
   const [topByYearPlaying, setTopByYearPlaying] = useState(false);
   const [marketYearIndex, setMarketYearIndex] = useState(0);
   const [topYearIndex, setTopYearIndex] = useState(0);
+  const [marketTransitioning, setMarketTransitioning] = useState(false);
   
   // 格式化货币
   const formatCurrency = (value: number) => {
@@ -98,6 +99,15 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
     }, 2200);
     return () => window.clearInterval(timer);
   }, [marketByYearPlaying, yearlyTopData.length]);
+
+  useEffect(() => {
+    if (!marketByYearPlaying) return;
+    setMarketTransitioning(true);
+    const timer = window.setTimeout(() => {
+      setMarketTransitioning(false);
+    }, 420);
+    return () => window.clearTimeout(timer);
+  }, [marketYearIndex, marketByYearPlaying]);
 
   useEffect(() => {
     if (!topByYearPlaying || yearlyTopData.length === 0) return;
@@ -244,30 +254,34 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
           </p>
           <div className="h-[300px]">
             {displayMarketShareData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={displayMarketShareData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percentage }) => `${name}: ${percentage.toFixed(1)}%`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                    isAnimationActive={marketByYearPlaying}
-                    animationDuration={850}
-                    animationEasing="ease-in-out"
-                  >
-                    {displayMarketShareData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    formatter={(value: number) => formatCurrency(value)}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+              <div
+                className={`w-full h-full transition-all duration-500 ease-in-out ${
+                  marketTransitioning ? 'opacity-90 scale-[0.99]' : 'opacity-100 scale-100'
+                }`}
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={displayMarketShareData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percentage }) => `${name}: ${percentage.toFixed(1)}%`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                      isAnimationActive={false}
+                    >
+                      {displayMarketShareData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(value: number) => formatCurrency(value)}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
             ) : (
               <div className="flex items-center justify-center h-full text-[#86868B]">
                 暂无数据
