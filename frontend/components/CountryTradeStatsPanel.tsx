@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
 import { TrendingUp, Globe, DollarSign, Package } from 'lucide-react';
 import { CountryMonthlyTradeStat, CountryTradeStatSummary, CountryTradeTrend, TopCountry } from '../types';
@@ -24,6 +24,8 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
   const [topByYearPlaying, setTopByYearPlaying] = useState(false);
   const [marketYearIndex, setMarketYearIndex] = useState(0);
   const [topYearIndex, setTopYearIndex] = useState(0);
+  const marketChartContainerRef = useRef<HTMLDivElement>(null);
+  const [marketChartSize, setMarketChartSize] = useState({ width: 0, height: 0 });
   
   // 格式化货币
   const formatCurrency = (value: number) => {
@@ -121,6 +123,24 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
     return () => window.clearInterval(timer);
   }, [topByYearPlaying, yearlyTopData.length]);
 
+  useEffect(() => {
+    const node = marketChartContainerRef.current;
+    if (!node) return;
+
+    const updateSize = () => {
+      const rect = node.getBoundingClientRect();
+      setMarketChartSize({
+        width: rect.width,
+        height: rect.height,
+      });
+    };
+
+    updateSize();
+    const observer = new ResizeObserver(updateSize);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
   const marketYearData =
     yearlyTopData.length > 0
       ? (yearlyTopData[marketYearIndex] || yearlyTopData[0])
@@ -138,6 +158,11 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
     : topCountriesData;
   const displayMarketYear = marketByYearPlaying && marketYearData ? marketYearData.year : null;
   const displayTopYear = topByYearPlaying && topYearData ? topYearData.year : null;
+  const pieCx = marketChartSize.width > 0 ? marketChartSize.width / 2 : 150;
+  const pieCy = marketChartSize.height > 0 ? marketChartSize.height / 2 : 150;
+  const pieOuterRadius = marketChartSize.width > 0 && marketChartSize.height > 0
+    ? Math.max(68, Math.min(96, Math.min(marketChartSize.width, marketChartSize.height) * 0.27))
+    : 80;
   const marketAroundLabels = useMemo(() => {
     const total = displayMarketShareData.reduce((acc, item) => acc + item.value, 0) || 1;
     let accValue = 0;
@@ -146,9 +171,11 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
       // 与 Pie 的 startAngle/endAngle 对齐：90 -> -270
       const angleDeg = 90 - midRatio * 360;
       const angleRad = (angleDeg * Math.PI) / 180;
-      const radius = 125;
-      const x = 150 + Math.cos(angleRad) * radius;
-      const y = 150 - Math.sin(angleRad) * radius;
+      const labelRadius = pieOuterRadius + 46;
+      const rawX = pieCx + Math.cos(angleRad) * labelRadius;
+      const rawY = pieCy - Math.sin(angleRad) * labelRadius;
+      const x = Math.max(12, Math.min(marketChartSize.width - 12, rawX));
+      const y = Math.max(16, Math.min(marketChartSize.height - 16, rawY));
       accValue += item.value;
       return {
         key: item.name,
@@ -156,9 +183,10 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
         x,
         y,
         color: item.color,
+        align: x >= pieCx ? 'left' : 'right',
       };
     });
-  }, [displayMarketShareData]);
+  }, [displayMarketShareData, pieOuterRadius, pieCx, pieCy, marketChartSize.width, marketChartSize.height]);
 
   return (
     <div className="space-y-6">
@@ -286,16 +314,16 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
               ? `${t('countryTrade.playingYear') || 'Playing year'}: ${displayMarketYear}`
               : (t('countryTrade.totalWithinSelection') || 'Total within selected filter range')}
           </p>
-          <div className="h-[300px] relative">
+          <div ref={marketChartContainerRef} className="h-[300px] relative">
             {displayMarketShareData.length > 0 ? (
               <>
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
                       data={displayMarketShareData}
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={80}
+                      cx={pieCx}
+                      cy={pieCy}
+                      outerRadius={pieOuterRadius}
                       fill="#8884d8"
                       dataKey="value"
                       startAngle={90}
@@ -323,8 +351,9 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
                       style={{
                         left: `${label.x}px`,
                         top: `${label.y}px`,
-                        transform: 'translate(-50%, -50%)',
+                        transform: label.align === 'right' ? 'translate(-100%, -50%)' : 'translate(0, -50%)',
                         color: label.color,
+                        transition: 'left 850ms ease-in-out, top 850ms ease-in-out',
                       }}
                     >
                       {label.text}
