@@ -51,7 +51,7 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [countriesOpen, hsCodeCategoriesOpen, hsCodeSubcategoriesOpen]);
-
+  
   // 从实际数据中提取可选的小类（HS Code 后2位）
   // 只显示已选择大类下实际出现的小类
   const availableSubcategories = useMemo(() => {
@@ -126,7 +126,7 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
       const next = { ...prev };
       countriesByContinent.forEach(([continent]) => {
         if (next[continent] === undefined) {
-          next[continent] = true;
+          next[continent] = false;
         }
       });
       return next;
@@ -260,23 +260,23 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
                     {continentExpanded[continent] && (
                       <div className="mt-1 space-y-0.5">
                         {continentCountries.map((country) => (
-                          <div
-                            key={country.countryCode}
-                            onClick={() => toggleCountry(country.countryCode)}
+                <div 
+                  key={country.countryCode}
+                  onClick={() => toggleCountry(country.countryCode)}
                             className={`ml-2 px-3 py-2 text-[12px] flex items-center justify-between cursor-pointer rounded-[8px] transition-colors ${
                               filters.selectedCountries.includes(country.countryCode) ? 'bg-[#007AFF] text-white font-bold' : 'text-[#1D1D1F] hover:bg-black/5'
                             }`}
-                          >
-                            <div className="flex flex-col">
-                              <span>{country.countryName}</span>
+                >
+                  <div className="flex flex-col">
+                    <span>{country.countryName}</span>
                               <span className="text-[9px] uppercase font-bold opacity-60">{country.countryCode}</span>
-                            </div>
-                            {filters.selectedCountries.includes(country.countryCode) && <Check className="w-3.5 h-3.5" />}
+                  </div>
+                  {filters.selectedCountries.includes(country.countryCode) && <Check className="w-3.5 h-3.5" />}
                           </div>
                         ))}
                       </div>
                     )}
-                  </div>
+                </div>
                 ))
               )}
             </div>
