@@ -715,7 +715,7 @@ const App: React.FC = () => {
               </div>
 
               <>
-                <div className="bg-white border border-black/5 rounded-[28px] p-6 shadow-sm h-[600px]">
+                <div className="bg-white border border-black/5 rounded-[28px] p-6 shadow-sm h-[600px] overflow-hidden">
                   <h3 className="text-[18px] font-bold text-[#1D1D1F] mb-4">{t('countryTrade.tradeMap')}</h3>
                   <div className="h-[550px]">
                     <CountryTradeMap

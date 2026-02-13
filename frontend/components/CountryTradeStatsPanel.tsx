@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, Legend } from 'recharts';
 import { TrendingUp, Globe, DollarSign, Package } from 'lucide-react';
 import { CountryMonthlyTradeStat, CountryTradeStatSummary, CountryTradeTrend, TopCountry } from '../types';
@@ -20,6 +20,10 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
   topCountries,
 }) => {
   const { t } = useLanguage();
+  const [marketByYearPlaying, setMarketByYearPlaying] = useState(false);
+  const [topByYearPlaying, setTopByYearPlaying] = useState(false);
+  const [marketYearIndex, setMarketYearIndex] = useState(0);
+  const [topYearIndex, setTopYearIndex] = useState(0);
   
   // 格式化货币
   const formatCurrency = (value: number) => {
@@ -51,6 +55,66 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
       share: country.amountSharePct * 100,
     }));
   }, [topCountries]);
+
+  const yearlyTopData = useMemo(() => {
+    const yearlyMap = new Map<number, Map<string, number>>();
+    stats.forEach((item) => {
+      if (!yearlyMap.has(item.year)) {
+        yearlyMap.set(item.year, new Map<string, number>());
+      }
+      const countryMap = yearlyMap.get(item.year)!;
+      countryMap.set(item.countryCode, (countryMap.get(item.countryCode) || 0) + item.sumOfUsd);
+    });
+
+    const years = Array.from(yearlyMap.keys()).sort((a, b) => a - b);
+    const byYear = years.map((year) => {
+      const countryMap = yearlyMap.get(year)!;
+      const sorted = Array.from(countryMap.entries())
+        .sort((a, b) => b[1] - a[1]);
+      const total = sorted.reduce((acc, [, value]) => acc + value, 0) || 1;
+      const top10 = sorted.slice(0, 10);
+      return {
+        year,
+        marketShare: top10.slice(0, 8).map(([name, value], index) => ({
+          name,
+          value,
+          percentage: (value / total) * 100,
+          color: COLORS[index % COLORS.length],
+        })),
+        topCountries: top10.map(([name, value]) => ({
+          name,
+          value: value / 1000000000,
+          share: (value / total) * 100,
+        })),
+      };
+    });
+    return byYear;
+  }, [stats]);
+
+  useEffect(() => {
+    if (!marketByYearPlaying || yearlyTopData.length === 0) return;
+    const timer = window.setInterval(() => {
+      setMarketYearIndex((prev) => (prev + 1) % yearlyTopData.length);
+    }, 1400);
+    return () => window.clearInterval(timer);
+  }, [marketByYearPlaying, yearlyTopData.length]);
+
+  useEffect(() => {
+    if (!topByYearPlaying || yearlyTopData.length === 0) return;
+    const timer = window.setInterval(() => {
+      setTopYearIndex((prev) => (prev + 1) % yearlyTopData.length);
+    }, 1400);
+    return () => window.clearInterval(timer);
+  }, [topByYearPlaying, yearlyTopData.length]);
+
+  const displayMarketShareData = marketByYearPlaying && yearlyTopData.length > 0
+    ? yearlyTopData[marketYearIndex].marketShare
+    : marketShareData;
+  const displayTopCountriesData = topByYearPlaying && yearlyTopData.length > 0
+    ? yearlyTopData[topYearIndex].topCountries
+    : topCountriesData;
+  const displayMarketYear = marketByYearPlaying && yearlyTopData.length > 0 ? yearlyTopData[marketYearIndex].year : null;
+  const displayTopYear = topByYearPlaying && yearlyTopData.length > 0 ? yearlyTopData[topYearIndex].year : null;
 
   return (
     <div className="space-y-6">
@@ -164,13 +228,26 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* 市场份额饼图 */}
         <div className="bg-white border border-black/5 p-8 rounded-[28px] shadow-sm">
-          <h3 className="text-[18px] font-bold text-[#1D1D1F] mb-6">{t('countryTrade.marketShare')}</h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-[18px] font-bold text-[#1D1D1F]">{t('countryTrade.marketShare')}</h3>
+            <button
+              onClick={() => setMarketByYearPlaying((prev) => !prev)}
+              className="text-[11px] px-3 py-1.5 rounded-full border border-black/10 text-[#007AFF] hover:bg-[#F5F5F7] font-semibold"
+            >
+              {marketByYearPlaying ? (t('countryTrade.showTotal') || 'Show Total') : (t('countryTrade.playByYear') || 'Play by Year')}
+            </button>
+          </div>
+          <p className="text-[11px] text-[#86868B] mb-4">
+            {marketByYearPlaying && displayMarketYear
+              ? `${t('countryTrade.playingYear') || 'Playing year'}: ${displayMarketYear}`
+              : (t('countryTrade.totalWithinSelection') || 'Total within selected filter range')}
+          </p>
           <div className="h-[300px]">
-            {marketShareData.length > 0 ? (
+            {displayMarketShareData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={marketShareData}
+                    data={displayMarketShareData}
                     cx="50%"
                     cy="50%"
                     labelLine={false}
@@ -179,7 +256,7 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
                     fill="#8884d8"
                     dataKey="value"
                   >
-                    {marketShareData.map((entry, index) => (
+                    {displayMarketShareData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
@@ -198,11 +275,24 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
 
         {/* Top国家柱状图 */}
         <div className="bg-white border border-black/5 p-8 rounded-[28px] shadow-sm">
-          <h3 className="text-[18px] font-bold text-[#1D1D1F] mb-6">{t('countryTrade.topCountries')}</h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-[18px] font-bold text-[#1D1D1F]">{t('countryTrade.topCountries')}</h3>
+            <button
+              onClick={() => setTopByYearPlaying((prev) => !prev)}
+              className="text-[11px] px-3 py-1.5 rounded-full border border-black/10 text-[#007AFF] hover:bg-[#F5F5F7] font-semibold"
+            >
+              {topByYearPlaying ? (t('countryTrade.showTotal') || 'Show Total') : (t('countryTrade.playByYear') || 'Play by Year')}
+            </button>
+          </div>
+          <p className="text-[11px] text-[#86868B] mb-4">
+            {topByYearPlaying && displayTopYear
+              ? `${t('countryTrade.playingYear') || 'Playing year'}: ${displayTopYear}`
+              : (t('countryTrade.totalWithinSelection') || 'Total within selected filter range')}
+          </p>
           <div className="h-[300px]">
-            {topCountriesData.length > 0 ? (
+            {displayTopCountriesData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={topCountriesData}>
+                <BarChart data={displayTopCountriesData}>
                   <XAxis 
                     dataKey="name" 
                     stroke="#86868B" 
