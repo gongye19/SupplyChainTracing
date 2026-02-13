@@ -93,6 +93,20 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
   }, [stats]);
 
   useEffect(() => {
+    if (yearlyTopData.length === 0) {
+      setMarketYearIndex(0);
+      setTopYearIndex(0);
+      return;
+    }
+    if (marketYearIndex >= yearlyTopData.length) {
+      setMarketYearIndex(0);
+    }
+    if (topYearIndex >= yearlyTopData.length) {
+      setTopYearIndex(0);
+    }
+  }, [yearlyTopData.length, marketYearIndex, topYearIndex]);
+
+  useEffect(() => {
     if (!marketByYearPlaying || yearlyTopData.length === 0) return;
     const timer = window.setInterval(() => {
       setMarketYearIndex((prev) => (prev + 1) % yearlyTopData.length);
@@ -117,14 +131,23 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
     return () => window.clearInterval(timer);
   }, [topByYearPlaying, yearlyTopData.length]);
 
-  const displayMarketShareData = marketByYearPlaying && yearlyTopData.length > 0
-    ? yearlyTopData[marketYearIndex].marketShare
+  const marketYearData =
+    yearlyTopData.length > 0
+      ? (yearlyTopData[marketYearIndex] || yearlyTopData[0])
+      : null;
+  const topYearData =
+    yearlyTopData.length > 0
+      ? (yearlyTopData[topYearIndex] || yearlyTopData[0])
+      : null;
+
+  const displayMarketShareData = marketByYearPlaying && marketYearData
+    ? marketYearData.marketShare
     : marketShareData;
-  const displayTopCountriesData = topByYearPlaying && yearlyTopData.length > 0
-    ? yearlyTopData[topYearIndex].topCountries
+  const displayTopCountriesData = topByYearPlaying && topYearData
+    ? topYearData.topCountries
     : topCountriesData;
-  const displayMarketYear = marketByYearPlaying && yearlyTopData.length > 0 ? yearlyTopData[marketYearIndex].year : null;
-  const displayTopYear = topByYearPlaying && yearlyTopData.length > 0 ? yearlyTopData[topYearIndex].year : null;
+  const displayMarketYear = marketByYearPlaying && marketYearData ? marketYearData.year : null;
+  const displayTopYear = topByYearPlaying && topYearData ? topYearData.year : null;
 
   return (
     <div className="space-y-6">

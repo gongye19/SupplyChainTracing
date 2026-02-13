@@ -786,7 +786,7 @@ const App: React.FC = () => {
 
                 {displayedCountryTradeSummary !== null && (
                   <CountryTradeStatsPanel
-                    stats={displayedCountryTradeStats}
+                    stats={countryTradeStats}
                     summary={displayedCountryTradeSummary}
                     trends={countryTradeTrends}
                     topCountries={topCountries}
