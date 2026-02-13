@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, Legend } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
 import { TrendingUp, Globe, DollarSign, Package } from 'lucide-react';
 import { CountryMonthlyTradeStat, CountryTradeStatSummary, CountryTradeTrend, TopCountry } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -115,11 +115,6 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
     : topCountriesData;
   const displayMarketYear = marketByYearPlaying && yearlyTopData.length > 0 ? yearlyTopData[marketYearIndex].year : null;
   const displayTopYear = topByYearPlaying && yearlyTopData.length > 0 ? yearlyTopData[topYearIndex].year : null;
-  const marketShareLabelMap = useMemo(() => {
-    const map = new Map<string, number>();
-    displayMarketShareData.forEach((item) => map.set(item.name, item.percentage));
-    return map;
-  }, [displayMarketShareData]);
 
   return (
     <div className="space-y-6">
@@ -266,15 +261,6 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Legend
-                    layout="vertical"
-                    align="right"
-                    verticalAlign="middle"
-                    formatter={(value: string) => {
-                      const pct = marketShareLabelMap.get(value) ?? 0;
-                      return `${value}: ${pct.toFixed(1)}%`;
-                    }}
-                  />
                   <Tooltip
                     formatter={(value: number) => formatCurrency(value)}
                   />

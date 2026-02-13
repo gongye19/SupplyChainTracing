@@ -775,7 +775,7 @@ const App: React.FC = () => {
                       ? `${t('countryTrade.playingYear') || 'Playing year'}: ${countryTradeYears[countryMapYearIndex]}`
                       : (t('countryTrade.totalWithinSelection') || 'Total within selected filter range')}
                   </p>
-                  <div className="h-[532px] pb-2">
+                  <div className="h-[510px] pb-5">
                       <CountryTradeMap
                       stats={displayedCountryTradeStats}
                         countries={countries}
