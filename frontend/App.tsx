@@ -66,6 +66,8 @@ const App: React.FC = () => {
   });
   const [countryTradeLoading, setCountryTradeLoading] = useState(false);
   const [availableHSCodes, setAvailableHSCodes] = useState<string[]>([]);
+  const [countryMapYearPlaying, setCountryMapYearPlaying] = useState(false);
+  const [countryMapYearIndex, setCountryMapYearIndex] = useState(0);
   
   // Refs for preview/final scheduling
   const filtersRef = useRef(mapFilters);
@@ -238,7 +240,7 @@ const App: React.FC = () => {
         }
 
         setCountryTradeLoading(true);
-
+        
         const [statsData, summaryData, trendsData, topCountriesData] = await Promise.all([
           countryTradeStatsAPI.getAll(countryTradeFilters),
           countryTradeStatsAPI.getSummary(countryTradeFilters),
@@ -292,7 +294,7 @@ const App: React.FC = () => {
 
     if (countryTradeTimerRef.current) window.clearTimeout(countryTradeTimerRef.current);
     countryTradeTimerRef.current = window.setTimeout(() => {
-      loadCountryTradeData();
+    loadCountryTradeData();
     }, 120);
     return () => {
       if (countryTradeTimerRef.current) window.clearTimeout(countryTradeTimerRef.current);
@@ -556,6 +558,49 @@ const App: React.FC = () => {
     });
   }, [shipments, hsCodeCategories, countries, getCountryCode]);
 
+  const countryTradeYears = useMemo(() => {
+    return Array.from(new Set(countryTradeStats.map((item) => item.year))).sort((a, b) => a - b);
+  }, [countryTradeStats]);
+
+  useEffect(() => {
+    if (!countryMapYearPlaying || countryTradeYears.length === 0) return;
+    const timer = window.setInterval(() => {
+      setCountryMapYearIndex((prev) => (prev + 1) % countryTradeYears.length);
+    }, 1500);
+    return () => window.clearInterval(timer);
+  }, [countryMapYearPlaying, countryTradeYears.length]);
+
+  const displayedCountryTradeStats = useMemo(() => {
+    if (!countryMapYearPlaying || countryTradeYears.length === 0) return countryTradeStats;
+    const year = countryTradeYears[countryMapYearIndex];
+    return countryTradeStats.filter((item) => item.year === year);
+  }, [countryMapYearPlaying, countryTradeYears, countryMapYearIndex, countryTradeStats]);
+
+  const displayedCountryTradeSummary = useMemo(() => {
+    if (!countryTradeSummary) return null;
+    if (!countryMapYearPlaying) return countryTradeSummary;
+
+    const statsForYear = displayedCountryTradeStats;
+    const totalCountries = new Set(statsForYear.map((s) => s.countryCode)).size;
+    const totalTradeValue = statsForYear.reduce((acc, s) => acc + s.sumOfUsd, 0);
+    const totalWeightVal = statsForYear.reduce((acc, s) => acc + (s.weight || 0), 0);
+    const totalQuantityVal = statsForYear.reduce((acc, s) => acc + (s.quantity || 0), 0);
+    const totalTradeCount = statsForYear.reduce((acc, s) => acc + s.tradeCount, 0);
+    const avgSharePct =
+      statsForYear.length > 0
+        ? statsForYear.reduce((acc, s) => acc + s.amountSharePct, 0) / statsForYear.length
+        : 0;
+
+    return {
+      totalCountries,
+      totalTradeValue,
+      totalWeight: totalWeightVal || undefined,
+      totalQuantity: totalQuantityVal || undefined,
+      totalTradeCount,
+      avgSharePct,
+    };
+  }, [countryMapYearPlaying, countryTradeSummary, displayedCountryTradeStats]);
+
   return (
     <div className="min-h-screen flex flex-col bg-[#F5F5F7] text-[#1D1D1F]">
       {/* Header */}
@@ -716,25 +761,38 @@ const App: React.FC = () => {
 
               <>
                 <div className="bg-white border border-black/5 rounded-[28px] p-6 shadow-sm h-[600px] overflow-hidden">
-                  <h3 className="text-[18px] font-bold text-[#1D1D1F] mb-4">{t('countryTrade.tradeMap')}</h3>
-                  <div className="h-[550px]">
-                    <CountryTradeMap
-                      stats={countryTradeStats}
-                      countries={countries}
-                      selectedHSCodes={countryTradeFilters.hsCode}
-                    />
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-[18px] font-bold text-[#1D1D1F]">{t('countryTrade.tradeMap')}</h3>
+                    <button
+                      onClick={() => setCountryMapYearPlaying((prev) => !prev)}
+                      className="text-[11px] px-3 py-1.5 rounded-full border border-black/10 text-[#007AFF] hover:bg-[#F5F5F7] font-semibold"
+                    >
+                      {countryMapYearPlaying ? (t('countryTrade.showTotal') || 'Show Total') : (t('countryTrade.playByYear') || 'Play by Year')}
+                    </button>
                   </div>
-                </div>
+                  <p className="text-[11px] text-[#86868B] mb-3">
+                    {countryMapYearPlaying && countryTradeYears.length > 0
+                      ? `${t('countryTrade.playingYear') || 'Playing year'}: ${countryTradeYears[countryMapYearIndex]}`
+                      : (t('countryTrade.totalWithinSelection') || 'Total within selected filter range')}
+                  </p>
+                  <div className="h-[532px] pb-2">
+                      <CountryTradeMap
+                      stats={displayedCountryTradeStats}
+                        countries={countries}
+                        selectedHSCodes={countryTradeFilters.hsCode}
+                      />
+                    </div>
+                  </div>
 
-                {countryTradeSummary !== null && (
+                {displayedCountryTradeSummary !== null && (
                   <CountryTradeStatsPanel
-                    stats={countryTradeStats}
-                    summary={countryTradeSummary}
+                    stats={displayedCountryTradeStats}
+                    summary={displayedCountryTradeSummary}
                     trends={countryTradeTrends}
                     topCountries={topCountries}
                   />
                 )}
-              </>
+                </>
             </div>
           )}
 
