@@ -7,6 +7,7 @@ import CountryTradeSidebar from './components/CountryTradeSidebar';
 import AIAssistant from './components/AIAssistant';
 import CountryTradeMap from './components/CountryTradeMap';
 import CountryTradeStatsPanel from './components/CountryTradeStatsPanel';
+import TopCountriesHorizontalBar, { TopCountriesDatum } from './components/TopCountriesHorizontalBar';
 import { Transaction, Filters, HSCodeCategory, CountryLocation, Location, Shipment, CountryMonthlyTradeStat, CountryTradeStatSummary, CountryTradeTrend, TopCountry, CountryTradeFilters } from './types';
 import { shipmentsAPI, hsCodeCategoriesAPI, countryLocationsAPI, chatAPI, ChatMessage, countryTradeStatsAPI } from './services/api';
 import { Globe, Map as MapIcon, Package, TrendingUp, Users, ChevronRight, Filter } from 'lucide-react';
@@ -641,6 +642,55 @@ const App: React.FC = () => {
     };
   }, [mapHsFilters]);
 
+  const buildTopCountries = useCallback(
+    (
+      data: Shipment[],
+      direction: 'import' | 'export',
+      metric: 'tradeValue' | 'tradeCount'
+    ): TopCountriesDatum[] => {
+      const aggregate = new Map<string, { tradeValue: number; tradeCount: number }>();
+      data.forEach((shipment) => {
+        const countryCode = direction === 'import'
+          ? shipment.destinationCountryCode
+          : shipment.originCountryCode;
+        if (!countryCode) return;
+        const prev = aggregate.get(countryCode) || { tradeValue: 0, tradeCount: 0 };
+        aggregate.set(countryCode, {
+          tradeValue: prev.tradeValue + (shipment.totalValueUsd || 0),
+          tradeCount: prev.tradeCount + (shipment.tradeCount || 0),
+        });
+      });
+
+      return Array.from(aggregate.entries())
+        .map(([countryCode, value]) => {
+          const countryName = countries.find((item) => item.countryCode === countryCode)?.countryName || countryCode;
+          return {
+            countryCode,
+            countryName,
+            value: metric === 'tradeValue' ? value.tradeValue : value.tradeCount,
+          };
+        })
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 10);
+    },
+    [countries]
+  );
+
+  const topCountriesByHSCodeMap = useMemo(() => {
+    if (activeView !== 'map-hscode') return [];
+    return buildTopCountries(filteredShipmentsForCurrentMap, mapHsFilters.tradeDirection || 'import', 'tradeCount');
+  }, [activeView, buildTopCountries, filteredShipmentsForCurrentMap, mapHsFilters.tradeDirection]);
+
+  const topCountriesByCountryMapValue = useMemo(() => {
+    if (activeView !== 'map-country') return [];
+    return buildTopCountries(filteredShipmentsForCurrentMap, mapCountryFilters.tradeDirection || 'import', 'tradeValue');
+  }, [activeView, buildTopCountries, filteredShipmentsForCurrentMap, mapCountryFilters.tradeDirection]);
+
+  const topCountriesByCountryMapCount = useMemo(() => {
+    if (activeView !== 'map-country') return [];
+    return buildTopCountries(filteredShipmentsForCurrentMap, mapCountryFilters.tradeDirection || 'import', 'tradeCount');
+  }, [activeView, buildTopCountries, filteredShipmentsForCurrentMap, mapCountryFilters.tradeDirection]);
+
   const countryTradeYears = useMemo(() => {
     return Array.from(new Set(countryTradeStats.map((item) => item.year))).sort((a, b) => a - b);
   }, [countryTradeStats]);
@@ -802,53 +852,79 @@ const App: React.FC = () => {
         {/* Main Content Area */}
         <section className="flex-1 flex flex-col p-6 relative">
           {activeView === 'map-country' || activeView === 'map-hscode' ? (
-            <div className="h-full flex flex-col relative">
+            <div className="flex flex-col gap-6 pr-4">
               {/* 地图内容 */}
               {initialLoading ? (
-                <div className="flex items-center justify-center h-full absolute inset-0 bg-white/80 backdrop-blur-sm z-10">
+                <div className="flex items-center justify-center h-[600px] bg-white/80 backdrop-blur-sm z-10 rounded-[28px] border border-black/5">
                   <div className="w-10 h-10 rounded-full border-2 border-[#D1D1D6] border-t-[#007AFF] animate-spin" />
                 </div>
               ) : (
                 <>
                   {activeView === 'map-country' ? (
-                    <SupplyMap 
-                      shipments={shipmentsForMap}
-                      transactions={[]}
-                      selectedCountries={currentMapFilters.selectedCountries}
-                      countries={countries}
-                      companies={[]}
-                      categories={[]}
-                      filters={currentMapFilters}
-                      isPreview={isInteracting}
-                    />
-                  ) : (
-                    <div className="bg-white border border-black/5 rounded-[28px] p-6 shadow-sm h-[630px] overflow-hidden">
-                      <div className="flex items-center justify-between mb-2">
-                        <h3 className="text-[18px] font-bold text-[#1D1D1F]">Trade Map by HSCode</h3>
+                    <>
+                      <div className="h-[600px]">
+                        <SupplyMap 
+                          shipments={shipmentsForMap}
+                          transactions={[]}
+                          selectedCountries={currentMapFilters.selectedCountries}
+                          countries={countries}
+                          companies={[]}
+                          categories={[]}
+                          filters={currentMapFilters}
+                          isPreview={isInteracting}
+                        />
                       </div>
-                      <p className="text-[11px] text-[#86868B] mb-3">Country intensity by transaction count</p>
-                      <div className="h-[510px] pb-5 relative">
-                        <div className="absolute left-3 top-3 z-30 w-fit">
-                          <div className="bg-white border border-black/10 rounded-[14px] shadow-md px-4 py-3 text-[11px] text-[#1D1D1F]">
-                            <div className="text-[10px] uppercase tracking-wider text-[#86868B] font-bold mb-1 flex items-center gap-1.5">
-                              <Filter className="w-3.5 h-3.5" />
-                              Filter Control
+                      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                        <TopCountriesHorizontalBar
+                          title="Top 10 Countries by Trade Value"
+                          data={topCountriesByCountryMapValue}
+                          valueFormatter={(value) => `$${(value / 1000000000).toFixed(2)}B`}
+                          barColor="#007AFF"
+                        />
+                        <TopCountriesHorizontalBar
+                          title="Top 10 Countries by Trade Count"
+                          data={topCountriesByCountryMapCount}
+                          valueFormatter={(value) => Math.round(value).toLocaleString()}
+                          barColor="#34C759"
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="bg-white border border-black/5 rounded-[28px] p-6 shadow-sm h-[630px] overflow-hidden">
+                        <div className="flex items-center justify-between mb-2">
+                          <h3 className="text-[18px] font-bold text-[#1D1D1F]">Trade Map by HSCode</h3>
+                        </div>
+                        <p className="text-[11px] text-[#86868B] mb-3">Country intensity by transaction count</p>
+                        <div className="h-[510px] pb-5 relative">
+                          <div className="absolute left-3 top-3 z-30 w-fit">
+                            <div className="bg-white border border-black/10 rounded-[14px] shadow-md px-4 py-3 text-[11px] text-[#1D1D1F]">
+                              <div className="text-[10px] uppercase tracking-wider text-[#86868B] font-bold mb-1 flex items-center gap-1.5">
+                                <Filter className="w-3.5 h-3.5" />
+                                Filter Control
+                              </div>
+                              <div><span className="text-[#86868B]">Time:</span> {hsCodeMapFilterSummary.time}</div>
+                              <div><span className="text-[#86868B]">Direction:</span> {hsCodeMapFilterSummary.direction}</div>
+                              <div className="max-w-[340px] truncate"><span className="text-[#86868B]">HS Code (4-digit):</span> {hsCodeMapFilterSummary.hsCodes}</div>
                             </div>
-                            <div><span className="text-[#86868B]">Time:</span> {hsCodeMapFilterSummary.time}</div>
-                            <div><span className="text-[#86868B]">Direction:</span> {hsCodeMapFilterSummary.direction}</div>
-                            <div className="max-w-[340px] truncate"><span className="text-[#86868B]">HS Code (4-digit):</span> {hsCodeMapFilterSummary.hsCodes}</div>
+                          </div>
+                          <div className="absolute inset-0">
+                            <CountryTradeMap
+                              stats={hsCodeMapStats}
+                              countries={countries}
+                              selectedHSCodes={[]}
+                              colorMetric="tradeCount"
+                            />
                           </div>
                         </div>
-                        <div className="absolute inset-0">
-                          <CountryTradeMap
-                            stats={hsCodeMapStats}
-                            countries={countries}
-                            selectedHSCodes={[]}
-                            colorMetric="tradeCount"
-                          />
-                        </div>
                       </div>
-                    </div>
+                      <TopCountriesHorizontalBar
+                        title="Top 10 Countries by Trade Count"
+                        data={topCountriesByHSCodeMap}
+                        valueFormatter={(value) => Math.round(value).toLocaleString()}
+                        barColor="#5856D6"
+                      />
+                    </>
                   )}
                 </>
               )}
