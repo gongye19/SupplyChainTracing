@@ -800,15 +800,15 @@ const App: React.FC = () => {
 
       <main className="flex-1 flex overflow-y-auto overflow-x-hidden">
         {/* Sidebar - Narrowed from 300px to 250px */}
-        <aside className="w-[250px] border-r border-black/5 bg-white flex flex-col p-5 gap-8 overflow-visible self-start">
+        <aside className="w-[280px] border-r border-black/5 bg-white flex flex-col p-5 gap-8 overflow-visible self-start">
            <div className="flex flex-col gap-1.5">
              <button 
                onClick={() => setActiveView('global-stats')}
                className={`flex items-center justify-between px-4 py-3 rounded-[12px] transition-all text-[14px] font-semibold ${activeView === 'global-stats' ? 'bg-[#007AFF] text-white shadow-lg shadow-blue-500/20' : 'text-[#86868B] hover:bg-black/5'}`}
              >
-               <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 min-w-0">
                  <Globe className="w-4 h-4" />
-                 {t('countryTrade.title')}
+                <span className="whitespace-nowrap">{t('countryTrade.title')}</span>
                </div>
                {activeView === 'global-stats' && <ChevronRight className="w-3.5 h-3.5" />}
              </button>
@@ -816,9 +816,9 @@ const App: React.FC = () => {
                onClick={() => setActiveView('map-country')}
                className={`flex items-center justify-between px-4 py-3 rounded-[12px] transition-all text-[14px] font-semibold ${activeView === 'map-country' ? 'bg-[#007AFF] text-white shadow-lg shadow-blue-500/20' : 'text-[#86868B] hover:bg-black/5'}`}
              >
-               <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 min-w-0">
                  <MapIcon className="w-4 h-4" />
-                 Trade Map by Country
+                <span className="whitespace-nowrap">Trade Map by Country</span>
                </div>
                {activeView === 'map-country' && <ChevronRight className="w-3.5 h-3.5" />}
              </button>
@@ -826,9 +826,9 @@ const App: React.FC = () => {
                onClick={() => setActiveView('map-hscode')}
                className={`flex items-center justify-between px-4 py-3 rounded-[12px] transition-all text-[14px] font-semibold ${activeView === 'map-hscode' ? 'bg-[#007AFF] text-white shadow-lg shadow-blue-500/20' : 'text-[#86868B] hover:bg-black/5'}`}
              >
-               <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 min-w-0">
                  <Package className="w-4 h-4" />
-                 Trade Map by HSCode
+                <span className="whitespace-nowrap">Trade Map by HSCode</span>
                </div>
                {activeView === 'map-hscode' && <ChevronRight className="w-3.5 h-3.5" />}
              </button>
