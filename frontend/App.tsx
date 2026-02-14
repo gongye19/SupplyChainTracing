@@ -30,6 +30,7 @@ const App: React.FC = () => {
     endDate,
     tradeDirection: 'import',
     selectedCountries: [],
+    selectedHSCode4Digit: [],
     selectedHSCodeCategories: [],
     selectedHSCodeSubcategories: [],
     selectedCompanies: []
@@ -40,7 +41,9 @@ const App: React.FC = () => {
   };
   const defaultHsMapFilters: Filters = {
     ...defaultFilters,
-    selectedCountries: ['CHN'],
+    selectedHSCode4Digit: ['8542'],
+    selectedHSCodeCategories: ['85'],
+    selectedHSCodeSubcategories: ['42'],
   };
   const [mapCountryFilters, setMapCountryFilters] = useState<Filters>(defaultCountryMapFilters);
   const [mapHsFilters, setMapHsFilters] = useState<Filters>(defaultHsMapFilters);
@@ -480,16 +483,24 @@ const App: React.FC = () => {
 
   const filteredShipmentsForCurrentMap = useMemo(() => {
     const activeFilters = currentMapFilters;
+    const isHsCodeMapView = activeView === 'map-hscode';
     const focusCountries = new Set(activeFilters.selectedCountries || []);
+    const hs4Set = new Set(activeFilters.selectedHSCode4Digit || []);
+    const hasHs4Filter = hs4Set.size > 0;
     const subcategorySet = new Set(activeFilters.selectedHSCodeSubcategories || []);
     const hasSubcategoryFilter = subcategorySet.size > 0;
     const direction = activeFilters.tradeDirection || 'import';
 
     return shipments.filter((shipment) => {
+      if (isHsCodeMapView && hasHs4Filter) {
+        const hs4 = shipment.hsCode?.slice(0, 4);
+        if (!hs4 || !hs4Set.has(hs4)) return false;
+      }
       if (hasSubcategoryFilter) {
         const sub = shipment.hsCode?.slice(2, 4);
         if (!sub || !subcategorySet.has(sub)) return false;
       }
+      if (isHsCodeMapView) return true;
       if (focusCountries.size === 0) return true;
       const origin = shipment.originCountryCode;
       const dest = shipment.destinationCountryCode;
@@ -498,7 +509,7 @@ const App: React.FC = () => {
       }
       return !!origin && focusCountries.has(origin);
     });
-  }, [shipments, currentMapFilters]);
+  }, [shipments, currentMapFilters, activeView]);
 
   // 将聚合统计数据按国家对聚合，转换为地图组件格式
   const shipmentsForMap = useMemo(() => {
@@ -591,8 +602,8 @@ const App: React.FC = () => {
 
     filteredShipmentsForCurrentMap.forEach((shipment) => {
       const countryCode = direction === 'import'
-        ? shipment.originCountryCode
-        : shipment.destinationCountryCode;
+        ? shipment.destinationCountryCode
+        : shipment.originCountryCode;
       if (!countryCode) return;
       const current = countryMap.get(countryCode) || { sumOfUsd: 0, tradeCount: 0 };
       countryMap.set(countryCode, {
@@ -611,6 +622,21 @@ const App: React.FC = () => {
       amountSharePct: 0,
     }));
   }, [filteredShipmentsForCurrentMap, mapHsFilters.tradeDirection]);
+
+  const hsCodeMapFilterSummary = useMemo(() => {
+    const hs4 = mapHsFilters.selectedHSCode4Digit || [];
+    const hsLabel =
+      hs4.length === 0
+        ? 'All'
+        : hs4.length <= 4
+          ? hs4.join(', ')
+          : `${hs4.slice(0, 4).join(', ')} +${hs4.length - 4}`;
+    return {
+      time: `${mapHsFilters.startDate} ~ ${mapHsFilters.endDate}`,
+      direction: mapHsFilters.tradeDirection === 'import' ? 'Import' : 'Export',
+      hsCodes: hsLabel,
+    };
+  }, [mapHsFilters]);
 
   const countryTradeYears = useMemo(() => {
     return Array.from(new Set(countryTradeStats.map((item) => item.year))).sort((a, b) => a - b);
@@ -793,9 +819,20 @@ const App: React.FC = () => {
                       isPreview={isInteracting}
                     />
                   ) : (
-                    <div className="bg-white border border-black/5 rounded-[28px] p-6 shadow-sm h-full overflow-hidden">
-                      <h3 className="text-[18px] font-bold text-[#1D1D1F] mb-4">Trade Map by HSCode</h3>
-                      <div className="h-[calc(100%-2rem)]">
+                    <div className="bg-white border border-black/5 rounded-[28px] p-6 shadow-sm h-[600px] overflow-hidden">
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-[18px] font-bold text-[#1D1D1F]">Trade Map by HSCode</h3>
+                      </div>
+                      <p className="text-[11px] text-[#86868B] mb-3">Country intensity by transaction count</p>
+                      <div className="h-[510px] pb-5 relative">
+                        <div className="absolute left-3 top-3 z-20 w-fit">
+                          <div className="bg-white/92 backdrop-blur border border-black/10 rounded-[14px] shadow-md px-4 py-3 text-[11px] text-[#1D1D1F]">
+                            <div className="text-[10px] uppercase tracking-wider text-[#86868B] font-bold mb-1">Filter Control</div>
+                            <div><span className="text-[#86868B]">Time:</span> {hsCodeMapFilterSummary.time}</div>
+                            <div><span className="text-[#86868B]">Direction:</span> {hsCodeMapFilterSummary.direction}</div>
+                            <div className="max-w-[340px] truncate"><span className="text-[#86868B]">HS Code (4-digit):</span> {hsCodeMapFilterSummary.hsCodes}</div>
+                          </div>
+                        </div>
                         <CountryTradeMap
                           stats={hsCodeMapStats}
                           countries={countries}

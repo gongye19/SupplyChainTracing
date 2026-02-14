@@ -75,6 +75,7 @@ export interface Filters {
   endDate: string;   // YYYY-MM 格式
   tradeDirection: 'import' | 'export';
   selectedCountries: string[]; // 国家代码数组（ISO3，如 CHN/USA）
+  selectedHSCode4Digit: string[]; // HS Code 4位数组（如 ["8542", "3818"]）
   selectedHSCodeCategories: string[]; // HS Code 2位大类数组（如 ["42", "54", "62"]）
   selectedHSCodeSubcategories: string[]; // HS Code 2位小类数组（如 ["04", "07", "05"]）
   selectedCompanies: string[]; // 公司名称数组
