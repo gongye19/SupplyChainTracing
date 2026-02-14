@@ -861,7 +861,7 @@ const App: React.FC = () => {
             />
           )}
           
-          {activeView !== 'global-stats' && (
+          {activeView === 'map-country' && (
             <div className="mt-auto pt-8 border-t border-black/5 space-y-4">
              <div className="bg-[#F5F5F7] p-4 rounded-[20px] space-y-3 border border-black/5">
                <div className="flex items-center justify-between">
@@ -917,28 +917,44 @@ const App: React.FC = () => {
                       </div>
                       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                         <TopCountriesHorizontalBar
-                          title="selected trade value ranking"
+                          title="Selected Trade Value Ranking"
                           data={topCountriesByCountryMapValue}
                           valueFormatter={(value) => `$${(value / 1000000000).toFixed(2)}B`}
                           barColor="#007AFF"
+                          metaLines={[
+                            `Time: ${mapCountryFilters.startDate} ~ ${mapCountryFilters.endDate}`,
+                            `Direction: ${mapCountryFilters.tradeDirection === 'import' ? 'Import' : 'Export'}`,
+                          ]}
                         />
                         <TopCountriesHorizontalBar
-                          title="selected trade amount ranking"
+                          title="Selected Trade Amount Ranking"
                           data={topCountriesByCountryMapCount}
                           valueFormatter={(value) => Math.round(value).toLocaleString()}
                           barColor="#34C759"
+                          metaLines={[
+                            `Time: ${mapCountryFilters.startDate} ~ ${mapCountryFilters.endDate}`,
+                            `Direction: ${mapCountryFilters.tradeDirection === 'import' ? 'Import' : 'Export'}`,
+                          ]}
                         />
                         <TopCountriesHorizontalBar
-                          title="overall trade value ranking"
+                          title="Overall Top 10 Trade Value Ranking"
                           data={topCountriesByCountryOverallValue}
                           valueFormatter={(value) => `$${(value / 1000000000).toFixed(2)}B`}
                           barColor="#5856D6"
+                          metaLines={[
+                            `Time: ${mapCountryFilters.startDate} ~ ${mapCountryFilters.endDate}`,
+                            `Direction: ${mapCountryFilters.tradeDirection === 'import' ? 'Import' : 'Export'}`,
+                          ]}
                         />
                         <TopCountriesHorizontalBar
-                          title="overall trade amount ranking"
+                          title="Overall Top 10 Trade Amount Ranking"
                           data={topCountriesByCountryOverallCount}
                           valueFormatter={(value) => Math.round(value).toLocaleString()}
                           barColor="#FF9500"
+                          metaLines={[
+                            `Time: ${mapCountryFilters.startDate} ~ ${mapCountryFilters.endDate}`,
+                            `Direction: ${mapCountryFilters.tradeDirection === 'import' ? 'Import' : 'Export'}`,
+                          ]}
                         />
                       </div>
                     </>
