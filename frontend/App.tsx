@@ -827,19 +827,19 @@ const App: React.FC = () => {
                         <h3 className="text-[18px] font-bold text-[#1D1D1F]">Trade Map by HSCode</h3>
                       </div>
                       <p className="text-[11px] text-[#86868B] mb-3">Country intensity by transaction count</p>
-                      <div className="sticky top-20 z-30 w-fit mb-3">
-                        <div className="bg-white border border-black/10 rounded-[14px] shadow-md px-4 py-3 text-[11px] text-[#1D1D1F]">
-                          <div className="text-[10px] uppercase tracking-wider text-[#86868B] font-bold mb-1 flex items-center gap-1.5">
-                            <Filter className="w-3.5 h-3.5" />
-                            Filter Control
-                          </div>
-                          <div><span className="text-[#86868B]">Time:</span> {hsCodeMapFilterSummary.time}</div>
-                          <div><span className="text-[#86868B]">Direction:</span> {hsCodeMapFilterSummary.direction}</div>
-                          <div className="max-w-[340px] truncate"><span className="text-[#86868B]">HS Code (4-digit):</span> {hsCodeMapFilterSummary.hsCodes}</div>
-                        </div>
-                      </div>
                       <div className="h-[510px] pb-5 relative">
-                        <div className="absolute inset-x-0 top-0 bottom-7">
+                        <div className="absolute left-3 top-3 z-30 w-fit">
+                          <div className="bg-white border border-black/10 rounded-[14px] shadow-md px-4 py-3 text-[11px] text-[#1D1D1F]">
+                            <div className="text-[10px] uppercase tracking-wider text-[#86868B] font-bold mb-1 flex items-center gap-1.5">
+                              <Filter className="w-3.5 h-3.5" />
+                              Filter Control
+                            </div>
+                            <div><span className="text-[#86868B]">Time:</span> {hsCodeMapFilterSummary.time}</div>
+                            <div><span className="text-[#86868B]">Direction:</span> {hsCodeMapFilterSummary.direction}</div>
+                            <div className="max-w-[340px] truncate"><span className="text-[#86868B]">HS Code (4-digit):</span> {hsCodeMapFilterSummary.hsCodes}</div>
+                          </div>
+                        </div>
+                        <div className="absolute inset-0">
                           <CountryTradeMap
                             stats={hsCodeMapStats}
                             countries={countries}
