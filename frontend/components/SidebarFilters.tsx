@@ -317,7 +317,9 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
             className="w-full bg-[#F5F5F7] border border-black/5 rounded-[12px] px-3 py-2.5 flex items-center justify-between text-[12px] text-[#1D1D1F] font-semibold hover:bg-[#EBEBEB] transition-all shadow-sm"
           >
             <span className="truncate">
-              {filters.selectedHSCode4Digit.length === 0 ? 'Select HS Codes' : `${filters.selectedHSCode4Digit.length} selected`}
+              {filters.selectedHSCode4Digit.length === 0
+                ? 'Select HSCode'
+                : filters.selectedHSCode4Digit.join(', ')}
             </span>
             <ChevronDown className="w-3.5 h-3.5 text-[#86868B]" />
           </button>

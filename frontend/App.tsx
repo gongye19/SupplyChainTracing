@@ -9,7 +9,7 @@ import CountryTradeMap from './components/CountryTradeMap';
 import CountryTradeStatsPanel from './components/CountryTradeStatsPanel';
 import { Transaction, Filters, HSCodeCategory, CountryLocation, Location, Shipment, CountryMonthlyTradeStat, CountryTradeStatSummary, CountryTradeTrend, TopCountry, CountryTradeFilters } from './types';
 import { shipmentsAPI, hsCodeCategoriesAPI, countryLocationsAPI, chatAPI, ChatMessage, countryTradeStatsAPI } from './services/api';
-import { Globe, Map as MapIcon, Package, TrendingUp, Users, ChevronRight } from 'lucide-react';
+import { Globe, Map as MapIcon, Package, TrendingUp, Users, ChevronRight, Filter } from 'lucide-react';
 import { useLanguage } from './contexts/LanguageContext';
 import { getHSCodeColorCached } from './utils/hsCodeColors';
 import { getCountriesFromCodes } from './utils/countryCoordinates';
@@ -492,6 +492,9 @@ const App: React.FC = () => {
     const direction = activeFilters.tradeDirection || 'import';
 
     return shipments.filter((shipment) => {
+      if (isHsCodeMapView && !hasHs4Filter) {
+        return false;
+      }
       if (isHsCodeMapView && hasHs4Filter) {
         const hs4 = shipment.hsCode?.slice(0, 4);
         if (!hs4 || !hs4Set.has(hs4)) return false;
@@ -824,16 +827,19 @@ const App: React.FC = () => {
                         <h3 className="text-[18px] font-bold text-[#1D1D1F]">Trade Map by HSCode</h3>
                       </div>
                       <p className="text-[11px] text-[#86868B] mb-3">Country intensity by transaction count</p>
-                      <div className="h-[510px] pb-5 relative">
-                        <div className="sticky top-20 z-20 w-fit ml-3 mt-3">
-                          <div className="bg-white/92 backdrop-blur border border-black/10 rounded-[14px] shadow-md px-4 py-3 text-[11px] text-[#1D1D1F]">
-                            <div className="text-[10px] uppercase tracking-wider text-[#86868B] font-bold mb-1">Filter Control</div>
-                            <div><span className="text-[#86868B]">Time:</span> {hsCodeMapFilterSummary.time}</div>
-                            <div><span className="text-[#86868B]">Direction:</span> {hsCodeMapFilterSummary.direction}</div>
-                            <div className="max-w-[340px] truncate"><span className="text-[#86868B]">HS Code (4-digit):</span> {hsCodeMapFilterSummary.hsCodes}</div>
+                      <div className="sticky top-20 z-30 w-fit mb-3">
+                        <div className="bg-white border border-black/10 rounded-[14px] shadow-md px-4 py-3 text-[11px] text-[#1D1D1F]">
+                          <div className="text-[10px] uppercase tracking-wider text-[#86868B] font-bold mb-1 flex items-center gap-1.5">
+                            <Filter className="w-3.5 h-3.5" />
+                            Filter Control
                           </div>
+                          <div><span className="text-[#86868B]">Time:</span> {hsCodeMapFilterSummary.time}</div>
+                          <div><span className="text-[#86868B]">Direction:</span> {hsCodeMapFilterSummary.direction}</div>
+                          <div className="max-w-[340px] truncate"><span className="text-[#86868B]">HS Code (4-digit):</span> {hsCodeMapFilterSummary.hsCodes}</div>
                         </div>
-                        <div className="absolute inset-0">
+                      </div>
+                      <div className="h-[510px] pb-5 relative">
+                        <div className="absolute inset-x-0 top-0 bottom-7">
                           <CountryTradeMap
                             stats={hsCodeMapStats}
                             countries={countries}
