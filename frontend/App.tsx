@@ -28,17 +28,22 @@ const App: React.FC = () => {
   const defaultFilters: Filters = {
     startDate,
     endDate,
+    tradeDirection: 'import',
     selectedCountries: [],
     selectedHSCodeCategories: [],
     selectedHSCodeSubcategories: [],
     selectedCompanies: []
   };
-  const defaultMapFilters: Filters = {
+  const defaultCountryMapFilters: Filters = {
     ...defaultFilters,
     selectedCountries: ['CHN'],
   };
-  const [mapCountryFilters, setMapCountryFilters] = useState<Filters>(defaultMapFilters);
-  const [mapHsFilters, setMapHsFilters] = useState<Filters>(defaultFilters);
+  const defaultHsMapFilters: Filters = {
+    ...defaultFilters,
+    selectedCountries: ['CHN'],
+  };
+  const [mapCountryFilters, setMapCountryFilters] = useState<Filters>(defaultCountryMapFilters);
+  const [mapHsFilters, setMapHsFilters] = useState<Filters>(defaultHsMapFilters);
 
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [hsCodeCategories, setHsCodeCategories] = useState<HSCodeCategory[]>([]);
@@ -121,7 +126,7 @@ const App: React.FC = () => {
           allShipmentsData = await shipmentsAPI.getAll({
             startDate,
             endDate,
-            selectedCountries: defaultMapFilters.selectedCountries,
+            selectedCountries: defaultCountryMapFilters.selectedCountries,
           });
         }
         logger.debug('[Init] HS categories:', hsCodeCatsData.length, 'countries:', locationsData.length, 'shipments:', allShipmentsData.length);
@@ -473,8 +478,29 @@ const App: React.FC = () => {
     };
   }, [activeView, currentMapFilters, hsCodeCategories.length, countries.length, scheduleFetch]);
 
+  const filteredShipmentsForCurrentMap = useMemo(() => {
+    const activeFilters = currentMapFilters;
+    const focusCountries = new Set(activeFilters.selectedCountries || []);
+    const subcategorySet = new Set(activeFilters.selectedHSCodeSubcategories || []);
+    const hasSubcategoryFilter = subcategorySet.size > 0;
+    const direction = activeFilters.tradeDirection || 'import';
+
+    return shipments.filter((shipment) => {
+      if (hasSubcategoryFilter) {
+        const sub = shipment.hsCode?.slice(2, 4);
+        if (!sub || !subcategorySet.has(sub)) return false;
+      }
+      if (focusCountries.size === 0) return true;
+      const origin = shipment.originCountryCode;
+      const dest = shipment.destinationCountryCode;
+      if (direction === 'import') {
+        return !!dest && focusCountries.has(dest);
+      }
+      return !!origin && focusCountries.has(origin);
+    });
+  }, [shipments, currentMapFilters]);
+
   // 将聚合统计数据按国家对聚合，转换为地图组件格式
-  // 每个国家对（原产国 → 目的地国家）合并成一条线
   const shipmentsForMap = useMemo(() => {
     // 按国家对聚合所有交易
     const countryPairGroups = new Map<string, {
@@ -488,7 +514,7 @@ const App: React.FC = () => {
       hsCodes: Set<string>;
     }>();
     
-    shipments.forEach(shipment => {
+    filteredShipmentsForCurrentMap.forEach(shipment => {
       // 使用原产国和目的地国家代码
       const originCountryCode = shipment.originCountryCode || getCountryCode(shipment.countryOfOrigin || '');
       const destinationCountryCode = shipment.destinationCountryCode || getCountryCode(shipment.destinationCountry || '');
@@ -557,7 +583,34 @@ const App: React.FC = () => {
         weight: group.totalWeight,
       };
     });
-  }, [shipments, hsCodeCategories, countries, getCountryCode]);
+  }, [filteredShipmentsForCurrentMap, hsCodeCategories, countries, getCountryCode]);
+
+  const hsCodeMapStats = useMemo(() => {
+    const direction = mapHsFilters.tradeDirection || 'import';
+    const countryMap = new Map<string, { sumOfUsd: number; tradeCount: number }>();
+
+    filteredShipmentsForCurrentMap.forEach((shipment) => {
+      const countryCode = direction === 'import'
+        ? shipment.originCountryCode
+        : shipment.destinationCountryCode;
+      if (!countryCode) return;
+      const current = countryMap.get(countryCode) || { sumOfUsd: 0, tradeCount: 0 };
+      countryMap.set(countryCode, {
+        sumOfUsd: current.sumOfUsd + (shipment.totalValueUsd || 0),
+        tradeCount: current.tradeCount + (shipment.tradeCount || 0),
+      });
+    });
+
+    return Array.from(countryMap.entries()).map(([countryCode, data]) => ({
+      hsCode: 'ALL',
+      year: 0,
+      month: 0,
+      countryCode,
+      sumOfUsd: data.sumOfUsd,
+      tradeCount: data.tradeCount,
+      amountSharePct: 0,
+    }));
+  }, [filteredShipmentsForCurrentMap, mapHsFilters.tradeDirection]);
 
   const countryTradeYears = useMemo(() => {
     return Array.from(new Set(countryTradeStats.map((item) => item.year))).sort((a, b) => a - b);
@@ -728,16 +781,30 @@ const App: React.FC = () => {
                 </div>
               ) : (
                 <>
-                  <SupplyMap 
-                    shipments={shipmentsForMap}
-                    transactions={[]}
-                    selectedCountries={currentMapFilters.selectedCountries}
-                    countries={countries}
-                    companies={[]}
-                    categories={[]}
-                    filters={currentMapFilters}
-                    isPreview={isInteracting}
-                  />
+                  {activeView === 'map-country' ? (
+                    <SupplyMap 
+                      shipments={shipmentsForMap}
+                      transactions={[]}
+                      selectedCountries={currentMapFilters.selectedCountries}
+                      countries={countries}
+                      companies={[]}
+                      categories={[]}
+                      filters={currentMapFilters}
+                      isPreview={isInteracting}
+                    />
+                  ) : (
+                    <div className="bg-white border border-black/5 rounded-[28px] p-6 shadow-sm h-full overflow-hidden">
+                      <h3 className="text-[18px] font-bold text-[#1D1D1F] mb-4">Trade Map by HSCode</h3>
+                      <div className="h-[calc(100%-2rem)]">
+                        <CountryTradeMap
+                          stats={hsCodeMapStats}
+                          countries={countries}
+                          selectedHSCodes={[]}
+                          colorMetric="tradeCount"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
             </div>

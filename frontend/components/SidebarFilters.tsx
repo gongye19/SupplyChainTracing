@@ -180,6 +180,7 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
   const showCountries = mode === 'all' || mode === 'country';
   const showHsCategories = mode === 'all' || mode === 'hscode';
   const showHsSubcategories = mode === 'all' || mode === 'hscode';
+  const showTradeDirection = mode === 'country' || mode === 'hscode';
 
   return (
     <div className="flex flex-col gap-10 p-1">
@@ -193,14 +194,15 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
             const now = new Date();
             const currentYear = now.getFullYear();
             const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
-            setFilters({ 
+            setFilters(prev => ({ 
               startDate: '2021-01',
               endDate: `${currentYear}-${currentMonth}`,
-              selectedCountries: [], 
+              tradeDirection: 'import',
+              selectedCountries: mode === 'hscode' ? prev.selectedCountries : [],
               selectedHSCodeCategories: [],
               selectedHSCodeSubcategories: [],
               selectedCompanies: [],
-            });
+            }));
           }}
           className="text-[12px] text-[#007AFF] hover:underline font-semibold"
         >
@@ -219,6 +221,38 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
           setFilters(prev => ({ ...prev, startDate: startMonth, endDate: endMonth }));
         }}
       />
+
+      {showTradeDirection && (
+        <section className="space-y-2.5">
+          <label className="text-[11px] font-bold text-[#86868B] uppercase tracking-widest">
+            Trade Direction
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setFilters(prev => ({ ...prev, tradeDirection: 'import' }))}
+              className={`px-3 py-2.5 rounded-[12px] text-[12px] font-semibold border transition-all ${
+                filters.tradeDirection === 'import'
+                  ? 'bg-[#007AFF] text-white border-[#007AFF]'
+                  : 'bg-[#F5F5F7] text-[#1D1D1F] border-black/5 hover:bg-[#EBEBEB]'
+              }`}
+            >
+              Import
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilters(prev => ({ ...prev, tradeDirection: 'export' }))}
+              className={`px-3 py-2.5 rounded-[12px] text-[12px] font-semibold border transition-all ${
+                filters.tradeDirection === 'export'
+                  ? 'bg-[#007AFF] text-white border-[#007AFF]'
+                  : 'bg-[#F5F5F7] text-[#1D1D1F] border-black/5 hover:bg-[#EBEBEB]'
+              }`}
+            >
+              Export
+            </button>
+          </div>
+        </section>
+      )}
 
       {/* 国家筛选 */}
       {showCountries && (

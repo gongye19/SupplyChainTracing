@@ -27,6 +27,7 @@ const sameFilters = (a?: Filters, b?: Filters) => {
   return (
     a.startDate === b.startDate &&
     a.endDate === b.endDate &&
+    a.tradeDirection === b.tradeDirection &&
     sameStringArray(a.selectedCountries, b.selectedCountries) &&
     sameStringArray(a.selectedCompanies, b.selectedCompanies) &&
     sameStringArray(a.selectedHSCodeCategories, b.selectedHSCodeCategories) &&

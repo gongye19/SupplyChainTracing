@@ -10,12 +10,14 @@ interface CountryTradeMapProps {
   stats: CountryMonthlyTradeStat[];
   countries: CountryLocation[];
   selectedHSCodes?: string[];
+  colorMetric?: 'tradeValue' | 'tradeCount';
 }
 
 const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({ 
   stats,
   countries,
   selectedHSCodes = [],
+  colorMetric = 'tradeValue',
 }) => {
   const { t } = useLanguage();
   const svgRef = useRef<SVGSVGElement>(null);
@@ -54,11 +56,17 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
     return tradeMap;
   }, [stats, selectedHSCodes]);
 
-  // 获取最大贸易额用于颜色映射
-  const maxTradeValue = useMemo(() => {
+  const metricOf = useMemo(
+    () => (item: { sumOfUsd: number; tradeCount: number }) =>
+      colorMetric === 'tradeCount' ? item.tradeCount : item.sumOfUsd,
+    [colorMetric]
+  );
+
+  // 获取最大值用于颜色映射
+  const maxMetricValue = useMemo(() => {
     if (countryTradeData.size === 0) return 1;
-    return Math.max(...Array.from(countryTradeData.values()).map(d => d.sumOfUsd));
-  }, [countryTradeData]);
+    return Math.max(...Array.from(countryTradeData.values()).map(metricOf));
+  }, [countryTradeData, metricOf]);
 
   // 颜色比例尺 - 使用更明显的颜色（从浅蓝到深蓝，增强对比度）
   const colorScale = useMemo(() => {
@@ -66,8 +74,8 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
     return d3.scaleSequential((t: number) => {
       // 从浅蓝 (#E3F2FD) 到深蓝 (#1565C0)，增强对比度
       return d3.interpolateRgb('#E3F2FD', '#1565C0')(Math.pow(t, 0.6)); // 使用幂函数增强低值的颜色深度
-    }).domain([0, maxTradeValue]);
-  }, [maxTradeValue]);
+    }).domain([0, maxMetricValue]);
+  }, [maxMetricValue]);
 
   useEffect(() => {
     const countryLocationMap = new Map<string, CountryLocation>();
@@ -176,12 +184,16 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
           .style('filter', 'brightness(1.2) drop-shadow(0 0 8px rgba(0, 122, 255, 0.6))');
         
         // 显示tooltip
-        if (tradeData && tradeData.sumOfUsd > 0) {
+        const metricValue = tradeData ? metricOf(tradeData) : 0;
+        if (tradeData && metricValue > 0) {
           d3Tooltip
             .style('visibility', 'visible')
             .html(`
               <div style="font-weight: 600; margin-bottom: 6px; font-size: 14px;">${countryName || 'Unknown'}</div>
-              <div style="margin-bottom: 4px;">${t('countryTrade.tradeValue')}: <strong>$${(tradeData.sumOfUsd / 1000000).toFixed(2)}M</strong></div>
+              <div style="margin-bottom: 4px;">
+                ${colorMetric === 'tradeCount' ? t('countryTrade.transactionCount') : t('countryTrade.tradeValue')}:
+                <strong>${colorMetric === 'tradeCount' ? tradeData.tradeCount.toLocaleString() : `$${(tradeData.sumOfUsd / 1000000).toFixed(2)}M`}</strong>
+              </div>
               <div>${t('countryTrade.transactionCount')}: <strong>${tradeData.tradeCount.toLocaleString()}</strong></div>
             `);
         } else if (countryName) {
@@ -236,7 +248,8 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
       const selection = d3.select(this);
       const countryCode = selection.attr('data-country-code');
       const tradeData = countryCode ? countryTradeData.get(countryCode) : undefined;
-      const nextFill = tradeData && tradeData.sumOfUsd > 0 ? colorScale(tradeData.sumOfUsd) : '#EBEBEB';
+      const metricValue = tradeData ? metricOf(tradeData) : 0;
+      const nextFill = tradeData && metricValue > 0 ? colorScale(metricValue) : '#EBEBEB';
       if (selection.attr('fill') !== nextFill) {
         selection.attr('fill', nextFill);
       }
@@ -248,7 +261,7 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
       gNodesRef.current.selectAll('circle.country-node').remove();
     }
 
-  }, [countryTradeData, colorScale, countries.length, geoJsonLoaded]);
+  }, [countryTradeData, colorScale, countries.length, geoJsonLoaded, metricOf]);
 
   return (
     <div className="w-full h-full relative" style={{ minHeight: '400px' }}>
