@@ -825,7 +825,7 @@ const App: React.FC = () => {
                       </div>
                       <p className="text-[11px] text-[#86868B] mb-3">Country intensity by transaction count</p>
                       <div className="h-[510px] pb-5 relative">
-                        <div className="absolute left-3 top-3 z-20 w-fit">
+                        <div className="sticky top-20 z-20 w-fit ml-3 mt-3">
                           <div className="bg-white/92 backdrop-blur border border-black/10 rounded-[14px] shadow-md px-4 py-3 text-[11px] text-[#1D1D1F]">
                             <div className="text-[10px] uppercase tracking-wider text-[#86868B] font-bold mb-1">Filter Control</div>
                             <div><span className="text-[#86868B]">Time:</span> {hsCodeMapFilterSummary.time}</div>
@@ -833,12 +833,14 @@ const App: React.FC = () => {
                             <div className="max-w-[340px] truncate"><span className="text-[#86868B]">HS Code (4-digit):</span> {hsCodeMapFilterSummary.hsCodes}</div>
                           </div>
                         </div>
-                        <CountryTradeMap
-                          stats={hsCodeMapStats}
-                          countries={countries}
-                          selectedHSCodes={[]}
-                          colorMetric="tradeCount"
-                        />
+                        <div className="absolute inset-0">
+                          <CountryTradeMap
+                            stats={hsCodeMapStats}
+                            countries={countries}
+                            selectedHSCodes={[]}
+                            colorMetric="tradeCount"
+                          />
+                        </div>
                       </div>
                     </div>
                   )}
