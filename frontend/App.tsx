@@ -50,6 +50,7 @@ const App: React.FC = () => {
   const [mapHsFilters, setMapHsFilters] = useState<Filters>(defaultHsMapFilters);
 
   const [shipments, setShipments] = useState<Shipment[]>([]);
+  const [countryOverallShipments, setCountryOverallShipments] = useState<Shipment[]>([]);
   const [hsCodeCategories, setHsCodeCategories] = useState<HSCodeCategory[]>([]);
   const [countries, setCountries] = useState<CountryLocation[]>([]);
   const [companies, setCompanies] = useState<string[]>([]);
@@ -83,6 +84,7 @@ const App: React.FC = () => {
   const filtersRef = useRef(currentMapFilters);
   useEffect(() => { filtersRef.current = currentMapFilters; }, [currentMapFilters]);
   const abortRef = useRef<AbortController | null>(null);
+  const countryOverallAbortRef = useRef<AbortController | null>(null);
   const finalTimerRef = useRef<number | null>(null);
   const countryTradeTimerRef = useRef<number | null>(null);
   const countryTradeCacheRef = useRef<
@@ -691,6 +693,45 @@ const App: React.FC = () => {
     return buildTopCountries(filteredShipmentsForCurrentMap, mapCountryFilters.tradeDirection || 'import', 'tradeCount');
   }, [activeView, buildTopCountries, filteredShipmentsForCurrentMap, mapCountryFilters.tradeDirection]);
 
+  const topCountriesByCountryOverallValue = useMemo(() => {
+    if (activeView !== 'map-country') return [];
+    return buildTopCountries(countryOverallShipments, mapCountryFilters.tradeDirection || 'import', 'tradeValue');
+  }, [activeView, buildTopCountries, countryOverallShipments, mapCountryFilters.tradeDirection]);
+
+  const topCountriesByCountryOverallCount = useMemo(() => {
+    if (activeView !== 'map-country') return [];
+    return buildTopCountries(countryOverallShipments, mapCountryFilters.tradeDirection || 'import', 'tradeCount');
+  }, [activeView, buildTopCountries, countryOverallShipments, mapCountryFilters.tradeDirection]);
+
+  useEffect(() => {
+    if (activeView !== 'map-country') return;
+    countryOverallAbortRef.current?.abort();
+    const controller = new AbortController();
+    countryOverallAbortRef.current = controller;
+
+    const loadOverallCountryShipments = async () => {
+      try {
+        const data = await shipmentsAPI.getAll(
+          {
+            startDate: mapCountryFilters.startDate,
+            endDate: mapCountryFilters.endDate,
+            selectedCountries: [],
+          },
+          { signal: controller.signal }
+        );
+        if (!controller.signal.aborted) {
+          setCountryOverallShipments(data);
+        }
+      } catch (error: any) {
+        if (error?.name === 'AbortError') return;
+        logger.error('Failed to load overall country rankings data:', error);
+      }
+    };
+
+    loadOverallCountryShipments();
+    return () => controller.abort();
+  }, [activeView, mapCountryFilters.startDate, mapCountryFilters.endDate]);
+
   const countryTradeYears = useMemo(() => {
     return Array.from(new Set(countryTradeStats.map((item) => item.year))).sort((a, b) => a - b);
   }, [countryTradeStats]);
@@ -876,16 +917,28 @@ const App: React.FC = () => {
                       </div>
                       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                         <TopCountriesHorizontalBar
-                          title="Top 10 Countries by Trade Value"
+                          title="selected trade value ranking"
                           data={topCountriesByCountryMapValue}
                           valueFormatter={(value) => `$${(value / 1000000000).toFixed(2)}B`}
                           barColor="#007AFF"
                         />
                         <TopCountriesHorizontalBar
-                          title="Top 10 Countries by Trade Count"
+                          title="selected trade amount ranking"
                           data={topCountriesByCountryMapCount}
                           valueFormatter={(value) => Math.round(value).toLocaleString()}
                           barColor="#34C759"
+                        />
+                        <TopCountriesHorizontalBar
+                          title="overall trade value ranking"
+                          data={topCountriesByCountryOverallValue}
+                          valueFormatter={(value) => `$${(value / 1000000000).toFixed(2)}B`}
+                          barColor="#5856D6"
+                        />
+                        <TopCountriesHorizontalBar
+                          title="overall trade amount ranking"
+                          data={topCountriesByCountryOverallCount}
+                          valueFormatter={(value) => Math.round(value).toLocaleString()}
+                          barColor="#FF9500"
                         />
                       </div>
                     </>
@@ -923,6 +976,11 @@ const App: React.FC = () => {
                         data={topCountriesByHSCodeMap}
                         valueFormatter={(value) => Math.round(value).toLocaleString()}
                         barColor="#5856D6"
+                        metaLines={[
+                          `Time: ${hsCodeMapFilterSummary.time}`,
+                          `Direction: ${hsCodeMapFilterSummary.direction}`,
+                          `Category: ${hsCodeMapFilterSummary.hsCodes}`,
+                        ]}
                       />
                     </>
                   )}

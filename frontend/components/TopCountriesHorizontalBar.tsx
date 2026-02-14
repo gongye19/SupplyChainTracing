@@ -12,6 +12,7 @@ interface TopCountriesHorizontalBarProps {
   data: TopCountriesDatum[];
   valueFormatter?: (value: number) => string;
   barColor?: string;
+  metaLines?: string[];
 }
 
 const TopCountriesHorizontalBar: React.FC<TopCountriesHorizontalBarProps> = ({
@@ -19,10 +20,20 @@ const TopCountriesHorizontalBar: React.FC<TopCountriesHorizontalBarProps> = ({
   data,
   valueFormatter = (value) => value.toLocaleString(),
   barColor = '#007AFF',
+  metaLines = [],
 }) => {
   return (
     <div className="bg-white border border-black/5 p-6 rounded-[24px] shadow-sm">
       <h3 className="text-[16px] font-bold text-[#1D1D1F] mb-4">{title}</h3>
+      {metaLines.length > 0 && (
+        <div className="mb-3 space-y-1">
+          {metaLines.map((line, index) => (
+            <div key={`${line}-${index}`} className="text-[11px] text-[#86868B] leading-tight">
+              {line}
+            </div>
+          ))}
+        </div>
+      )}
       <div className="h-[320px]">
         {data.length > 0 ? (
           <ResponsiveContainer width="100%" height="100%">
