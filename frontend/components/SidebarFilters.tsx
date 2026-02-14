@@ -34,6 +34,7 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
   const [hsCodeCategoriesOpen, setHsCodeCategoriesOpen] = useState(false);
   const [hsCodeSubcategoriesOpen, setHsCodeSubcategoriesOpen] = useState(false);
   const [hs4ModalOpen, setHs4ModalOpen] = useState(false);
+  const [hs4Search, setHs4Search] = useState('');
   const [continentExpanded, setContinentExpanded] = useState<Record<string, boolean>>({});
 
   const countriesRef = useRef<HTMLDivElement>(null);
@@ -72,6 +73,20 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
     if (set.size === 0) set.add('8542');
     return Array.from(set).sort();
   }, [shipments]);
+
+  const filteredHS4Codes = useMemo(() => {
+    const keyword = hs4Search.trim().toLowerCase();
+    if (!keyword) return availableHS4Codes;
+    return availableHS4Codes.filter((code4) => {
+      const note = (HS4_ANNOTATIONS[code4] || '').toLowerCase();
+      return code4.includes(keyword) || note.includes(keyword);
+    });
+  }, [availableHS4Codes, hs4Search]);
+
+  const customSearchHS4 = useMemo(() => {
+    const code = hs4Search.trim();
+    return /^\d{4}$/.test(code) ? code : '';
+  }, [hs4Search]);
 
   const countriesByContinent = useMemo(() => {
     const groups = new Map<string, CountryLocation[]>();
@@ -321,7 +336,6 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
                 ? 'Select HSCode'
                 : filters.selectedHSCode4Digit.join(', ')}
             </span>
-            <ChevronDown className="w-3.5 h-3.5 text-[#86868B]" />
           </button>
         </section>
       )}
@@ -432,8 +446,24 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
             <div className="text-[12px] text-[#86868B] mb-3">
               Default: 8542 (Electronic integrated circuits)
             </div>
+            <input
+              type="text"
+              value={hs4Search}
+              onChange={(e) => setHs4Search(e.target.value)}
+              placeholder="Search HSCode, e.g. 8542"
+              className="w-full mb-3 px-3 py-2.5 rounded-[10px] border border-black/10 bg-[#F8F8FA] text-[12px] text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-[#007AFF]/25"
+            />
+            {customSearchHS4 && !availableHS4Codes.includes(customSearchHS4) && (
+              <button
+                type="button"
+                onClick={() => toggleHS4(customSearchHS4)}
+                className="w-full mb-3 px-3 py-2 rounded-[10px] border border-dashed border-[#007AFF]/50 bg-[#F2F8FF] text-[#007AFF] text-[12px] font-semibold text-left"
+              >
+                Select typed HSCode: {customSearchHS4}
+              </button>
+            )}
             <div className="overflow-y-auto custom-scrollbar pr-1 space-y-1.5">
-              {availableHS4Codes.map((code4) => {
+              {filteredHS4Codes.map((code4) => {
                 const selected = filters.selectedHSCode4Digit.includes(code4);
                 const note = HS4_ANNOTATIONS[code4] || `HS ${code4} product group`;
                 return (
@@ -455,6 +485,9 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
                   </button>
                 );
               })}
+              {filteredHS4Codes.length === 0 && (
+                <div className="text-[12px] text-[#86868B] px-2 py-1">No matched HSCode</div>
+              )}
             </div>
             <div className="flex justify-end mt-4">
               <button
