@@ -456,7 +456,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
       const safeCountDomainMax = countDomainMax <= countDomainMin ? countDomainMin + 1 : countDomainMax;
       const strokeScale = d3.scaleSqrt()
         .domain([countDomainMin, safeCountDomainMax])
-        .range([1, 5]);
+        .range([0.9, 3.2]); // 控制最大线宽，避免视觉过粗
 
       const valueExtent = d3.extent(routeGroups, d => d.totalValue) as [number, number];
       const valueDomainMin = valueExtent[0] ?? 1;
@@ -537,9 +537,9 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
         const colorDepth = Math.max(0, Math.min(1, colorScale(routeGroup.totalValue)));
         // 用非线性增强中低值区间的可见差异，避免“看起来都差不多”
         const enhancedDepth = Math.pow(colorDepth, 0.45);
-        const color = d3.interpolateRgbBasis(['#EAF4FF', '#86BEFF', '#1E7BFF', '#003C99'])(enhancedDepth);
-        const baseArcOpacity = 0.36 + enhancedDepth * 0.5;
-        const haloOpacity = 0.08 + enhancedDepth * 0.2;
+        const color = d3.interpolateRgbBasis(['#78B6FF', '#4A97FF', '#1F73F1', '#0A3FA8'])(enhancedDepth);
+        const baseArcOpacity = 0.34 + enhancedDepth * 0.42;
+        const haloOpacity = 0.08 + enhancedDepth * 0.14;
         const directionText =
           routeGroup.flowType === 'inbound'
             ? (language === 'zh' ? '流入' : 'Inbound')
@@ -553,7 +553,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
           .attr('d', lineData)
           .attr('fill', 'none')
           .attr('stroke', color)
-          .attr('stroke-width', thickness * 2.2)
+          .attr('stroke-width', thickness * 1.7)
           .attr('stroke-linecap', 'round')
           .attr('opacity', haloOpacity)
           .style('pointer-events', 'none');
