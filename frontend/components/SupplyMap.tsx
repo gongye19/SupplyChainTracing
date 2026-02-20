@@ -534,8 +534,12 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
         const cy = (sy + ty) / 2 + normalY * curvature;
         const lineData = `M${sx},${sy} Q${cx},${cy} ${tx},${ty}`;
           
-        const colorDepth = colorScale(routeGroup.totalValue);
-        const color = d3.interpolateRgb('#A7D2FF', '#005FCC')(Math.max(0, Math.min(1, colorDepth)));
+        const colorDepth = Math.max(0, Math.min(1, colorScale(routeGroup.totalValue)));
+        // 用非线性增强中低值区间的可见差异，避免“看起来都差不多”
+        const enhancedDepth = Math.pow(colorDepth, 0.45);
+        const color = d3.interpolateRgbBasis(['#EAF4FF', '#86BEFF', '#1E7BFF', '#003C99'])(enhancedDepth);
+        const baseArcOpacity = 0.36 + enhancedDepth * 0.5;
+        const haloOpacity = 0.08 + enhancedDepth * 0.2;
         const directionText =
           routeGroup.flowType === 'inbound'
             ? (language === 'zh' ? '流入' : 'Inbound')
@@ -551,7 +555,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
           .attr('stroke', color)
           .attr('stroke-width', thickness * 2.2)
           .attr('stroke-linecap', 'round')
-          .attr('opacity', 0.08)
+          .attr('opacity', haloOpacity)
           .style('pointer-events', 'none');
 
         const arc = gFlows.append('path')
@@ -561,19 +565,21 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
             .attr('stroke-width', thickness)
           .attr('data-base-stroke-width', thickness)
             .attr('stroke-linecap', 'round')
-            .attr('opacity', 0.28)
+            .attr('opacity', baseArcOpacity)
           .attr('class', 'shipment-path');
 
         if (!isDenseMode && routeIndex < 120) {
+          const breathUpOpacity = Math.min(0.96, baseArcOpacity + 0.18);
+          const breathDownOpacity = Math.max(0.28, baseArcOpacity - 0.1);
           const breath = () => {
             const up = arc.transition()
               .duration(1300 + Math.random() * 500)
-              .attr('opacity', 0.5)
+              .attr('opacity', breathUpOpacity)
               .on('end', () => {
                 particleAnimationsRef.current.delete(up);
                 const down = arc.transition()
                   .duration(1300 + Math.random() * 500)
-                  .attr('opacity', 0.22)
+                  .attr('opacity', breathDownOpacity)
                   .on('end', () => {
                     particleAnimationsRef.current.delete(down);
                     if (!isPreview) {
@@ -692,7 +698,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
           const currentScale = svgNode ? d3.zoomTransform(svgNode)?.k || 1 : 1;
             const baseStrokeWidth = parseFloat(d3.select(this).attr('data-base-stroke-width') || thickness.toString());
             const scaledThickness = Math.max(0.2, baseStrokeWidth / currentScale);
-            d3.select(this).attr('opacity', 0.28).attr('stroke-width', scaledThickness);
+            d3.select(this).attr('opacity', baseArcOpacity).attr('stroke-width', scaledThickness);
           if (tooltipRef.current) {
             tooltipRef.current.style('visibility', 'hidden');
           }
