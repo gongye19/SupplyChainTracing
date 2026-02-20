@@ -75,7 +75,6 @@ const App: React.FC = () => {
     endYearMonth: endDate,
   });
   const [countryTradeLoading, setCountryTradeLoading] = useState(false);
-  const [availableHSCodes, setAvailableHSCodes] = useState<string[]>([]);
   const [countryMapYearPlaying, setCountryMapYearPlaying] = useState(false);
   const [countryMapYearIndex, setCountryMapYearIndex] = useState(0);
   
@@ -200,20 +199,6 @@ const App: React.FC = () => {
       }
     };
     loadInitialData();
-  }, []);
-
-  useEffect(() => {
-    const loadAvailableHSCodes = async () => {
-      try {
-        const codes = await countryTradeStatsAPI.getAvailableHSCodes();
-        setAvailableHSCodes(codes);
-      } catch (error) {
-        logger.warn('[HS Codes] fallback to local defaults:', error);
-        setAvailableHSCodes([]);
-      }
-    };
-
-    loadAvailableHSCodes();
   }, []);
 
   // 加载国家贸易统计数据
@@ -839,7 +824,6 @@ const App: React.FC = () => {
             <CountryTradeSidebar
               filters={countryTradeFilters}
               setFilters={setCountryTradeFilters}
-              availableHSCodes={availableHSCodes}
             />
           ) : activeView === 'map-country' ? (
             <SidebarFilters 

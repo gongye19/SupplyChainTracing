@@ -201,7 +201,7 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
               startDate: '2021-01',
               endDate: `${currentYear}-${currentMonth}`,
               tradeDirection: 'import',
-              selectedCountries: [],
+              selectedCountries: mode === 'country' ? ['CHN'] : [],
               selectedHSCode4Digit: mode === 'hscode' ? ['8542'] : [],
               selectedHSCodeCategories: mode === 'hscode' ? ['85'] : [],
               selectedHSCodeSubcategories: mode === 'hscode' ? ['42'] : [],
