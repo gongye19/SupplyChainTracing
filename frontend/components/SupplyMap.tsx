@@ -93,7 +93,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
     const gMap = g.append('g').attr('class', 'map-layer');
     const gNodes = g.append('g').attr('class', 'nodes-layer');
     const gFlows = g.append('g').attr('class', 'flows-layer');
-
+    
     gMapRef.current = gMap;
     gNodesRef.current = gNodes;
     gFlowsRef.current = gFlows;
@@ -168,7 +168,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
           const scaledStrokeWidth = Math.max(0.2, baseStrokeWidth / scale);
           d3.select(this).attr('stroke-width', scaledStrokeWidth);
         });
-
+        
         gFlows.selectAll('.shipment-highlight').each(function() {
           const baseStrokeWidth = parseFloat(d3.select(this).attr('data-base-stroke-width') || '1.2');
           const scaledStrokeWidth = Math.max(0.2, baseStrokeWidth / scale);
@@ -434,7 +434,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
             : focusCountry && destCountryCode === focusCountry
               ? 'inbound'
               : 'transit';
-
+        
         return {
           originId: originCountryCode,
           destinationId: destCountryCode,
@@ -449,11 +449,22 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
         };
       });
 
-      // 按交易价值计算路径粗细
-      const valueExtent = d3.extent(routeGroups, d => d.totalValue) as [number, number];
+      // 线粗细按交易量（tradeCount），颜色深浅按交易价值（totalValue）
+      const countExtent = d3.extent(routeGroups, d => d.count) as [number, number];
+      const countDomainMin = countExtent[0] ?? 1;
+      const countDomainMax = countExtent[1] ?? 100;
+      const safeCountDomainMax = countDomainMax <= countDomainMin ? countDomainMin + 1 : countDomainMax;
       const strokeScale = d3.scaleSqrt()
-        .domain(valueExtent[0] !== undefined ? valueExtent : [1, 100])
-        .range([1, 5]); // 根据交易价值，范围 1-5（更粗，更明显）
+        .domain([countDomainMin, safeCountDomainMax])
+        .range([1, 5]);
+
+      const valueExtent = d3.extent(routeGroups, d => d.totalValue) as [number, number];
+      const valueDomainMin = valueExtent[0] ?? 1;
+      const valueDomainMax = valueExtent[1] ?? 100;
+      const safeValueDomainMax = valueDomainMax <= valueDomainMin ? valueDomainMin + 1 : valueDomainMax;
+      const colorScale = d3.scaleLinear()
+        .domain([valueDomainMin, safeValueDomainMax])
+        .range([0, 1]);
 
       // preview 模式：只显示少量路径，不画粒子
       // final 模式：限制最大路径数，避免大数据量时 SVG 过载
@@ -523,14 +534,15 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
         const cy = (sy + ty) / 2 + normalY * curvature;
         const lineData = `M${sx},${sy} Q${cx},${cy} ${tx},${ty}`;
           
-        const color = '#007AFF';
+        const colorDepth = colorScale(routeGroup.totalValue);
+        const color = d3.interpolateRgb('#A7D2FF', '#005FCC')(Math.max(0, Math.min(1, colorDepth)));
         const directionText =
           routeGroup.flowType === 'inbound'
             ? (language === 'zh' ? '流入' : 'Inbound')
             : routeGroup.flowType === 'outbound'
               ? (language === 'zh' ? '流出' : 'Outbound')
               : (language === 'zh' ? '中转' : 'Transit');
-        const thickness = strokeScale(routeGroup.totalValue); // 根据交易价值计算粗细
+        const thickness = strokeScale(routeGroup.count); // 根据交易量计算粗细
 
         // 底层光晕，增强层次感
         gFlows.append('path')
