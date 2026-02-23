@@ -1028,7 +1028,7 @@ const App: React.FC = () => {
                       </div>
                       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                         <TopCountriesHorizontalBar
-                          title="Top 10 交易量的品类"
+                          title="Top 10 Categories by Trade Amount"
                           data={topCategoriesByHSCodeCount}
                           valueFormatter={(value) => Math.round(value).toLocaleString()}
                           barColor="#5856D6"
@@ -1039,7 +1039,7 @@ const App: React.FC = () => {
                           ]}
                         />
                         <TopCountriesHorizontalBar
-                          title="Top 10 交易金额的品类"
+                          title="Top 10 Categories by Trade Value"
                           data={topCategoriesByHSCodeValue}
                           valueFormatter={(value) => `$${(value / 1000000000).toFixed(2)}B`}
                           barColor="#007AFF"
