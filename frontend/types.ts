@@ -198,6 +198,7 @@ export interface TopCountry {
 // 国家贸易统计筛选条件
 export interface CountryTradeFilters {
   hsCode?: string[];
+  tradeDirection?: 'import' | 'export' | 'all';
   year?: number;
   month?: number;
   country?: string[];

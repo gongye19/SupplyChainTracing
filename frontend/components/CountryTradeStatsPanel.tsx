@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, Line } from 'recharts';
 import { TrendingUp, Globe, DollarSign, Package } from 'lucide-react';
 import { CountryMonthlyTradeStat, CountryTradeStatSummary, CountryTradeTrend, TopCountry } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -142,7 +142,7 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
   return (
     <div className="space-y-6">
       {/* KPI卡片 */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white border border-black/5 p-6 rounded-[20px] shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[12px] font-medium text-[#86868B] uppercase">{t('countryTrade.totalTradeValue')}</span>
@@ -173,15 +173,6 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
           </div>
         </div>
 
-        <div className="bg-white border border-black/5 p-6 rounded-[20px] shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[12px] font-medium text-[#86868B] uppercase">{t('countryTrade.avgMarketShare')}</span>
-            <TrendingUp className="w-5 h-5 text-[#5856D6]" />
-          </div>
-          <div className="text-[24px] font-bold text-[#1D1D1F]">
-            {(summary.avgSharePct * 100).toFixed(2)}%
-          </div>
-        </div>
       </div>
 
       {/* 趋势图 */}
@@ -220,6 +211,17 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
                   axisLine={false} 
                   tickLine={false}
                   tickFormatter={(value) => formatCurrency(value)}
+                  yAxisId="left"
+                />
+                <YAxis
+                  yAxisId="right"
+                  orientation="right"
+                  stroke="#34C759"
+                  fontSize={11}
+                  fontWeight={600}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(value) => Number(value).toLocaleString()}
                 />
                 <Tooltip
                   contentStyle={{
@@ -228,14 +230,27 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
                     borderRadius: '12px',
                     padding: '12px',
                   }}
-                  formatter={(value: number) => formatCurrency(value)}
+                  formatter={(value: number, name: string) => {
+                    if (name === 'tradeCount') return [Number(value).toLocaleString(), 'Trade Count'];
+                    return [formatCurrency(value), 'Trade Value'];
+                  }}
                 />
                 <Area 
                   type="monotone" 
                   dataKey="sumOfUsd" 
                   stroke="#007AFF" 
                   strokeWidth={2}
-                  fill="url(#tradeGradient)" 
+                  fill="url(#tradeGradient)"
+                  yAxisId="left"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="tradeCount"
+                  yAxisId="right"
+                  stroke="#34C759"
+                  strokeWidth={2}
+                  dot={false}
+                  activeDot={{ r: 4 }}
                 />
               </AreaChart>
             </ResponsiveContainer>

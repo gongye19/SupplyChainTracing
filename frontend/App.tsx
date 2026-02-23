@@ -70,6 +70,7 @@ const App: React.FC = () => {
   const [topCountries, setTopCountries] = useState<TopCountry[]>([]);
   const [countryTradeFilters, setCountryTradeFilters] = useState<CountryTradeFilters>({
     hsCode: [],
+    tradeDirection: 'import',
     industry: 'SemiConductor',
     startYearMonth: '2021-01',
     endYearMonth: endDate,
@@ -210,6 +211,7 @@ const App: React.FC = () => {
       const countriesFilter = [...(countryTradeFilters.country || [])].sort().join(',');
       return [
         hsCodes,
+        countryTradeFilters.tradeDirection || 'import',
         countriesFilter,
         countryTradeFilters.industry || '',
         countryTradeFilters.year || '',
@@ -244,6 +246,7 @@ const App: React.FC = () => {
           countryTradeStatsAPI.getTrends({
             hsCode: countryTradeFilters.hsCode?.[0],
             industry: countryTradeFilters.industry,
+            tradeDirection: countryTradeFilters.tradeDirection,
             startYearMonth: countryTradeFilters.startYearMonth,
             endYearMonth: countryTradeFilters.endYearMonth,
           }),
@@ -251,6 +254,7 @@ const App: React.FC = () => {
             hsCode: countryTradeFilters.hsCode,
             country: countryTradeFilters.country,
             industry: countryTradeFilters.industry,
+            tradeDirection: countryTradeFilters.tradeDirection,
             startYearMonth: countryTradeFilters.startYearMonth,
             endYearMonth: countryTradeFilters.endYearMonth,
             limit: 10,

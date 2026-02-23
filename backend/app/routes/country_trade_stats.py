@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from ..database import get_db
 from ..schemas import CountryMonthlyTradeStat, CountryTradeStatSummary, CountryTradeTrend, TopCountry
@@ -20,6 +20,7 @@ def _apply_common_filters(
     industry: Optional[str] = None,
     start_year_month: Optional[str] = None,
     end_year_month: Optional[str] = None,
+    country_column: str = "country_code",
 ) -> tuple[str, dict]:
     if hs_code:
         placeholders = ", ".join([f":hs_code_{i}" for i in range(len(hs_code))])
@@ -37,7 +38,7 @@ def _apply_common_filters(
 
     if country:
         placeholders = ", ".join([f":country_{i}" for i in range(len(country))])
-        query += f" AND country_code IN ({placeholders})"
+        query += f" AND {country_column} IN ({placeholders})"
         for i, value in enumerate(country):
             params[f"country_{i}"] = value
 
@@ -70,6 +71,14 @@ def _safe_query(db: Session, query: str, params: dict, default_value):
         raise HTTPException(status_code=500, detail=f"数据库查询错误: {str(exc)}")
 
 
+def _resolve_trade_source(trade_direction: Optional[str]) -> Tuple[str, str]:
+    if trade_direction == "import":
+        return "country_origin_trade_stats", "destination_country_code"
+    if trade_direction == "export":
+        return "country_origin_trade_stats", "origin_country_code"
+    return "country_monthly_trade_stats", "country_code"
+
+
 @router.get("", response_model=List[CountryMonthlyTradeStat])
 def get_country_trade_stats(
     hs_code: Optional[List[str]] = Query(None, description="HS编码筛选（6位，可多个）"),
@@ -77,12 +86,30 @@ def get_country_trade_stats(
     month: Optional[int] = Query(None, description="月份筛选（1-12）"),
     country: Optional[List[str]] = Query(None, description="国家代码筛选（可多个）"),
     industry: Optional[str] = Query(None, description="行业筛选"),
+    trade_direction: Optional[str] = Query("all", description="贸易方向: import/export/all"),
     start_year_month: Optional[str] = Query(None, description="起始年月 (YYYY-MM)"),
     end_year_month: Optional[str] = Query(None, description="结束年月 (YYYY-MM)"),
     limit: Optional[int] = Query(10000, description="返回记录数限制"),
     db: Session = Depends(get_db),
 ):
-    query = "SELECT * FROM country_monthly_trade_stats WHERE 1=1"
+    source_table, country_column = _resolve_trade_source(trade_direction)
+    query = f"""
+        SELECT
+            hs_code,
+            year,
+            month,
+            {country_column} AS country_code,
+            MAX(industry) AS industry,
+            COALESCE(SUM(weight), 0) AS weight,
+            COALESCE(SUM(quantity), 0) AS quantity,
+            COALESCE(SUM(sum_of_usd), 0) AS sum_of_usd,
+            NULL AS weight_avg_price,
+            NULL AS quantity_avg_price,
+            COALESCE(SUM(trade_count), 0) AS trade_count,
+            COALESCE(AVG(amount_share_pct), 0) AS amount_share_pct
+        FROM {source_table}
+        WHERE 1=1
+    """
     params: dict = {}
     query, params = _apply_common_filters(
         query,
@@ -94,7 +121,9 @@ def get_country_trade_stats(
         industry=industry,
         start_year_month=start_year_month,
         end_year_month=end_year_month,
+        country_column=country_column,
     )
+    query += f" GROUP BY hs_code, year, month, {country_column}"
     query += " ORDER BY year DESC, month DESC, sum_of_usd DESC"
     if limit:
         query += " LIMIT :limit"
@@ -113,19 +142,21 @@ def get_country_trade_stats_summary(
     month: Optional[int] = Query(None, description="月份筛选（1-12）"),
     country: Optional[List[str]] = Query(None, description="国家代码筛选（可多个）"),
     industry: Optional[str] = Query(None, description="行业筛选"),
+    trade_direction: Optional[str] = Query("all", description="贸易方向: import/export/all"),
     start_year_month: Optional[str] = Query(None, description="起始年月 (YYYY-MM)"),
     end_year_month: Optional[str] = Query(None, description="结束年月 (YYYY-MM)"),
     db: Session = Depends(get_db),
 ):
-    query = """
+    source_table, country_column = _resolve_trade_source(trade_direction)
+    query = f"""
         SELECT
-            COUNT(DISTINCT country_code) AS total_countries,
+            COUNT(DISTINCT {country_column}) AS total_countries,
             COALESCE(SUM(sum_of_usd), 0) AS total_trade_value,
             COALESCE(SUM(weight), 0) AS total_weight,
             COALESCE(SUM(quantity), 0) AS total_quantity,
             COALESCE(SUM(trade_count), 0) AS total_trade_count,
             COALESCE(AVG(amount_share_pct), 0) AS avg_share_pct
-        FROM country_monthly_trade_stats
+        FROM {source_table}
         WHERE 1=1
     """
     params: dict = {}
@@ -139,6 +170,7 @@ def get_country_trade_stats_summary(
         industry=industry,
         start_year_month=start_year_month,
         end_year_month=end_year_month,
+        country_column=country_column,
     )
 
     default_summary = {
@@ -167,18 +199,20 @@ def get_country_trade_trends(
     hs_code: Optional[str] = Query(None, description="HS编码（6位）"),
     country: Optional[str] = Query(None, description="国家代码"),
     industry: Optional[str] = Query(None, description="行业筛选"),
+    trade_direction: Optional[str] = Query("all", description="贸易方向: import/export/all"),
     start_year_month: Optional[str] = Query(None, description="起始年月 (YYYY-MM)"),
     end_year_month: Optional[str] = Query(None, description="结束年月 (YYYY-MM)"),
     db: Session = Depends(get_db),
 ):
-    query = """
+    source_table, country_column = _resolve_trade_source(trade_direction)
+    query = f"""
         SELECT
             TO_CHAR(TO_DATE(year || '-' || LPAD(month::text, 2, '0') || '-01', 'YYYY-MM-DD'), 'YYYY-MM') AS year_month,
             COALESCE(SUM(sum_of_usd), 0) AS sum_of_usd,
             COALESCE(SUM(weight), 0) AS weight,
             COALESCE(SUM(quantity), 0) AS quantity,
             COALESCE(SUM(trade_count), 0) AS trade_count
-        FROM country_monthly_trade_stats
+        FROM {source_table}
         WHERE 1=1
     """
     params: dict = {}
@@ -186,7 +220,7 @@ def get_country_trade_trends(
         query += " AND hs_code = :hs_code"
         params["hs_code"] = hs_code
     if country:
-        query += " AND country_code = :country"
+        query += f" AND {country_column} = :country"
         params["country"] = country
     if industry:
         query += " AND industry = :industry"
@@ -216,20 +250,22 @@ def get_top_countries(
     month: Optional[int] = Query(None, description="月份筛选（1-12）"),
     country: Optional[List[str]] = Query(None, description="国家代码筛选（可多个）"),
     industry: Optional[str] = Query(None, description="行业筛选"),
+    trade_direction: Optional[str] = Query("all", description="贸易方向: import/export/all"),
     start_year_month: Optional[str] = Query(None, description="起始年月 (YYYY-MM)"),
     end_year_month: Optional[str] = Query(None, description="结束年月 (YYYY-MM)"),
     limit: int = Query(10, description="返回Top N国家"),
     db: Session = Depends(get_db),
 ):
-    query = """
+    source_table, country_column = _resolve_trade_source(trade_direction)
+    query = f"""
         SELECT
-            country_code,
+            {country_column} AS country_code,
             COALESCE(SUM(sum_of_usd), 0) AS sum_of_usd,
             COALESCE(SUM(weight), 0) AS weight,
             COALESCE(SUM(quantity), 0) AS quantity,
             COALESCE(SUM(trade_count), 0) AS trade_count,
             COALESCE(AVG(amount_share_pct), 0) AS amount_share_pct
-        FROM country_monthly_trade_stats
+        FROM {source_table}
         WHERE 1=1
     """
     params: dict = {}
@@ -243,9 +279,10 @@ def get_top_countries(
         industry=industry,
         start_year_month=start_year_month,
         end_year_month=end_year_month,
+        country_column=country_column,
     )
 
-    query += " GROUP BY country_code ORDER BY sum_of_usd DESC LIMIT :limit"
+    query += f" GROUP BY {country_column} ORDER BY sum_of_usd DESC LIMIT :limit"
     params["limit"] = limit
 
     result = _safe_query(db, query, params, default_value=[])

@@ -313,6 +313,9 @@ export const countryTradeStatsAPI = {
     if (filters?.industry) {
       params.append('industry', filters.industry);
     }
+    if (filters?.tradeDirection) {
+      params.append('trade_direction', filters.tradeDirection);
+    }
     if (filters?.startYearMonth) {
       params.append('start_year_month', filters.startYearMonth);
     }
@@ -356,6 +359,9 @@ export const countryTradeStatsAPI = {
     if (filters?.industry) {
       params.append('industry', filters.industry);
     }
+    if (filters?.tradeDirection) {
+      params.append('trade_direction', filters.tradeDirection);
+    }
     if (filters?.startYearMonth) {
       params.append('start_year_month', filters.startYearMonth);
     }
@@ -378,6 +384,7 @@ export const countryTradeStatsAPI = {
     hsCode?: string;
     country?: string;
     industry?: string;
+    tradeDirection?: 'import' | 'export' | 'all';
     startYearMonth?: string;
     endYearMonth?: string;
   }): Promise<CountryTradeTrend[]> => {
@@ -390,6 +397,9 @@ export const countryTradeStatsAPI = {
     }
     if (filters?.industry) {
       params.append('industry', filters.industry);
+    }
+    if (filters?.tradeDirection) {
+      params.append('trade_direction', filters.tradeDirection);
     }
     if (filters?.startYearMonth) {
       params.append('start_year_month', filters.startYearMonth);
@@ -415,6 +425,7 @@ export const countryTradeStatsAPI = {
       month?: number;
       country?: string[];
       industry?: string;
+      tradeDirection?: 'import' | 'export' | 'all';
       startYearMonth?: string;
       endYearMonth?: string;
       limit?: number;
@@ -435,6 +446,9 @@ export const countryTradeStatsAPI = {
     }
     if (filters?.industry) {
       params.append('industry', filters.industry);
+    }
+    if (filters?.tradeDirection) {
+      params.append('trade_direction', filters.tradeDirection);
     }
     if (filters?.startYearMonth) {
       params.append('start_year_month', filters.startYearMonth);
