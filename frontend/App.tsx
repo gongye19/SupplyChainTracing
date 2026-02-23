@@ -663,10 +663,65 @@ const App: React.FC = () => {
     [countries]
   );
 
-  const topCountriesByHSCodeMap = useMemo(() => {
+  const topCategoriesByHSCodeCount = useMemo(() => {
     if (activeView !== 'map-hscode') return [];
-    return buildTopCountries(filteredShipmentsForCurrentMap, mapHsFilters.tradeDirection || 'import', 'tradeCount');
-  }, [activeView, buildTopCountries, filteredShipmentsForCurrentMap, mapHsFilters.tradeDirection]);
+    const aggregate = new Map<string, { tradeCount: number; tradeValue: number }>();
+    filteredShipmentsForCurrentMap.forEach((shipment) => {
+      const hs4 = shipment.hsCode?.slice(0, 4) || 'Unknown';
+      const prev = aggregate.get(hs4) || { tradeCount: 0, tradeValue: 0 };
+      aggregate.set(hs4, {
+        tradeCount: prev.tradeCount + (shipment.tradeCount || 0),
+        tradeValue: prev.tradeValue + (shipment.totalValueUsd || 0),
+      });
+    });
+
+    if (aggregate.size === 0 && mapHsFilters.selectedHSCode4Digit.length > 0) {
+      return mapHsFilters.selectedHSCode4Digit.slice(0, 10).map((hs4) => ({
+        countryCode: hs4,
+        countryName: `HS ${hs4}`,
+        value: 0,
+      }));
+    }
+
+    return Array.from(aggregate.entries())
+      .map(([hs4, value]) => ({
+        countryCode: hs4,
+        countryName: `HS ${hs4}`,
+        value: value.tradeCount,
+      }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
+  }, [activeView, filteredShipmentsForCurrentMap, mapHsFilters.selectedHSCode4Digit]);
+
+  const topCategoriesByHSCodeValue = useMemo(() => {
+    if (activeView !== 'map-hscode') return [];
+    const aggregate = new Map<string, { tradeCount: number; tradeValue: number }>();
+    filteredShipmentsForCurrentMap.forEach((shipment) => {
+      const hs4 = shipment.hsCode?.slice(0, 4) || 'Unknown';
+      const prev = aggregate.get(hs4) || { tradeCount: 0, tradeValue: 0 };
+      aggregate.set(hs4, {
+        tradeCount: prev.tradeCount + (shipment.tradeCount || 0),
+        tradeValue: prev.tradeValue + (shipment.totalValueUsd || 0),
+      });
+    });
+
+    if (aggregate.size === 0 && mapHsFilters.selectedHSCode4Digit.length > 0) {
+      return mapHsFilters.selectedHSCode4Digit.slice(0, 10).map((hs4) => ({
+        countryCode: hs4,
+        countryName: `HS ${hs4}`,
+        value: 0,
+      }));
+    }
+
+    return Array.from(aggregate.entries())
+      .map(([hs4, value]) => ({
+        countryCode: hs4,
+        countryName: `HS ${hs4}`,
+        value: value.tradeValue,
+      }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
+  }, [activeView, filteredShipmentsForCurrentMap, mapHsFilters.selectedHSCode4Digit]);
 
   const topCountriesByCountryMapValue = useMemo(() => {
     if (activeView !== 'map-country') return [];
@@ -971,17 +1026,30 @@ const App: React.FC = () => {
                           </div>
                         </div>
                       </div>
-                      <TopCountriesHorizontalBar
-                        title="Top 10 Countries by Trade Count"
-                        data={topCountriesByHSCodeMap}
-                        valueFormatter={(value) => Math.round(value).toLocaleString()}
-                        barColor="#5856D6"
-                        metaLines={[
-                          `Time: ${hsCodeMapFilterSummary.time}`,
-                          `Direction: ${hsCodeMapFilterSummary.direction}`,
-                          `Category: ${hsCodeMapFilterSummary.hsCodes}`,
-                        ]}
-                      />
+                      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                        <TopCountriesHorizontalBar
+                          title="Top 10 交易量的品类"
+                          data={topCategoriesByHSCodeCount}
+                          valueFormatter={(value) => Math.round(value).toLocaleString()}
+                          barColor="#5856D6"
+                          metaLines={[
+                            `Time: ${hsCodeMapFilterSummary.time}`,
+                            `Direction: ${hsCodeMapFilterSummary.direction}`,
+                            `Category: ${hsCodeMapFilterSummary.hsCodes}`,
+                          ]}
+                        />
+                        <TopCountriesHorizontalBar
+                          title="Top 10 交易金额的品类"
+                          data={topCategoriesByHSCodeValue}
+                          valueFormatter={(value) => `$${(value / 1000000000).toFixed(2)}B`}
+                          barColor="#007AFF"
+                          metaLines={[
+                            `Time: ${hsCodeMapFilterSummary.time}`,
+                            `Direction: ${hsCodeMapFilterSummary.direction}`,
+                            `Category: ${hsCodeMapFilterSummary.hsCodes}`,
+                          ]}
+                        />
+                      </div>
                     </>
                   )}
                 </>
