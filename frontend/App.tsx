@@ -738,14 +738,16 @@ const App: React.FC = () => {
   }, [activeView, buildTopCountries, filteredShipmentsForCurrentMap, mapCountryFilters.tradeDirection]);
 
   const topCountriesByCountryOverallValue = useMemo(() => {
-    if (activeView !== 'map-country') return [];
-    return buildTopCountries(countryOverallShipments, mapCountryFilters.tradeDirection || 'import', 'tradeValue');
-  }, [activeView, buildTopCountries, countryOverallShipments, mapCountryFilters.tradeDirection]);
+    const sourceData =
+      countryOverallShipments.length > 0 ? countryOverallShipments : filteredShipmentsForCurrentMap;
+    return buildTopCountries(sourceData, mapCountryFilters.tradeDirection || 'import', 'tradeValue');
+  }, [buildTopCountries, countryOverallShipments, filteredShipmentsForCurrentMap, mapCountryFilters.tradeDirection]);
 
   const topCountriesByCountryOverallCount = useMemo(() => {
-    if (activeView !== 'map-country') return [];
-    return buildTopCountries(countryOverallShipments, mapCountryFilters.tradeDirection || 'import', 'tradeCount');
-  }, [activeView, buildTopCountries, countryOverallShipments, mapCountryFilters.tradeDirection]);
+    const sourceData =
+      countryOverallShipments.length > 0 ? countryOverallShipments : filteredShipmentsForCurrentMap;
+    return buildTopCountries(sourceData, mapCountryFilters.tradeDirection || 'import', 'tradeCount');
+  }, [buildTopCountries, countryOverallShipments, filteredShipmentsForCurrentMap, mapCountryFilters.tradeDirection]);
 
   useEffect(() => {
     if (activeView !== 'map-country') return;
