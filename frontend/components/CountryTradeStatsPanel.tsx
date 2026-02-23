@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, Line } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
 import { TrendingUp, Globe, DollarSign, Package } from 'lucide-react';
 import { CountryMonthlyTradeStat, CountryTradeStatSummary, CountryTradeTrend, TopCountry } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -175,90 +175,130 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
 
       </div>
 
-      {/* 趋势图 */}
-      <div className="bg-white border border-black/5 p-8 rounded-[28px] shadow-sm">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-[18px] font-bold text-[#1D1D1F] flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-[#007AFF]" />
-            {t('countryTrade.tradeTrends')}
-          </h3>
+      {/* 趋势图（拆分为两张） */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white border border-black/5 p-8 rounded-[28px] shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-[18px] font-bold text-[#1D1D1F] flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-[#007AFF]" />
+              {t('countryTrade.tradeTrends')}
+            </h3>
+          </div>
+          <div className="h-[320px]">
+            {trends.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={trends}>
+                  <defs>
+                    <linearGradient id="tradeValueGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#007AFF" stopOpacity={0.15}/>
+                      <stop offset="95%" stopColor="#007AFF" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <XAxis 
+                    dataKey="yearMonth" 
+                    stroke="#86868B" 
+                    fontSize={11} 
+                    fontWeight={600} 
+                    axisLine={false} 
+                    tickLine={false}
+                    angle={-45}
+                    textAnchor="end"
+                    height={60}
+                  />
+                  <YAxis 
+                    stroke="#86868B" 
+                    fontSize={11} 
+                    fontWeight={600} 
+                    axisLine={false} 
+                    tickLine={false}
+                    tickFormatter={(value) => formatCurrency(value)}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#fff',
+                      border: '1px solid #E5E5E7',
+                      borderRadius: '12px',
+                      padding: '12px',
+                    }}
+                    formatter={(value: number) => [formatCurrency(value), 'Trade Value']}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="sumOfUsd" 
+                    stroke="#007AFF" 
+                    strokeWidth={2}
+                    fill="url(#tradeValueGradient)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-full text-[#86868B]">
+                {t('countryTrade.noData')}
+              </div>
+            )}
+          </div>
         </div>
-        <div className="h-[320px]">
-          {trends.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={trends}>
-                <defs>
-                  <linearGradient id="tradeGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#007AFF" stopOpacity={0.15}/>
-                    <stop offset="95%" stopColor="#007AFF" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <XAxis 
-                  dataKey="yearMonth" 
-                  stroke="#86868B" 
-                  fontSize={11} 
-                  fontWeight={600} 
-                  axisLine={false} 
-                  tickLine={false}
-                  angle={-45}
-                  textAnchor="end"
-                  height={60}
-                />
-                <YAxis 
-                  stroke="#86868B" 
-                  fontSize={11} 
-                  fontWeight={600} 
-                  axisLine={false} 
-                  tickLine={false}
-                  tickFormatter={(value) => formatCurrency(value)}
-                  yAxisId="left"
-                />
-                <YAxis
-                  yAxisId="right"
-                  orientation="right"
-                  stroke="#34C759"
-                  fontSize={11}
-                  fontWeight={600}
-                  axisLine={false}
-                  tickLine={false}
-                  tickFormatter={(value) => Number(value).toLocaleString()}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#fff',
-                    border: '1px solid #E5E5E7',
-                    borderRadius: '12px',
-                    padding: '12px',
-                  }}
-                  formatter={(value: number, name: string) => {
-                    if (name === 'tradeCount') return [Number(value).toLocaleString(), 'Trade Count'];
-                    return [formatCurrency(value), 'Trade Value'];
-                  }}
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="sumOfUsd" 
-                  stroke="#007AFF" 
-                  strokeWidth={2}
-                  fill="url(#tradeGradient)"
-                  yAxisId="left"
-                />
-                <Line
-                  type="monotone"
-                  dataKey="tradeCount"
-                  yAxisId="right"
-                  stroke="#34C759"
-                  strokeWidth={2}
-                  dot={false}
-                  activeDot={{ r: 4 }}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex items-center justify-center h-full text-[#86868B]">
-              {t('countryTrade.noData')}
-            </div>
-          )}
+
+        <div className="bg-white border border-black/5 p-8 rounded-[28px] shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-[18px] font-bold text-[#1D1D1F] flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-[#34C759]" />
+              Trade Count Trends
+            </h3>
+          </div>
+          <div className="h-[320px]">
+            {trends.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={trends}>
+                  <defs>
+                    <linearGradient id="tradeCountGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#34C759" stopOpacity={0.18}/>
+                      <stop offset="95%" stopColor="#34C759" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <XAxis 
+                    dataKey="yearMonth" 
+                    stroke="#86868B" 
+                    fontSize={11} 
+                    fontWeight={600} 
+                    axisLine={false} 
+                    tickLine={false}
+                    angle={-45}
+                    textAnchor="end"
+                    height={60}
+                  />
+                  <YAxis 
+                    stroke="#86868B" 
+                    fontSize={11} 
+                    fontWeight={600} 
+                    axisLine={false} 
+                    tickLine={false}
+                    tickFormatter={(value) => Number(value).toLocaleString()}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#fff',
+                      border: '1px solid #E5E5E7',
+                      borderRadius: '12px',
+                      padding: '12px',
+                    }}
+                    formatter={(value: number) => [Number(value).toLocaleString(), 'Trade Count']}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="tradeCount" 
+                    stroke="#34C759" 
+                    strokeWidth={2}
+                    fill="url(#tradeCountGradient)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-full text-[#86868B]">
+                {t('countryTrade.noData')}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
