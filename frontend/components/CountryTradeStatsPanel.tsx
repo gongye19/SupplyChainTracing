@@ -12,6 +12,12 @@ interface CountryTradeStatsPanelProps {
 }
 
 const COLORS = ['#007AFF', '#5856D6', '#34C759', '#FF9500', '#FF2D55', '#30B0C7', '#AF52DE', '#FF3B30'];
+const quarterLabelMap: Record<number, string> = {
+  1: '1-3',
+  2: '4-6',
+  3: '7-9',
+  4: '10-12',
+};
 
 const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
   stats,
@@ -20,10 +26,12 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
   topCountries,
 }) => {
   const { t } = useLanguage();
-  const [marketByYearPlaying, setMarketByYearPlaying] = useState(false);
-  const [topByYearPlaying, setTopByYearPlaying] = useState(false);
-  const [marketYearIndex, setMarketYearIndex] = useState(0);
-  const [topYearIndex, setTopYearIndex] = useState(0);
+  const [marketByQuarterPlaying, setMarketByQuarterPlaying] = useState(false);
+  const [topByQuarterPlaying, setTopByQuarterPlaying] = useState(false);
+  const [marketQuarterPaused, setMarketQuarterPaused] = useState(false);
+  const [topQuarterPaused, setTopQuarterPaused] = useState(false);
+  const [marketQuarterIndex, setMarketQuarterIndex] = useState(0);
+  const [topQuarterIndex, setTopQuarterIndex] = useState(0);
   
   // 格式化货币
   const formatCurrency = (value: number) => {
@@ -56,25 +64,29 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
     }));
   }, [topCountries]);
 
-  const yearlyTopData = useMemo(() => {
-    const yearlyMap = new Map<number, Map<string, number>>();
+  const quarterlyTopData = useMemo(() => {
+    const quarterMap = new Map<string, { year: number; quarter: number; countryMap: Map<string, number> }>();
     stats.forEach((item) => {
-      if (!yearlyMap.has(item.year)) {
-        yearlyMap.set(item.year, new Map<string, number>());
+      const quarter = Math.floor((item.month - 1) / 3) + 1;
+      const key = `${item.year}-Q${quarter}`;
+      if (!quarterMap.has(key)) {
+        quarterMap.set(key, { year: item.year, quarter, countryMap: new Map<string, number>() });
       }
-      const countryMap = yearlyMap.get(item.year)!;
+      const countryMap = quarterMap.get(key)!.countryMap;
       countryMap.set(item.countryCode, (countryMap.get(item.countryCode) || 0) + item.sumOfUsd);
     });
 
-    const years = Array.from(yearlyMap.keys()).sort((a, b) => a - b);
-    const byYear = years.map((year) => {
-      const countryMap = yearlyMap.get(year)!;
+    const periods = Array.from(quarterMap.values()).sort((a, b) =>
+      a.year === b.year ? a.quarter - b.quarter : a.year - b.year
+    );
+    const byQuarter = periods.map((period) => {
+      const countryMap = period.countryMap;
       const sorted = Array.from(countryMap.entries())
         .sort((a, b) => b[1] - a[1]);
       const total = sorted.reduce((acc, [, value]) => acc + value, 0) || 1;
       const top10 = sorted.slice(0, 10);
       return {
-        year,
+        label: `${period.year} (${quarterLabelMap[period.quarter]})`,
         marketShare: top10.slice(0, 8).map(([name, value], index) => ({
           name,
           value,
@@ -88,56 +100,56 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
         })),
       };
     });
-    return byYear;
+    return byQuarter;
   }, [stats]);
 
   useEffect(() => {
-    if (yearlyTopData.length === 0) {
-      setMarketYearIndex(0);
-      setTopYearIndex(0);
+    if (quarterlyTopData.length === 0) {
+      setMarketQuarterIndex(0);
+      setTopQuarterIndex(0);
       return;
     }
-    if (marketYearIndex >= yearlyTopData.length) {
-      setMarketYearIndex(0);
+    if (marketQuarterIndex >= quarterlyTopData.length) {
+      setMarketQuarterIndex(0);
     }
-    if (topYearIndex >= yearlyTopData.length) {
-      setTopYearIndex(0);
+    if (topQuarterIndex >= quarterlyTopData.length) {
+      setTopQuarterIndex(0);
     }
-  }, [yearlyTopData.length, marketYearIndex, topYearIndex]);
+  }, [quarterlyTopData.length, marketQuarterIndex, topQuarterIndex]);
 
   useEffect(() => {
-    if (!marketByYearPlaying || yearlyTopData.length === 0) return;
+    if (!marketByQuarterPlaying || marketQuarterPaused || quarterlyTopData.length === 0) return;
     const timer = window.setInterval(() => {
-      setMarketYearIndex((prev) => (prev + 1) % yearlyTopData.length);
+      setMarketQuarterIndex((prev) => (prev + 1) % quarterlyTopData.length);
     }, 2200);
     return () => window.clearInterval(timer);
-  }, [marketByYearPlaying, yearlyTopData.length]);
+  }, [marketByQuarterPlaying, marketQuarterPaused, quarterlyTopData.length]);
 
   useEffect(() => {
-    if (!topByYearPlaying || yearlyTopData.length === 0) return;
+    if (!topByQuarterPlaying || topQuarterPaused || quarterlyTopData.length === 0) return;
     const timer = window.setInterval(() => {
-      setTopYearIndex((prev) => (prev + 1) % yearlyTopData.length);
+      setTopQuarterIndex((prev) => (prev + 1) % quarterlyTopData.length);
     }, 1400);
     return () => window.clearInterval(timer);
-  }, [topByYearPlaying, yearlyTopData.length]);
+  }, [topByQuarterPlaying, topQuarterPaused, quarterlyTopData.length]);
 
-  const marketYearData =
-    yearlyTopData.length > 0
-      ? (yearlyTopData[marketYearIndex] || yearlyTopData[0])
+  const marketQuarterData =
+    quarterlyTopData.length > 0
+      ? (quarterlyTopData[marketQuarterIndex] || quarterlyTopData[0])
       : null;
-  const topYearData =
-    yearlyTopData.length > 0
-      ? (yearlyTopData[topYearIndex] || yearlyTopData[0])
+  const topQuarterData =
+    quarterlyTopData.length > 0
+      ? (quarterlyTopData[topQuarterIndex] || quarterlyTopData[0])
       : null;
 
-  const displayMarketShareData = marketByYearPlaying && marketYearData
-    ? marketYearData.marketShare
+  const displayMarketShareData = marketByQuarterPlaying && marketQuarterData
+    ? marketQuarterData.marketShare
     : marketShareData;
-  const displayTopCountriesData = topByYearPlaying && topYearData
-    ? topYearData.topCountries
+  const displayTopCountriesData = topByQuarterPlaying && topQuarterData
+    ? topQuarterData.topCountries
     : topCountriesData;
-  const displayMarketYear = marketByYearPlaying && marketYearData ? marketYearData.year : null;
-  const displayTopYear = topByYearPlaying && topYearData ? topYearData.year : null;
+  const displayMarketQuarter = marketByQuarterPlaying && marketQuarterData ? marketQuarterData.label : null;
+  const displayTopQuarter = topByQuarterPlaying && topQuarterData ? topQuarterData.label : null;
 
   return (
     <div className="space-y-6">
@@ -308,16 +320,35 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
         <div className="bg-white border border-black/5 p-8 rounded-[28px] shadow-sm">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-[18px] font-bold text-[#1D1D1F]">{t('countryTrade.marketShare')}</h3>
-            <button
-              onClick={() => setMarketByYearPlaying((prev) => !prev)}
-              className="text-[11px] px-3 py-1.5 rounded-full border border-black/10 text-[#007AFF] hover:bg-[#F5F5F7] font-semibold"
-            >
-              {marketByYearPlaying ? (t('countryTrade.showTotal') || 'Show Total') : (t('countryTrade.playByYear') || 'Play by Year')}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setMarketQuarterPaused((prev) => !prev)}
+                disabled={!marketByQuarterPlaying}
+                className={`text-[11px] px-3 py-1.5 rounded-full border font-semibold ${
+                  marketByQuarterPlaying
+                    ? 'border-black/10 text-[#1D1D1F] hover:bg-[#F5F5F7]'
+                    : 'border-black/10 text-[#B0B0B5] cursor-not-allowed'
+                }`}
+              >
+                {marketQuarterPaused ? 'Continue' : 'Pause'}
+              </button>
+              <button
+                onClick={() => {
+                  setMarketByQuarterPlaying((prev) => {
+                    const next = !prev;
+                    if (next) setMarketQuarterPaused(false);
+                    return next;
+                  });
+                }}
+                className="text-[11px] px-3 py-1.5 rounded-full border border-black/10 text-[#007AFF] hover:bg-[#F5F5F7] font-semibold"
+              >
+                {marketByQuarterPlaying ? (t('countryTrade.showTotal') || 'Show Total') : 'Play by Quarter'}
+              </button>
+            </div>
           </div>
           <p className="text-[11px] text-[#86868B] mb-4">
-            {marketByYearPlaying && displayMarketYear
-              ? `${t('countryTrade.playingYear') || 'Playing year'}: ${displayMarketYear}`
+            {marketByQuarterPlaying && displayMarketQuarter
+              ? `Playing quarter: ${displayMarketQuarter}`
               : (t('countryTrade.totalWithinSelection') || 'Total within selected filter range')}
           </p>
           <div className="h-[300px] grid grid-cols-[minmax(0,1fr)_170px] gap-2 items-center">
@@ -337,7 +368,7 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
                         endAngle={-270}
                         label={false}
                         labelLine={false}
-                        isAnimationActive={marketByYearPlaying}
+                        isAnimationActive={marketByQuarterPlaying}
                         animationDuration={850}
                         animationEasing="ease-in-out"
                       >
@@ -380,16 +411,35 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
         <div className="bg-white border border-black/5 p-8 rounded-[28px] shadow-sm">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-[18px] font-bold text-[#1D1D1F]">{t('countryTrade.topCountries')}</h3>
-            <button
-              onClick={() => setTopByYearPlaying((prev) => !prev)}
-              className="text-[11px] px-3 py-1.5 rounded-full border border-black/10 text-[#007AFF] hover:bg-[#F5F5F7] font-semibold"
-            >
-              {topByYearPlaying ? (t('countryTrade.showTotal') || 'Show Total') : (t('countryTrade.playByYear') || 'Play by Year')}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setTopQuarterPaused((prev) => !prev)}
+                disabled={!topByQuarterPlaying}
+                className={`text-[11px] px-3 py-1.5 rounded-full border font-semibold ${
+                  topByQuarterPlaying
+                    ? 'border-black/10 text-[#1D1D1F] hover:bg-[#F5F5F7]'
+                    : 'border-black/10 text-[#B0B0B5] cursor-not-allowed'
+                }`}
+              >
+                {topQuarterPaused ? 'Continue' : 'Pause'}
+              </button>
+              <button
+                onClick={() => {
+                  setTopByQuarterPlaying((prev) => {
+                    const next = !prev;
+                    if (next) setTopQuarterPaused(false);
+                    return next;
+                  });
+                }}
+                className="text-[11px] px-3 py-1.5 rounded-full border border-black/10 text-[#007AFF] hover:bg-[#F5F5F7] font-semibold"
+              >
+                {topByQuarterPlaying ? (t('countryTrade.showTotal') || 'Show Total') : 'Play by Quarter'}
+              </button>
+            </div>
           </div>
           <p className="text-[11px] text-[#86868B] mb-4">
-            {topByYearPlaying && displayTopYear
-              ? `${t('countryTrade.playingYear') || 'Playing year'}: ${displayTopYear}`
+            {topByQuarterPlaying && displayTopQuarter
+              ? `Playing quarter: ${displayTopQuarter}`
               : (t('countryTrade.totalWithinSelection') || 'Total within selected filter range')}
           </p>
           <div className="h-[300px]">

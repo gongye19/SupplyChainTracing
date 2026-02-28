@@ -78,6 +78,7 @@ const App: React.FC = () => {
   const [countryTradeLoading, setCountryTradeLoading] = useState(false);
   const [countryMapYearPlaying, setCountryMapYearPlaying] = useState(false);
   const [countryMapYearIndex, setCountryMapYearIndex] = useState(0);
+  const [countryMapQuarterPaused, setCountryMapQuarterPaused] = useState(false);
   
   // Refs for preview/final scheduling
   const currentMapFilters = activeView === 'map-country' ? mapCountryFilters : mapHsFilters;
@@ -778,23 +779,40 @@ const App: React.FC = () => {
     return () => controller.abort();
   }, [activeView, mapCountryFilters.startDate, mapCountryFilters.endDate]);
 
-  const countryTradeYears = useMemo(() => {
-    return Array.from(new Set(countryTradeStats.map((item) => item.year))).sort((a, b) => a - b);
+  const countryTradeQuarters = useMemo(() => {
+    const quarterSet = new Map<string, { year: number; quarter: number; label: string; months: number[] }>();
+    countryTradeStats.forEach((item) => {
+      const quarter = Math.floor((item.month - 1) / 3) + 1;
+      const key = `${item.year}-Q${quarter}`;
+      if (!quarterSet.has(key)) {
+        const months = quarter === 1 ? [1, 2, 3] : quarter === 2 ? [4, 5, 6] : quarter === 3 ? [7, 8, 9] : [10, 11, 12];
+        quarterSet.set(key, {
+          year: item.year,
+          quarter,
+          months,
+          label: `${item.year} (${months.join('-')})`,
+        });
+      }
+    });
+    return Array.from(quarterSet.values()).sort((a, b) => (a.year === b.year ? a.quarter - b.quarter : a.year - b.year));
   }, [countryTradeStats]);
 
   useEffect(() => {
-    if (!countryMapYearPlaying || countryTradeYears.length === 0) return;
+    if (!countryMapYearPlaying || countryMapQuarterPaused || countryTradeQuarters.length === 0) return;
     const timer = window.setInterval(() => {
-      setCountryMapYearIndex((prev) => (prev + 1) % countryTradeYears.length);
+      setCountryMapYearIndex((prev) => (prev + 1) % countryTradeQuarters.length);
     }, 1500);
     return () => window.clearInterval(timer);
-  }, [countryMapYearPlaying, countryTradeYears.length]);
+  }, [countryMapYearPlaying, countryMapQuarterPaused, countryTradeQuarters.length]);
 
   const displayedCountryTradeStats = useMemo(() => {
-    if (!countryMapYearPlaying || countryTradeYears.length === 0) return countryTradeStats;
-    const year = countryTradeYears[countryMapYearIndex];
-    return countryTradeStats.filter((item) => item.year === year);
-  }, [countryMapYearPlaying, countryTradeYears, countryMapYearIndex, countryTradeStats]);
+    if (!countryMapYearPlaying || countryTradeQuarters.length === 0) return countryTradeStats;
+    const quarter = countryTradeQuarters[countryMapYearIndex];
+    if (!quarter) return countryTradeStats;
+    return countryTradeStats.filter(
+      (item) => item.year === quarter.year && quarter.months.includes(item.month)
+    );
+  }, [countryMapYearPlaying, countryTradeQuarters, countryMapYearIndex, countryTradeStats]);
 
   const displayedCountryTradeSummary = useMemo(() => {
     if (!countryTradeSummary) return null;
@@ -1086,24 +1104,50 @@ const App: React.FC = () => {
                 <div className="bg-white border border-black/5 rounded-[28px] p-6 shadow-sm h-[600px] overflow-hidden">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-[18px] font-bold text-[#1D1D1F]">{t('countryTrade.tradeMap')}</h3>
-                    <button
-                      onClick={() => setCountryMapYearPlaying((prev) => !prev)}
-                      className="text-[11px] px-3 py-1.5 rounded-full border border-black/10 text-[#007AFF] hover:bg-[#F5F5F7] font-semibold"
-                    >
-                      {countryMapYearPlaying ? (t('countryTrade.showTotal') || 'Show Total') : (t('countryTrade.playByYear') || 'Play by Year')}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setCountryMapQuarterPaused((prev) => !prev)}
+                        disabled={!countryMapYearPlaying}
+                        className={`text-[11px] px-3 py-1.5 rounded-full border font-semibold ${
+                          countryMapYearPlaying
+                            ? 'border-black/10 text-[#1D1D1F] hover:bg-[#F5F5F7]'
+                            : 'border-black/10 text-[#B0B0B5] cursor-not-allowed'
+                        }`}
+                      >
+                        {countryMapQuarterPaused ? 'Continue' : 'Pause'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setCountryMapYearPlaying((prev) => {
+                            const next = !prev;
+                            if (next) setCountryMapQuarterPaused(false);
+                            return next;
+                          });
+                        }}
+                        className="text-[11px] px-3 py-1.5 rounded-full border border-black/10 text-[#007AFF] hover:bg-[#F5F5F7] font-semibold"
+                      >
+                        {countryMapYearPlaying ? (t('countryTrade.showTotal') || 'Show Total') : 'Play by Quarter'}
+                      </button>
+                    </div>
                   </div>
                   <p className="text-[11px] text-[#86868B] mb-3">
-                    {countryMapYearPlaying && countryTradeYears.length > 0
-                      ? `${t('countryTrade.playingYear') || 'Playing year'}: ${countryTradeYears[countryMapYearIndex]}`
+                    {countryMapYearPlaying && countryTradeQuarters.length > 0
+                      ? `Playing quarter: ${countryTradeQuarters[countryMapYearIndex]?.label || ''}`
                       : (t('countryTrade.totalWithinSelection') || 'Total within selected filter range')}
                   </p>
-                  <div className="h-[510px] pb-5">
+                  <div className="h-[510px] pb-5 relative">
                       <CountryTradeMap
                       stats={displayedCountryTradeStats}
                         countries={countries}
                         selectedHSCodes={countryTradeFilters.hsCode}
                       />
+                      {countryMapYearPlaying && countryTradeQuarters.length > 0 && (
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                          <div className="text-[72px] font-black text-[#1D1D1F]/20 tracking-wide select-none">
+                            {countryTradeQuarters[countryMapYearIndex]?.label}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 
