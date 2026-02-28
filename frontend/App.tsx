@@ -786,11 +786,12 @@ const App: React.FC = () => {
       const key = `${item.year}-Q${quarter}`;
       if (!quarterSet.has(key)) {
         const months = quarter === 1 ? [1, 2, 3] : quarter === 2 ? [4, 5, 6] : quarter === 3 ? [7, 8, 9] : [10, 11, 12];
+        const quarterRange = quarter === 1 ? '1-3' : quarter === 2 ? '4-6' : quarter === 3 ? '7-9' : '10-12';
         quarterSet.set(key, {
           year: item.year,
           quarter,
           months,
-          label: `${item.year} (${months.join('-')})`,
+          label: `${item.year} (${quarterRange})`,
         });
       }
     });
@@ -1142,8 +1143,8 @@ const App: React.FC = () => {
                         selectedHSCodes={countryTradeFilters.hsCode}
                       />
                       {countryMapYearPlaying && countryTradeQuarters.length > 0 && (
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                          <div className="text-[72px] font-black text-[#1D1D1F]/20 tracking-wide select-none">
+                        <div className="absolute left-5 bottom-4 pointer-events-none">
+                          <div className="text-[36px] md:text-[44px] font-black text-[#1D1D1F]/22 tracking-wide select-none leading-none">
                             {countryTradeQuarters[countryMapYearIndex]?.label}
                           </div>
                         </div>
