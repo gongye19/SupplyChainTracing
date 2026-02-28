@@ -970,12 +970,12 @@ const App: React.FC = () => {
                       <div className="mb-4">
                         <h2 className="text-[32px] font-bold tracking-tight text-[#1D1D1F]">Trade Map by Country</h2>
                         <p className="text-[#86868B] text-[16px] font-medium mt-1">
-                          Monthly trade statistics analysis by HS code and country
+                          Country-level trade flow analysis
                         </p>
                       </div>
                       <div className="bg-white border border-black/5 rounded-[28px] p-6 shadow-sm h-[600px] overflow-hidden">
                         <div className="flex items-center justify-between mb-2">
-                          <h3 className="text-[18px] font-bold text-[#1D1D1F]">Country Statistics Map</h3>
+                          <h3 className="text-[18px] font-bold text-[#1D1D1F]">Country Trade Flow Map</h3>
                         </div>
                         <div className="h-[540px]">
                           <SupplyMap 

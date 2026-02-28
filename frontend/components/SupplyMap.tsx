@@ -538,9 +538,8 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
         const colorDepth = Math.max(0, Math.min(1, colorScale(routeGroup.totalValue)));
         // 用非线性增强中低值区间的可见差异，避免“看起来都差不多”
         const enhancedDepth = Math.pow(colorDepth, 0.45);
-        const baseCategoryColor = routeGroup.mainColor || '#007AFF';
-        // 色相由品类色决定，深浅由交易金额决定
-        const color = d3.interpolateRgb('#DCEBFF', baseCategoryColor)(0.35 + enhancedDepth * 0.65);
+        // 恢复统一蓝色方案：深浅由交易金额决定
+        const color = d3.interpolateRgbBasis(['#78B6FF', '#4A97FF', '#1F73F1', '#0A3FA8'])(enhancedDepth);
         const baseArcOpacity = 0.34 + enhancedDepth * 0.42;
         const haloOpacity = 0.08 + enhancedDepth * 0.14;
         const directionText =
@@ -823,7 +822,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
           <div className="font-bold uppercase tracking-wide text-[#86868B] mb-1">Legend</div>
           <div>Line width: trade amount</div>
           <div>Line depth: trade value</div>
-          <div>Line color: product category</div>
+          <div>Line color: unified blue</div>
         </div>
       </div>
       <svg ref={svgRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
