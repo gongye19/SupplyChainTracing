@@ -1137,18 +1137,20 @@ const App: React.FC = () => {
                       : (t('countryTrade.totalWithinSelection') || 'Total within selected filter range')}
                   </p>
                   <div className="h-[510px] pb-5 relative">
-                      <CountryTradeMap
-                      stats={displayedCountryTradeStats}
-                        countries={countries}
-                        selectedHSCodes={countryTradeFilters.hsCode}
-                      />
-                      {countryMapYearPlaying && countryTradeQuarters.length > 0 && (
-                        <div className="absolute left-5 bottom-4 pointer-events-none">
-                          <div className="text-[36px] md:text-[44px] font-black text-[#1D1D1F]/22 tracking-wide select-none leading-none">
-                            {countryTradeQuarters[countryMapYearIndex]?.label}
+                      <div className="absolute inset-x-0 top-0 bottom-5">
+                        <CountryTradeMap
+                          stats={displayedCountryTradeStats}
+                          countries={countries}
+                          selectedHSCodes={countryTradeFilters.hsCode}
+                        />
+                        {countryMapYearPlaying && countryTradeQuarters.length > 0 && (
+                          <div className="absolute left-5 bottom-4 pointer-events-none">
+                            <div className="text-[72px] font-black text-[#1D1D1F]/20 tracking-wide select-none leading-none">
+                              {countryTradeQuarters[countryMapYearIndex]?.label}
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   </div>
 
