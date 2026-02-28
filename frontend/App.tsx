@@ -960,47 +960,61 @@ const App: React.FC = () => {
                           isPreview={isInteracting}
                         />
                       </div>
-                      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                        <TopCountriesHorizontalBar
-                          title="Selected Trade Value Ranking"
-                          data={topCountriesByCountryMapValue}
-                          valueFormatter={(value) => `$${(value / 1000000000).toFixed(2)}B`}
-                          barColor="#007AFF"
-                          metaLines={[
-                            `Time: ${mapCountryFilters.startDate} ~ ${mapCountryFilters.endDate}`,
-                            `Direction: ${mapCountryFilters.tradeDirection === 'import' ? 'Import' : 'Export'}`,
-                          ]}
-                        />
-                        <TopCountriesHorizontalBar
-                          title="Selected Trade Amount Ranking"
-                          data={topCountriesByCountryMapCount}
-                          valueFormatter={(value) => Math.round(value).toLocaleString()}
-                          barColor="#34C759"
-                          metaLines={[
-                            `Time: ${mapCountryFilters.startDate} ~ ${mapCountryFilters.endDate}`,
-                            `Direction: ${mapCountryFilters.tradeDirection === 'import' ? 'Import' : 'Export'}`,
-                          ]}
-                        />
-                        <TopCountriesHorizontalBar
-                          title="Overall Top 10 Trade Value Ranking"
-                          data={topCountriesByCountryOverallValue}
-                          valueFormatter={(value) => `$${(value / 1000000000).toFixed(2)}B`}
-                          barColor="#5856D6"
-                          metaLines={[
-                            `Time: ${mapCountryFilters.startDate} ~ ${mapCountryFilters.endDate}`,
-                            `Direction: ${mapCountryFilters.tradeDirection === 'import' ? 'Import' : 'Export'}`,
-                          ]}
-                        />
-                        <TopCountriesHorizontalBar
-                          title="Overall Top 10 Trade Amount Ranking"
-                          data={topCountriesByCountryOverallCount}
-                          valueFormatter={(value) => Math.round(value).toLocaleString()}
-                          barColor="#FF9500"
-                          metaLines={[
-                            `Time: ${mapCountryFilters.startDate} ~ ${mapCountryFilters.endDate}`,
-                            `Direction: ${mapCountryFilters.tradeDirection === 'import' ? 'Import' : 'Export'}`,
-                          ]}
-                        />
+                      <div className="space-y-6">
+                        <div>
+                          <div className="text-[12px] font-bold uppercase tracking-widest text-[#86868B] mb-3">
+                            Selected Rankings
+                          </div>
+                          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                            <TopCountriesHorizontalBar
+                              title="Selected Trade Value Ranking"
+                              data={topCountriesByCountryMapValue}
+                              valueFormatter={(value) => `$${(value / 1000000000).toFixed(2)}B`}
+                              barColor="#007AFF"
+                              metaLines={[
+                                `Time: ${mapCountryFilters.startDate} ~ ${mapCountryFilters.endDate}`,
+                                `Direction: ${mapCountryFilters.tradeDirection === 'import' ? 'Import' : 'Export'}`,
+                              ]}
+                            />
+                            <TopCountriesHorizontalBar
+                              title="Selected Trade Amount Ranking"
+                              data={topCountriesByCountryMapCount}
+                              valueFormatter={(value) => Math.round(value).toLocaleString()}
+                              barColor="#34C759"
+                              metaLines={[
+                                `Time: ${mapCountryFilters.startDate} ~ ${mapCountryFilters.endDate}`,
+                                `Direction: ${mapCountryFilters.tradeDirection === 'import' ? 'Import' : 'Export'}`,
+                              ]}
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-[12px] font-bold uppercase tracking-widest text-[#86868B] mb-3">
+                            Overall Rankings
+                          </div>
+                          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                            <TopCountriesHorizontalBar
+                              title="Overall Top 10 Trade Value Ranking"
+                              data={topCountriesByCountryOverallValue}
+                              valueFormatter={(value) => `$${(value / 1000000000).toFixed(2)}B`}
+                              barColor="#5856D6"
+                              metaLines={[
+                                `Time: ${mapCountryFilters.startDate} ~ ${mapCountryFilters.endDate}`,
+                                `Direction: ${mapCountryFilters.tradeDirection === 'import' ? 'Import' : 'Export'}`,
+                              ]}
+                            />
+                            <TopCountriesHorizontalBar
+                              title="Overall Top 10 Trade Amount Ranking"
+                              data={topCountriesByCountryOverallCount}
+                              valueFormatter={(value) => Math.round(value).toLocaleString()}
+                              barColor="#FF9500"
+                              metaLines={[
+                                `Time: ${mapCountryFilters.startDate} ~ ${mapCountryFilters.endDate}`,
+                                `Direction: ${mapCountryFilters.tradeDirection === 'import' ? 'Import' : 'Export'}`,
+                              ]}
+                            />
+                          </div>
+                        </div>
                       </div>
                     </>
                   ) : (
