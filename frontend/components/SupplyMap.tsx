@@ -363,13 +363,14 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
         .attr('data-stroke-width', baseStrokeWidth);
       
       // 国家节点图标：圆形
+      const isSelectedCountry = selectedCountries.includes(countryCode);
       iconGroup.append('circle')
         .attr('cx', 0)
         .attr('cy', 0)
-        .attr('r', scaledSize)
-        .attr('fill', '#007AFF')
+        .attr('r', isSelectedCountry ? scaledSize * 1.25 : scaledSize)
+        .attr('fill', isSelectedCountry ? '#FF9500' : '#007AFF')
         .attr('stroke', '#FFFFFF')
-        .attr('stroke-width', scaledStrokeWidth);
+        .attr('stroke-width', isSelectedCountry ? scaledStrokeWidth * 1.25 : scaledStrokeWidth);
       
       // 添加阴影效果
       iconGroup.style('filter', 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25))');
@@ -537,7 +538,9 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
         const colorDepth = Math.max(0, Math.min(1, colorScale(routeGroup.totalValue)));
         // 用非线性增强中低值区间的可见差异，避免“看起来都差不多”
         const enhancedDepth = Math.pow(colorDepth, 0.45);
-        const color = d3.interpolateRgbBasis(['#78B6FF', '#4A97FF', '#1F73F1', '#0A3FA8'])(enhancedDepth);
+        const baseCategoryColor = routeGroup.mainColor || '#007AFF';
+        // 色相由品类色决定，深浅由交易金额决定
+        const color = d3.interpolateRgb('#DCEBFF', baseCategoryColor)(0.35 + enhancedDepth * 0.65);
         const baseArcOpacity = 0.34 + enhancedDepth * 0.42;
         const haloOpacity = 0.08 + enhancedDepth * 0.14;
         const directionText =
@@ -813,6 +816,14 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
               </>
             )}
           </div>
+        </div>
+      </div>
+      <div className="absolute top-4 right-4 z-10 pointer-events-none">
+        <div className="bg-white/95 backdrop-blur-xl p-3 rounded-[14px] border border-black/[0.05] shadow-md text-[10px] text-[#1D1D1F] leading-relaxed">
+          <div className="font-bold uppercase tracking-wide text-[#86868B] mb-1">Legend</div>
+          <div>Line width: trade amount</div>
+          <div>Line depth: trade value</div>
+          <div>Line color: product category</div>
         </div>
       </div>
       <svg ref={svgRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
