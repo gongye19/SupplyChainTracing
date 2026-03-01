@@ -973,7 +973,7 @@ const App: React.FC = () => {
                           Country-level trade flow analysis
                         </p>
                       </div>
-                      <div className="bg-white border border-black/5 rounded-[28px] p-6 shadow-sm h-[600px] overflow-hidden">
+                      <div className="bg-white border border-black/5 rounded-[28px] p-6 shadow-sm h-[640px] overflow-hidden">
                         <div className="flex items-center justify-between mb-2">
                           <h3 className="text-[18px] font-bold text-[#1D1D1F]">Country Trade Flow Map</h3>
                         </div>
