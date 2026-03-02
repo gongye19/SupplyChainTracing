@@ -14,6 +14,7 @@ def _apply_common_filters(
     query: str,
     params: dict,
     hs_code: Optional[List[str]] = None,
+    hs_code_prefix: Optional[List[str]] = None,
     year: Optional[int] = None,
     month: Optional[int] = None,
     country: Optional[List[str]] = None,
@@ -27,6 +28,14 @@ def _apply_common_filters(
         query += f" AND hs_code IN ({placeholders})"
         for i, code in enumerate(hs_code):
             params[f"hs_code_{i}"] = code
+
+    if hs_code_prefix:
+        prefix_conditions = []
+        for i, prefix in enumerate(hs_code_prefix):
+            key = f"hs_code_prefix_{i}"
+            prefix_conditions.append(f"hs_code LIKE :{key}")
+            params[key] = f"{prefix}%"
+        query += f" AND ({' OR '.join(prefix_conditions)})"
 
     if year:
         query += " AND year = :year"
@@ -82,6 +91,7 @@ def _resolve_trade_source(trade_direction: Optional[str]) -> Tuple[str, str]:
 @router.get("", response_model=List[CountryMonthlyTradeStat])
 def get_country_trade_stats(
     hs_code: Optional[List[str]] = Query(None, description="HS编码筛选（6位，可多个）"),
+    hs_code_prefix: Optional[List[str]] = Query(None, description="HS编码前缀筛选（2位/4位，可多个）"),
     year: Optional[int] = Query(None, description="年份筛选"),
     month: Optional[int] = Query(None, description="月份筛选（1-12）"),
     country: Optional[List[str]] = Query(None, description="国家代码筛选（可多个）"),
@@ -115,6 +125,7 @@ def get_country_trade_stats(
         query,
         params,
         hs_code=hs_code,
+        hs_code_prefix=hs_code_prefix,
         year=year,
         month=month,
         country=country,
@@ -138,6 +149,7 @@ def get_country_trade_stats(
 @router.get("/summary", response_model=CountryTradeStatSummary)
 def get_country_trade_stats_summary(
     hs_code: Optional[List[str]] = Query(None, description="HS编码筛选（6位，可多个）"),
+    hs_code_prefix: Optional[List[str]] = Query(None, description="HS编码前缀筛选（2位/4位，可多个）"),
     year: Optional[int] = Query(None, description="年份筛选"),
     month: Optional[int] = Query(None, description="月份筛选（1-12）"),
     country: Optional[List[str]] = Query(None, description="国家代码筛选（可多个）"),
@@ -164,6 +176,7 @@ def get_country_trade_stats_summary(
         query,
         params,
         hs_code=hs_code,
+        hs_code_prefix=hs_code_prefix,
         year=year,
         month=month,
         country=country,
@@ -246,6 +259,7 @@ def get_country_trade_trends(
 @router.get("/top-countries", response_model=List[TopCountry])
 def get_top_countries(
     hs_code: Optional[List[str]] = Query(None, description="HS编码（6位，可多个）"),
+    hs_code_prefix: Optional[List[str]] = Query(None, description="HS编码前缀筛选（2位/4位，可多个）"),
     year: Optional[int] = Query(None, description="年份筛选"),
     month: Optional[int] = Query(None, description="月份筛选（1-12）"),
     country: Optional[List[str]] = Query(None, description="国家代码筛选（可多个）"),
@@ -273,6 +287,7 @@ def get_top_countries(
         query,
         params,
         hs_code=hs_code,
+        hs_code_prefix=hs_code_prefix,
         year=year,
         month=month,
         country=country,

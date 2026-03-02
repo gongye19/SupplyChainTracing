@@ -68,6 +68,7 @@ const App: React.FC = () => {
   const [countryTradeSummary, setCountryTradeSummary] = useState<CountryTradeStatSummary | null>(null);
   const [countryTradeTrends, setCountryTradeTrends] = useState<CountryTradeTrend[]>([]);
   const [topCountries, setTopCountries] = useState<TopCountry[]>([]);
+  const [hsCodeMapMonthlyStats, setHsCodeMapMonthlyStats] = useState<CountryMonthlyTradeStat[]>([]);
   const [countryTradeFilters, setCountryTradeFilters] = useState<CountryTradeFilters>({
     hsCode: [],
     tradeDirection: 'import',
@@ -76,6 +77,7 @@ const App: React.FC = () => {
     endYearMonth: endDate,
   });
   const [countryTradeLoading, setCountryTradeLoading] = useState(false);
+  const [hsCodeMapLoading, setHsCodeMapLoading] = useState(false);
   const [countryMapYearPlaying, setCountryMapYearPlaying] = useState(false);
   const [countryMapYearIndex, setCountryMapYearIndex] = useState(0);
   const [countryMapQuarterPaused, setCountryMapQuarterPaused] = useState(false);
@@ -88,6 +90,7 @@ const App: React.FC = () => {
   const countryOverallAbortRef = useRef<AbortController | null>(null);
   const finalTimerRef = useRef<number | null>(null);
   const countryTradeTimerRef = useRef<number | null>(null);
+  const hsCodeMapTimerRef = useRef<number | null>(null);
   const countryTradeCacheRef = useRef<
     Map<
       string,
@@ -101,7 +104,9 @@ const App: React.FC = () => {
   >(new Map());
   const lastCountryTradeKeyRef = useRef<string>('');
   const shipmentsCacheRef = useRef<Map<string, Shipment[]>>(new Map());
+  const hsCodeMapCacheRef = useRef<Map<string, CountryMonthlyTradeStat[]>>(new Map());
   const lastRequestedKeyRef = useRef<string>('');
+  const lastHsCodeMapKeyRef = useRef<string>('');
   // 标记是否正在拖动（用于时间滑块）
   const isDraggingRef = useRef<boolean>(false);
 
@@ -207,18 +212,23 @@ const App: React.FC = () => {
   useEffect(() => {
     if (activeView !== 'global-stats') return;
 
+    const requestFilters: CountryTradeFilters = {
+      ...countryTradeFilters,
+      tradeDirection: 'all',
+    };
+
     const buildCountryTradeKey = () => {
-      const hsCodes = [...(countryTradeFilters.hsCode || [])].sort().join(',');
-      const countriesFilter = [...(countryTradeFilters.country || [])].sort().join(',');
+      const hsCodes = [...(requestFilters.hsCode || [])].sort().join(',');
+      const countriesFilter = [...(requestFilters.country || [])].sort().join(',');
       return [
         hsCodes,
-        countryTradeFilters.tradeDirection || 'import',
+        requestFilters.tradeDirection || 'all',
         countriesFilter,
-        countryTradeFilters.industry || '',
-        countryTradeFilters.year || '',
-        countryTradeFilters.month || '',
-        countryTradeFilters.startYearMonth || '',
-        countryTradeFilters.endYearMonth || '',
+        requestFilters.industry || '',
+        requestFilters.year || '',
+        requestFilters.month || '',
+        requestFilters.startYearMonth || '',
+        requestFilters.endYearMonth || '',
       ].join('|');
     };
 
@@ -242,22 +252,22 @@ const App: React.FC = () => {
         setCountryTradeLoading(true);
         
         const [statsData, summaryData, trendsData, topCountriesData] = await Promise.all([
-          countryTradeStatsAPI.getAll(countryTradeFilters),
-          countryTradeStatsAPI.getSummary(countryTradeFilters),
+          countryTradeStatsAPI.getAll(requestFilters),
+          countryTradeStatsAPI.getSummary(requestFilters),
           countryTradeStatsAPI.getTrends({
-            hsCode: countryTradeFilters.hsCode?.[0],
-            industry: countryTradeFilters.industry,
-            tradeDirection: countryTradeFilters.tradeDirection,
-            startYearMonth: countryTradeFilters.startYearMonth,
-            endYearMonth: countryTradeFilters.endYearMonth,
+            hsCode: requestFilters.hsCode?.[0],
+            industry: requestFilters.industry,
+            tradeDirection: 'all',
+            startYearMonth: requestFilters.startYearMonth,
+            endYearMonth: requestFilters.endYearMonth,
           }),
           countryTradeStatsAPI.getTopCountries({
-            hsCode: countryTradeFilters.hsCode,
-            country: countryTradeFilters.country,
-            industry: countryTradeFilters.industry,
-            tradeDirection: countryTradeFilters.tradeDirection,
-            startYearMonth: countryTradeFilters.startYearMonth,
-            endYearMonth: countryTradeFilters.endYearMonth,
+            hsCode: requestFilters.hsCode,
+            country: requestFilters.country,
+            industry: requestFilters.industry,
+            tradeDirection: 'all',
+            startYearMonth: requestFilters.startYearMonth,
+            endYearMonth: requestFilters.endYearMonth,
             limit: 10,
           }),
         ]);
@@ -303,6 +313,65 @@ const App: React.FC = () => {
     };
   }, [activeView, countryTradeFilters, countries.length]);
 
+  useEffect(() => {
+    if (activeView !== 'map-hscode') return;
+
+    const selectedHs4 = [...(mapHsFilters.selectedHSCode4Digit || [])].sort();
+    if (selectedHs4.length === 0) {
+      setHsCodeMapMonthlyStats([]);
+      lastHsCodeMapKeyRef.current = '';
+      return;
+    }
+
+    const requestFilters: CountryTradeFilters = {
+      hsCodePrefix: selectedHs4,
+      tradeDirection: 'all',
+      industry: 'SemiConductor',
+      startYearMonth: mapHsFilters.startDate,
+      endYearMonth: mapHsFilters.endDate,
+    };
+
+    const requestKey = [
+      requestFilters.startYearMonth || '',
+      requestFilters.endYearMonth || '',
+      selectedHs4.join(','),
+      requestFilters.industry || '',
+    ].join('|');
+
+    const loadHsCodeMapData = async () => {
+      try {
+        if (lastHsCodeMapKeyRef.current === requestKey) {
+          return;
+        }
+        lastHsCodeMapKeyRef.current = requestKey;
+
+        const cached = hsCodeMapCacheRef.current.get(requestKey);
+        if (cached) {
+          setHsCodeMapMonthlyStats(cached);
+          return;
+        }
+
+        setHsCodeMapLoading(true);
+        const data = await countryTradeStatsAPI.getAll(requestFilters);
+        hsCodeMapCacheRef.current.set(requestKey, data);
+        setHsCodeMapMonthlyStats(data);
+      } catch (error) {
+        logger.error('Failed to load HSCode map monthly stats:', error);
+      } finally {
+        setHsCodeMapLoading(false);
+      }
+    };
+
+    if (hsCodeMapTimerRef.current) window.clearTimeout(hsCodeMapTimerRef.current);
+    hsCodeMapTimerRef.current = window.setTimeout(() => {
+      loadHsCodeMapData();
+    }, 120);
+
+    return () => {
+      if (hsCodeMapTimerRef.current) window.clearTimeout(hsCodeMapTimerRef.current);
+    };
+  }, [activeView, mapHsFilters.endDate, mapHsFilters.selectedHSCode4Digit, mapHsFilters.startDate]);
+
   // 国家名称到国家代码的映射函数
   const getCountryCode = useCallback((countryName: string): string => {
     if (!countryName) return '';
@@ -330,19 +399,20 @@ const App: React.FC = () => {
     if (cached) {
       setShipments(cached);
       if (mode === 'final') {
+        const countryMapData = cached.filter((item) => item.hsCode === '854231');
         const uniqueCountries = new Set<string>();
-        cached.forEach(s => {
+        countryMapData.forEach(s => {
           uniqueCountries.add(s.countryOfOrigin);
           uniqueCountries.add(s.destinationCountry);
         });
         const countryPairs = new Set<string>();
-        cached.forEach(s => {
+        countryMapData.forEach(s => {
           const originCode = s.originCountryCode || getCountryCode(s.countryOfOrigin || '');
           const destCode = s.destinationCountryCode || getCountryCode(s.destinationCountry || '');
           if (originCode && destCode) countryPairs.add(`${originCode}-${destCode}`);
         });
         const uniqueCategories = new Set<string>();
-        cached.forEach(s => {
+        countryMapData.forEach(s => {
           if (s.hsCode && s.hsCode.length >= 2) uniqueCategories.add(s.hsCode.slice(0, 2));
         });
         setStats({
@@ -395,15 +465,16 @@ const App: React.FC = () => {
       
       // 更新统计
       if (mode === 'final') {
+        const countryMapData = data.filter((item) => item.hsCode === '854231');
         const uniqueCountries = new Set<string>();
-        data.forEach(s => {
+        countryMapData.forEach(s => {
           uniqueCountries.add(s.countryOfOrigin);
           uniqueCountries.add(s.destinationCountry);
         });
         
         // 按国家对聚合，计算唯一国家对数量（用于 Transaction Flow）
         const countryPairs = new Set<string>();
-        data.forEach(s => {
+        countryMapData.forEach(s => {
           // 使用国家代码作为键（顺序固定：原产国-目的地国家）
           const originCode = s.originCountryCode || getCountryCode(s.countryOfOrigin || '');
           const destCode = s.destinationCountryCode || getCountryCode(s.destinationCountry || '');
@@ -415,7 +486,7 @@ const App: React.FC = () => {
         
         // 计算唯一品类数量（HS Code 前2位）
         const uniqueCategories = new Set<string>();
-        data.forEach(s => {
+        countryMapData.forEach(s => {
           if (s.hsCode && s.hsCode.length >= 2) {
             uniqueCategories.add(s.hsCode.slice(0, 2));
           }
@@ -477,6 +548,8 @@ const App: React.FC = () => {
   const filteredShipmentsForCurrentMap = useMemo(() => {
     const activeFilters = currentMapFilters;
     const isHsCodeMapView = activeView === 'map-hscode';
+    const isCountryMapView = activeView === 'map-country';
+    const fixedCountryMapHsCode = '854231';
     const focusCountries = new Set(activeFilters.selectedCountries || []);
     const hs4Set = new Set(activeFilters.selectedHSCode4Digit || []);
     const hasHs4Filter = hs4Set.size > 0;
@@ -485,6 +558,9 @@ const App: React.FC = () => {
     const direction = activeFilters.tradeDirection || 'import';
 
     return shipments.filter((shipment) => {
+      if (isCountryMapView && shipment.hsCode !== fixedCountryMapHsCode) {
+        return false;
+      }
       if (isHsCodeMapView && !hasHs4Filter) {
         return false;
       }
@@ -593,18 +669,17 @@ const App: React.FC = () => {
   }, [filteredShipmentsForCurrentMap, hsCodeCategories, countries, getCountryCode]);
 
   const hsCodeMapStats = useMemo(() => {
-    const direction = mapHsFilters.tradeDirection || 'import';
     const countryMap = new Map<string, { sumOfUsd: number; tradeCount: number }>();
 
-    filteredShipmentsForCurrentMap.forEach((shipment) => {
-      const countryCode = direction === 'import'
-        ? shipment.destinationCountryCode
-        : shipment.originCountryCode;
-      if (!countryCode) return;
+    hsCodeMapMonthlyStats.forEach((stat) => {
+      const countryCode = stat.countryCode;
+      if (!countryCode) {
+        return;
+      }
       const current = countryMap.get(countryCode) || { sumOfUsd: 0, tradeCount: 0 };
       countryMap.set(countryCode, {
-        sumOfUsd: current.sumOfUsd + (shipment.totalValueUsd || 0),
-        tradeCount: current.tradeCount + (shipment.tradeCount || 0),
+        sumOfUsd: current.sumOfUsd + (stat.sumOfUsd || 0),
+        tradeCount: current.tradeCount + (stat.tradeCount || 0),
       });
     });
 
@@ -617,7 +692,7 @@ const App: React.FC = () => {
       tradeCount: data.tradeCount,
       amountSharePct: 0,
     }));
-  }, [filteredShipmentsForCurrentMap, mapHsFilters.tradeDirection]);
+  }, [hsCodeMapMonthlyStats]);
 
   const hsCodeMapFilterSummary = useMemo(() => {
     const hs4 = mapHsFilters.selectedHSCode4Digit || [];
@@ -671,12 +746,12 @@ const App: React.FC = () => {
   const topCategoriesByHSCodeCount = useMemo(() => {
     if (activeView !== 'map-hscode') return [];
     const aggregate = new Map<string, { tradeCount: number; tradeValue: number }>();
-    filteredShipmentsForCurrentMap.forEach((shipment) => {
-      const hs4 = shipment.hsCode?.slice(0, 4) || 'Unknown';
+    hsCodeMapMonthlyStats.forEach((stat) => {
+      const hs4 = stat.hsCode?.slice(0, 4) || 'Unknown';
       const prev = aggregate.get(hs4) || { tradeCount: 0, tradeValue: 0 };
       aggregate.set(hs4, {
-        tradeCount: prev.tradeCount + (shipment.tradeCount || 0),
-        tradeValue: prev.tradeValue + (shipment.totalValueUsd || 0),
+        tradeCount: prev.tradeCount + (stat.tradeCount || 0),
+        tradeValue: prev.tradeValue + (stat.sumOfUsd || 0),
       });
     });
 
@@ -696,17 +771,17 @@ const App: React.FC = () => {
       }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 10);
-  }, [activeView, filteredShipmentsForCurrentMap, mapHsFilters.selectedHSCode4Digit]);
+  }, [activeView, hsCodeMapMonthlyStats, mapHsFilters.selectedHSCode4Digit]);
 
   const topCategoriesByHSCodeValue = useMemo(() => {
     if (activeView !== 'map-hscode') return [];
     const aggregate = new Map<string, { tradeCount: number; tradeValue: number }>();
-    filteredShipmentsForCurrentMap.forEach((shipment) => {
-      const hs4 = shipment.hsCode?.slice(0, 4) || 'Unknown';
+    hsCodeMapMonthlyStats.forEach((stat) => {
+      const hs4 = stat.hsCode?.slice(0, 4) || 'Unknown';
       const prev = aggregate.get(hs4) || { tradeCount: 0, tradeValue: 0 };
       aggregate.set(hs4, {
-        tradeCount: prev.tradeCount + (shipment.tradeCount || 0),
-        tradeValue: prev.tradeValue + (shipment.totalValueUsd || 0),
+        tradeCount: prev.tradeCount + (stat.tradeCount || 0),
+        tradeValue: prev.tradeValue + (stat.sumOfUsd || 0),
       });
     });
 
@@ -726,7 +801,7 @@ const App: React.FC = () => {
       }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 10);
-  }, [activeView, filteredShipmentsForCurrentMap, mapHsFilters.selectedHSCode4Digit]);
+  }, [activeView, hsCodeMapMonthlyStats, mapHsFilters.selectedHSCode4Digit]);
 
   const topCountriesByCountryMapValue = useMemo(() => {
     if (activeView !== 'map-country') return [];
@@ -767,7 +842,7 @@ const App: React.FC = () => {
           { signal: controller.signal }
         );
         if (!controller.signal.aborted) {
-          setCountryOverallShipments(data);
+          setCountryOverallShipments(data.filter((item) => item.hsCode === '854231'));
         }
       } catch (error: any) {
         if (error?.name === 'AbortError') return;
@@ -1194,7 +1269,7 @@ const App: React.FC = () => {
         </section>
       </main>
 
-      {(((activeView === 'map-country' || activeView === 'map-hscode') && filterLoading) || (activeView === 'global-stats' && countryTradeLoading)) && (
+      {((activeView === 'map-country' && filterLoading) || (activeView === 'map-hscode' && hsCodeMapLoading) || (activeView === 'global-stats' && countryTradeLoading)) && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center pointer-events-none">
           <div className="w-12 h-12 rounded-full border-[3px] border-[#D1D1D6] border-t-[#007AFF] animate-spin bg-white/40 backdrop-blur-[1px]" />
         </div>

@@ -301,6 +301,9 @@ export const countryTradeStatsAPI = {
     if (filters?.hsCode?.length) {
       filters.hsCode.forEach(code => params.append('hs_code', code));
     }
+    if (filters?.hsCodePrefix?.length) {
+      filters.hsCodePrefix.forEach(prefix => params.append('hs_code_prefix', prefix));
+    }
     if (filters?.year) {
       params.append('year', filters.year.toString());
     }
