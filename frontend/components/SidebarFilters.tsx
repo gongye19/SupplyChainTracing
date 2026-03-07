@@ -154,8 +154,8 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
     setFilters((prev) => {
       const exists = prev.selectedHSCodes.includes(hsCode);
       const nextCodes = exists
-        ? prev.selectedHSCodes.filter((code) => code !== hsCode)
-        : [...prev.selectedHSCodes, hsCode];
+        ? []
+        : [hsCode];
       const next4 = Array.from(new Set(nextCodes.map((code) => code.slice(0, 4))));
       const nextCategories = Array.from(new Set(nextCodes.map((code) => code.slice(0, 2))));
       const nextSubcategories = Array.from(new Set(nextCodes.map((code) => code.slice(2, 4))));
@@ -326,9 +326,7 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
               <span className="truncate">
                 {filters.selectedHSCodes.length === 0
                   ? 'Select HSCode'
-                  : filters.selectedHSCodes.length <= 3
-                    ? filters.selectedHSCodes.join(', ')
-                    : `${filters.selectedHSCodes.slice(0, 3).join(', ')} +${filters.selectedHSCodes.length - 3}`}
+                  : filters.selectedHSCodes[0]}
               </span>
               <ChevronDown className={`w-3.5 h-3.5 text-[#86868B] transition-transform ${hsCodeDropdownOpen ? 'rotate-180' : ''}`} />
             </button>

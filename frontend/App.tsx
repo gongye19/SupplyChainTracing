@@ -765,81 +765,21 @@ const App: React.FC = () => {
     [countries]
   );
 
-  const topCategoriesByHSCodeCount = useMemo(() => {
-    if (activeView !== 'map-hscode') return [];
-    const aggregate = new Map<string, { tradeCount: number; tradeValue: number }>();
-    hsCodeMapMonthlyStats.forEach((stat) => {
-      const hs4 = stat.hsCode?.slice(0, 4) || 'Unknown';
-      const prev = aggregate.get(hs4) || { tradeCount: 0, tradeValue: 0 };
-      aggregate.set(hs4, {
-        tradeCount: prev.tradeCount + (stat.tradeCount || 0),
-        tradeValue: prev.tradeValue + (stat.sumOfUsd || 0),
-      });
-    });
-
-    if (aggregate.size === 0 && mapHsFilters.selectedHSCodes.length > 0) {
-      return mapHsFilters.selectedHSCodes.slice(0, 10).map((hsCode) => ({
-        countryCode: hsCode,
-        countryName: `HS ${hsCode}`,
-        value: 0,
-      }));
-    }
-
-    return Array.from(aggregate.entries())
-      .map(([hs4, value]) => ({
-        countryCode: hs4,
-        countryName: `HS ${hs4}`,
-        value: value.tradeCount,
-      }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 10);
-  }, [activeView, hsCodeMapMonthlyStats, mapHsFilters.selectedHSCodes]);
-
-  const topCategoriesByHSCodeValue = useMemo(() => {
-    if (activeView !== 'map-hscode') return [];
-    const aggregate = new Map<string, { tradeCount: number; tradeValue: number }>();
-    hsCodeMapMonthlyStats.forEach((stat) => {
-      const hs4 = stat.hsCode?.slice(0, 4) || 'Unknown';
-      const prev = aggregate.get(hs4) || { tradeCount: 0, tradeValue: 0 };
-      aggregate.set(hs4, {
-        tradeCount: prev.tradeCount + (stat.tradeCount || 0),
-        tradeValue: prev.tradeValue + (stat.sumOfUsd || 0),
-      });
-    });
-
-    if (aggregate.size === 0 && mapHsFilters.selectedHSCodes.length > 0) {
-      return mapHsFilters.selectedHSCodes.slice(0, 10).map((hsCode) => ({
-        countryCode: hsCode,
-        countryName: `HS ${hsCode}`,
-        value: 0,
-      }));
-    }
-
-    return Array.from(aggregate.entries())
-      .map(([hs4, value]) => ({
-        countryCode: hs4,
-        countryName: `HS ${hs4}`,
-        value: value.tradeValue,
-      }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 10);
-  }, [activeView, hsCodeMapMonthlyStats, mapHsFilters.selectedHSCodes]);
-
   const topCategoriesByHSCodeOverallCount = useMemo(() => {
     if (activeView !== 'map-hscode') return [];
     const aggregate = new Map<string, { tradeCount: number; tradeValue: number }>();
     hsCodeMapOverallMonthlyStats.forEach((stat) => {
-      const hs4 = stat.hsCode?.slice(0, 4) || 'Unknown';
-      const prev = aggregate.get(hs4) || { tradeCount: 0, tradeValue: 0 };
-      aggregate.set(hs4, {
+      const hsCode = stat.hsCode || 'Unknown';
+      const prev = aggregate.get(hsCode) || { tradeCount: 0, tradeValue: 0 };
+      aggregate.set(hsCode, {
         tradeCount: prev.tradeCount + (stat.tradeCount || 0),
         tradeValue: prev.tradeValue + (stat.sumOfUsd || 0),
       });
     });
     return Array.from(aggregate.entries())
-      .map(([hs4, value]) => ({
-        countryCode: hs4,
-        countryName: `HS ${hs4}`,
+      .map(([hsCode, value]) => ({
+        countryCode: hsCode,
+        countryName: `HS ${hsCode}`,
         value: value.tradeCount,
       }))
       .sort((a, b) => b.value - a.value)
@@ -850,17 +790,17 @@ const App: React.FC = () => {
     if (activeView !== 'map-hscode') return [];
     const aggregate = new Map<string, { tradeCount: number; tradeValue: number }>();
     hsCodeMapOverallMonthlyStats.forEach((stat) => {
-      const hs4 = stat.hsCode?.slice(0, 4) || 'Unknown';
-      const prev = aggregate.get(hs4) || { tradeCount: 0, tradeValue: 0 };
-      aggregate.set(hs4, {
+      const hsCode = stat.hsCode || 'Unknown';
+      const prev = aggregate.get(hsCode) || { tradeCount: 0, tradeValue: 0 };
+      aggregate.set(hsCode, {
         tradeCount: prev.tradeCount + (stat.tradeCount || 0),
         tradeValue: prev.tradeValue + (stat.sumOfUsd || 0),
       });
     });
     return Array.from(aggregate.entries())
-      .map(([hs4, value]) => ({
-        countryCode: hs4,
-        countryName: `HS ${hs4}`,
+      .map(([hsCode, value]) => ({
+        countryCode: hsCode,
+        countryName: `HS ${hsCode}`,
         value: value.tradeValue,
       }))
       .sort((a, b) => b.value - a.value)
@@ -1217,64 +1157,33 @@ const App: React.FC = () => {
                           </div>
                         </div>
                       </div>
-                      <div className="space-y-6">
-                        <div>
-                          <div className="text-[12px] font-bold uppercase tracking-widest text-[#86868B] mb-3">
-                            Selected Rankings
-                          </div>
-                          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                            <TopCountriesHorizontalBar
-                              title="Selected Top 10 Categories by Trade Amount"
-                              data={topCategoriesByHSCodeCount}
-                              valueFormatter={(value) => Math.round(value).toLocaleString()}
-                              barColor="#5856D6"
-                              metaLines={[
-                                `Time: ${hsCodeMapFilterSummary.time}`,
-                                `Direction: ${hsCodeMapFilterSummary.direction}`,
-                                `HS Code: ${hsCodeMapFilterSummary.hsCodes}`,
-                              ]}
-                            />
-                            <TopCountriesHorizontalBar
-                              title="Selected Top 10 Categories by Trade Value"
-                              data={topCategoriesByHSCodeValue}
-                              valueFormatter={(value) => `$${(value / 1000000000).toFixed(2)}B`}
-                              barColor="#007AFF"
-                              metaLines={[
-                                `Time: ${hsCodeMapFilterSummary.time}`,
-                                `Direction: ${hsCodeMapFilterSummary.direction}`,
-                                `HS Code: ${hsCodeMapFilterSummary.hsCodes}`,
-                              ]}
-                            />
-                          </div>
+                      <div>
+                        <div className="text-[12px] font-bold uppercase tracking-widest text-[#86868B] mb-3">
+                          Overall Rankings
                         </div>
-                        <div>
-                          <div className="text-[12px] font-bold uppercase tracking-widest text-[#86868B] mb-3">
-                            Overall Rankings
-                          </div>
-                          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                            <TopCountriesHorizontalBar
-                              title="Overall Top 10 Categories by Trade Amount"
-                              data={topCategoriesByHSCodeOverallCount}
-                              valueFormatter={(value) => Math.round(value).toLocaleString()}
-                              barColor="#34C759"
-                              metaLines={[
-                                `Time: ${hsCodeMapFilterSummary.time}`,
-                                `Direction: ${hsCodeMapFilterSummary.direction}`,
-                                'HS Code: All',
-                              ]}
-                            />
-                            <TopCountriesHorizontalBar
-                              title="Overall Top 10 Categories by Trade Value"
-                              data={topCategoriesByHSCodeOverallValue}
-                              valueFormatter={(value) => `$${(value / 1000000000).toFixed(2)}B`}
-                              barColor="#FF9500"
-                              metaLines={[
-                                `Time: ${hsCodeMapFilterSummary.time}`,
-                                `Direction: ${hsCodeMapFilterSummary.direction}`,
-                                'HS Code: All',
-                              ]}
-                            />
-                          </div>
+                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                          <TopCountriesHorizontalBar
+                            title="Overall Top 10 Categories by Trade Amount"
+                            data={topCategoriesByHSCodeOverallCount}
+                            valueFormatter={(value) => Math.round(value).toLocaleString()}
+                            barColor="#34C759"
+                            metaLines={[
+                              `Time: ${hsCodeMapFilterSummary.time}`,
+                              `Direction: ${hsCodeMapFilterSummary.direction}`,
+                              'HS Code: All',
+                            ]}
+                          />
+                          <TopCountriesHorizontalBar
+                            title="Overall Top 10 Categories by Trade Value"
+                            data={topCategoriesByHSCodeOverallValue}
+                            valueFormatter={(value) => `$${(value / 1000000000).toFixed(2)}B`}
+                            barColor="#FF9500"
+                            metaLines={[
+                              `Time: ${hsCodeMapFilterSummary.time}`,
+                              `Direction: ${hsCodeMapFilterSummary.direction}`,
+                              'HS Code: All',
+                            ]}
+                          />
                         </div>
                       </div>
                     </>
