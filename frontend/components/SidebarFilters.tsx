@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Building2, Check, ChevronDown, Filter, Package, X } from 'lucide-react';
+import { Building2, Check, ChevronDown, Filter, Package } from 'lucide-react';
 import { CountryLocation, Filters, HSCodeCategory, Shipment } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
 import MonthRangeSlider from './MonthRangeSlider';
@@ -8,23 +8,17 @@ interface SidebarFiltersProps {
   filters: Filters;
   setFilters: React.Dispatch<React.SetStateAction<Filters>>;
   hsCodeCategories: HSCodeCategory[];
+  availableHSCodes?: string[];
   countries: CountryLocation[];
   shipments: Shipment[];
   mode?: 'country' | 'hscode' | 'all';
 }
 
-const HS4_ANNOTATIONS: Record<string, string> = {
-  '8542': 'Electronic integrated circuits',
-  '8541': 'Semiconductor devices, diodes and transistors',
-  '8486': 'Machines for semiconductor manufacturing',
-  '3818': 'Chemical elements doped for electronics',
-  '8471': 'Automatic data processing machines',
-};
-
 const SidebarFilters: React.FC<SidebarFiltersProps> = ({
   filters,
   setFilters,
   hsCodeCategories,
+  availableHSCodes = [],
   countries,
   shipments,
   mode = 'all',
@@ -33,25 +27,27 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
   const [countriesOpen, setCountriesOpen] = useState(false);
   const [hsCodeCategoriesOpen, setHsCodeCategoriesOpen] = useState(false);
   const [hsCodeSubcategoriesOpen, setHsCodeSubcategoriesOpen] = useState(false);
-  const [hs4ModalOpen, setHs4ModalOpen] = useState(false);
-  const [hs4Search, setHs4Search] = useState('');
+  const [hsCodeDropdownOpen, setHsCodeDropdownOpen] = useState(false);
+  const [hsCodeSearch, setHsCodeSearch] = useState('');
   const [continentExpanded, setContinentExpanded] = useState<Record<string, boolean>>({});
 
   const countriesRef = useRef<HTMLDivElement>(null);
   const hsCodeCategoriesRef = useRef<HTMLDivElement>(null);
   const hsCodeSubcategoriesRef = useRef<HTMLDivElement>(null);
+  const hsCodeDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (countriesRef.current && !countriesRef.current.contains(event.target as Node)) setCountriesOpen(false);
       if (hsCodeCategoriesRef.current && !hsCodeCategoriesRef.current.contains(event.target as Node)) setHsCodeCategoriesOpen(false);
       if (hsCodeSubcategoriesRef.current && !hsCodeSubcategoriesRef.current.contains(event.target as Node)) setHsCodeSubcategoriesOpen(false);
+      if (hsCodeDropdownRef.current && !hsCodeDropdownRef.current.contains(event.target as Node)) setHsCodeDropdownOpen(false);
     };
-    if (countriesOpen || hsCodeCategoriesOpen || hsCodeSubcategoriesOpen) {
+    if (countriesOpen || hsCodeCategoriesOpen || hsCodeSubcategoriesOpen || hsCodeDropdownOpen) {
       document.addEventListener('mousedown', handleClickOutside);
     }
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [countriesOpen, hsCodeCategoriesOpen, hsCodeSubcategoriesOpen]);
+  }, [countriesOpen, hsCodeCategoriesOpen, hsCodeSubcategoriesOpen, hsCodeDropdownOpen]);
 
   const availableSubcategories = useMemo(() => {
     if (filters.selectedHSCodeCategories.length === 0) return [];
@@ -65,28 +61,20 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
     return Array.from(subcategories).sort();
   }, [shipments, filters.selectedHSCodeCategories]);
 
-  const availableHS4Codes = useMemo(() => {
+  const hsCodeOptions = useMemo(() => {
+    if (availableHSCodes.length > 0) return [...availableHSCodes].sort();
     const set = new Set<string>();
     shipments.forEach((shipment) => {
-      if (shipment.hsCode && shipment.hsCode.length >= 4) set.add(shipment.hsCode.slice(0, 4));
+      if (shipment.hsCode && shipment.hsCode.length === 6) set.add(shipment.hsCode);
     });
-    if (set.size === 0) set.add('8542');
     return Array.from(set).sort();
-  }, [shipments]);
+  }, [availableHSCodes, shipments]);
 
-  const filteredHS4Codes = useMemo(() => {
-    const keyword = hs4Search.trim().toLowerCase();
-    if (!keyword) return availableHS4Codes;
-    return availableHS4Codes.filter((code4) => {
-      const note = (HS4_ANNOTATIONS[code4] || '').toLowerCase();
-      return code4.includes(keyword) || note.includes(keyword);
-    });
-  }, [availableHS4Codes, hs4Search]);
-
-  const customSearchHS4 = useMemo(() => {
-    const code = hs4Search.trim();
-    return /^\d{4}$/.test(code) ? code : '';
-  }, [hs4Search]);
+  const filteredHSCodeOptions = useMemo(() => {
+    const keyword = hsCodeSearch.trim().toLowerCase();
+    if (!keyword) return hsCodeOptions;
+    return hsCodeOptions.filter((code) => code.toLowerCase().includes(keyword));
+  }, [hsCodeOptions, hsCodeSearch]);
 
   const countriesByContinent = useMemo(() => {
     const groups = new Map<string, CountryLocation[]>();
@@ -162,16 +150,18 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
     }));
   };
 
-  const toggleHS4 = (code4: string) => {
+  const toggleHSCode = (hsCode: string) => {
     setFilters((prev) => {
-      const exists = prev.selectedHSCode4Digit.includes(code4);
-      const next4 = exists
-        ? prev.selectedHSCode4Digit.filter((code) => code !== code4)
-        : [...prev.selectedHSCode4Digit, code4];
-      const nextCategories = Array.from(new Set(next4.map((code) => code.slice(0, 2))));
-      const nextSubcategories = Array.from(new Set(next4.map((code) => code.slice(2, 4))));
+      const exists = prev.selectedHSCodes.includes(hsCode);
+      const nextCodes = exists
+        ? prev.selectedHSCodes.filter((code) => code !== hsCode)
+        : [...prev.selectedHSCodes, hsCode];
+      const next4 = Array.from(new Set(nextCodes.map((code) => code.slice(0, 4))));
+      const nextCategories = Array.from(new Set(nextCodes.map((code) => code.slice(0, 2))));
+      const nextSubcategories = Array.from(new Set(nextCodes.map((code) => code.slice(2, 4))));
       return {
         ...prev,
+        selectedHSCodes: nextCodes,
         selectedHSCode4Digit: next4,
         selectedHSCodeCategories: nextCategories,
         selectedHSCodeSubcategories: nextSubcategories,
@@ -202,6 +192,7 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
               endDate: `${currentYear}-${currentMonth}`,
               tradeDirection: 'import',
               selectedCountries: mode === 'country' ? ['CHN'] : [],
+              selectedHSCodes: mode === 'hscode' ? ['854231'] : [],
               selectedHSCode4Digit: mode === 'hscode' ? ['8542'] : [],
               selectedHSCodeCategories: mode === 'hscode' ? ['85'] : [],
               selectedHSCodeSubcategories: mode === 'hscode' ? ['42'] : [],
@@ -324,19 +315,54 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
       {showHs4ModalSelector && (
         <section className="space-y-2.5">
           <label className="text-[11px] font-bold text-[#86868B] uppercase tracking-widest flex items-center gap-2.5">
-            <Package className="w-4 h-4" /> HS Code (4-digit)
+            <Package className="w-4 h-4" /> HS Code
           </label>
-          <button
-            type="button"
-            onClick={() => setHs4ModalOpen(true)}
-            className="w-full bg-[#F5F5F7] border border-black/5 rounded-[12px] px-3 py-2.5 flex items-center justify-between text-[12px] text-[#1D1D1F] font-semibold hover:bg-[#EBEBEB] transition-all shadow-sm"
-          >
-            <span className="truncate">
-              {filters.selectedHSCode4Digit.length === 0
-                ? 'Select HSCode'
-                : filters.selectedHSCode4Digit.join(', ')}
-            </span>
-          </button>
+          <div className="relative" ref={hsCodeDropdownRef}>
+            <button
+              type="button"
+              onClick={() => setHsCodeDropdownOpen((prev) => !prev)}
+              className="w-full bg-[#F5F5F7] border border-black/5 rounded-[12px] px-3 py-2.5 flex items-center justify-between text-[12px] text-[#1D1D1F] font-semibold hover:bg-[#EBEBEB] transition-all shadow-sm"
+            >
+              <span className="truncate">
+                {filters.selectedHSCodes.length === 0
+                  ? 'Select HSCode'
+                  : filters.selectedHSCodes.length <= 3
+                    ? filters.selectedHSCodes.join(', ')
+                    : `${filters.selectedHSCodes.slice(0, 3).join(', ')} +${filters.selectedHSCodes.length - 3}`}
+              </span>
+              <ChevronDown className={`w-3.5 h-3.5 text-[#86868B] transition-transform ${hsCodeDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {hsCodeDropdownOpen && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-white/95 backdrop-blur-xl border border-black/5 rounded-[16px] shadow-2xl z-50 max-h-80 overflow-y-auto custom-scrollbar p-2 animate-in fade-in zoom-in-95 duration-200">
+                <input
+                  type="text"
+                  value={hsCodeSearch}
+                  onChange={(e) => setHsCodeSearch(e.target.value)}
+                  placeholder="Search HSCode..."
+                  className="w-full mb-2 px-3 py-2 rounded-[10px] border border-black/10 bg-[#F8F8FA] text-[12px] text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-[#007AFF]/25"
+                />
+                {filteredHSCodeOptions.length === 0 ? (
+                  <div className="px-3 py-2 text-[12px] text-[#86868B]">No matched HSCode</div>
+                ) : (
+                  filteredHSCodeOptions.map((hsCode) => {
+                    const selected = filters.selectedHSCodes.includes(hsCode);
+                    return (
+                      <div
+                        key={hsCode}
+                        onClick={() => toggleHSCode(hsCode)}
+                        className={`px-3 py-2.5 text-[12px] flex items-center justify-between cursor-pointer rounded-[8px] transition-colors mb-0.5 last:mb-0 ${
+                          selected ? 'bg-[#007AFF] text-white font-bold' : 'text-[#1D1D1F] hover:bg-black/5'
+                        }`}
+                      >
+                        <span className="font-semibold">{hsCode}</span>
+                        {selected && <Check className="w-3.5 h-3.5" />}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
+          </div>
         </section>
       )}
 
@@ -431,76 +457,6 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
         </section>
       )}
 
-      {hs4ModalOpen && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/35">
-          <div className="w-[min(92vw,560px)] max-h-[80vh] bg-white rounded-[20px] border border-black/10 shadow-2xl p-5 flex flex-col">
-            <div className="flex items-center justify-between mb-4">
-              <div className="text-[16px] font-bold text-[#1D1D1F]">Select 4-digit HS Codes</div>
-              <button
-                onClick={() => setHs4ModalOpen(false)}
-                className="p-1 rounded-full hover:bg-black/5 text-[#86868B]"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="text-[12px] text-[#86868B] mb-3">
-              Default: 8542 (Electronic integrated circuits)
-            </div>
-            <input
-              type="text"
-              value={hs4Search}
-              onChange={(e) => setHs4Search(e.target.value)}
-              placeholder="Search HSCode, e.g. 8542"
-              className="w-full mb-3 px-3 py-2.5 rounded-[10px] border border-black/10 bg-[#F8F8FA] text-[12px] text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-[#007AFF]/25"
-            />
-            {customSearchHS4 && !availableHS4Codes.includes(customSearchHS4) && (
-              <button
-                type="button"
-                onClick={() => toggleHS4(customSearchHS4)}
-                className="w-full mb-3 px-3 py-2 rounded-[10px] border border-dashed border-[#007AFF]/50 bg-[#F2F8FF] text-[#007AFF] text-[12px] font-semibold text-left"
-              >
-                Select typed HSCode: {customSearchHS4}
-              </button>
-            )}
-            <div className="overflow-y-auto custom-scrollbar pr-1 space-y-1.5">
-              {filteredHS4Codes.map((code4) => {
-                const selected = filters.selectedHSCode4Digit.includes(code4);
-                const note = HS4_ANNOTATIONS[code4] || `HS ${code4} product group`;
-                return (
-                  <button
-                    key={code4}
-                    type="button"
-                    onClick={() => toggleHS4(code4)}
-                    className={`w-full px-3 py-2.5 rounded-[10px] border text-left transition-all ${
-                      selected
-                        ? 'bg-[#007AFF] text-white border-[#007AFF]'
-                        : 'bg-[#F8F8FA] text-[#1D1D1F] border-black/5 hover:bg-[#EFEFF3]'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-[13px]">{code4}</span>
-                      {selected && <Check className="w-3.5 h-3.5" />}
-                    </div>
-                    <div className={`text-[11px] mt-1 ${selected ? 'text-white/85' : 'text-[#86868B]'}`}>{note}</div>
-                  </button>
-                );
-              })}
-              {filteredHS4Codes.length === 0 && (
-                <div className="text-[12px] text-[#86868B] px-2 py-1">No matched HSCode</div>
-              )}
-            </div>
-            <div className="flex justify-end mt-4">
-              <button
-                type="button"
-                onClick={() => setHs4ModalOpen(false)}
-                className="px-4 py-2 rounded-[10px] bg-[#007AFF] text-white text-[12px] font-semibold hover:opacity-90"
-              >
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
