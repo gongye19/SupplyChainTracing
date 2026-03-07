@@ -85,6 +85,9 @@ const App: React.FC = () => {
   const [countryMapYearPlaying, setCountryMapYearPlaying] = useState(false);
   const [countryMapYearIndex, setCountryMapYearIndex] = useState(0);
   const [countryMapQuarterPaused, setCountryMapQuarterPaused] = useState(false);
+  const [countryOverallQuarterPlaying, setCountryOverallQuarterPlaying] = useState(false);
+  const [countryOverallQuarterPaused, setCountryOverallQuarterPaused] = useState(false);
+  const [countryOverallQuarterIndex, setCountryOverallQuarterIndex] = useState(0);
   
   // Refs for preview/final scheduling
   const currentMapFilters = activeView === 'map-country' ? mapCountryFilters : mapHsFilters;
@@ -817,17 +820,64 @@ const App: React.FC = () => {
     return buildTopCountries(filteredShipmentsForCurrentMap, mapCountryFilters.tradeDirection || 'import', 'tradeCount');
   }, [activeView, buildTopCountries, filteredShipmentsForCurrentMap, mapCountryFilters.tradeDirection]);
 
+  const countryOverallSourceShipments = useMemo(
+    () => (countryOverallShipments.length > 0 ? countryOverallShipments : filteredShipmentsForCurrentMap),
+    [countryOverallShipments, filteredShipmentsForCurrentMap]
+  );
+
+  const countryOverallQuarters = useMemo(() => {
+    const quarterSet = new Map<string, { year: number; quarter: number; label: string; months: number[] }>();
+    countryOverallSourceShipments.forEach((item) => {
+      const quarter = Math.floor((item.month - 1) / 3) + 1;
+      const key = `${item.year}-Q${quarter}`;
+      if (!quarterSet.has(key)) {
+        const months = quarter === 1 ? [1, 2, 3] : quarter === 2 ? [4, 5, 6] : quarter === 3 ? [7, 8, 9] : [10, 11, 12];
+        const quarterRange = quarter === 1 ? '1-3' : quarter === 2 ? '4-6' : quarter === 3 ? '7-9' : '10-12';
+        quarterSet.set(key, {
+          year: item.year,
+          quarter,
+          months,
+          label: `${item.year} (${quarterRange})`,
+        });
+      }
+    });
+    return Array.from(quarterSet.values()).sort((a, b) => (a.year === b.year ? a.quarter - b.quarter : a.year - b.year));
+  }, [countryOverallSourceShipments]);
+
+  useEffect(() => {
+    if (countryOverallQuarters.length === 0) {
+      setCountryOverallQuarterIndex(0);
+      return;
+    }
+    if (countryOverallQuarterIndex >= countryOverallQuarters.length) {
+      setCountryOverallQuarterIndex(0);
+    }
+  }, [countryOverallQuarterIndex, countryOverallQuarters.length]);
+
+  useEffect(() => {
+    if (!countryOverallQuarterPlaying || countryOverallQuarterPaused || countryOverallQuarters.length === 0) return;
+    const timer = window.setInterval(() => {
+      setCountryOverallQuarterIndex((prev) => (prev + 1) % countryOverallQuarters.length);
+    }, 1500);
+    return () => window.clearInterval(timer);
+  }, [countryOverallQuarterPlaying, countryOverallQuarterPaused, countryOverallQuarters.length]);
+
+  const displayedCountryOverallSourceShipments = useMemo(() => {
+    if (!countryOverallQuarterPlaying || countryOverallQuarters.length === 0) return countryOverallSourceShipments;
+    const quarter = countryOverallQuarters[countryOverallQuarterIndex];
+    if (!quarter) return countryOverallSourceShipments;
+    return countryOverallSourceShipments.filter(
+      (item) => item.year === quarter.year && quarter.months.includes(item.month)
+    );
+  }, [countryOverallQuarterPlaying, countryOverallQuarters, countryOverallQuarterIndex, countryOverallSourceShipments]);
+
   const topCountriesByCountryOverallValue = useMemo(() => {
-    const sourceData =
-      countryOverallShipments.length > 0 ? countryOverallShipments : filteredShipmentsForCurrentMap;
-    return buildTopCountries(sourceData, mapCountryFilters.tradeDirection || 'import', 'tradeValue');
-  }, [buildTopCountries, countryOverallShipments, filteredShipmentsForCurrentMap, mapCountryFilters.tradeDirection]);
+    return buildTopCountries(displayedCountryOverallSourceShipments, mapCountryFilters.tradeDirection || 'import', 'tradeValue');
+  }, [buildTopCountries, displayedCountryOverallSourceShipments, mapCountryFilters.tradeDirection]);
 
   const topCountriesByCountryOverallCount = useMemo(() => {
-    const sourceData =
-      countryOverallShipments.length > 0 ? countryOverallShipments : filteredShipmentsForCurrentMap;
-    return buildTopCountries(sourceData, mapCountryFilters.tradeDirection || 'import', 'tradeCount');
-  }, [buildTopCountries, countryOverallShipments, filteredShipmentsForCurrentMap, mapCountryFilters.tradeDirection]);
+    return buildTopCountries(displayedCountryOverallSourceShipments, mapCountryFilters.tradeDirection || 'import', 'tradeCount');
+  }, [buildTopCountries, displayedCountryOverallSourceShipments, mapCountryFilters.tradeDirection]);
 
   useEffect(() => {
     if (activeView !== 'map-country') return;
@@ -1100,9 +1150,41 @@ const App: React.FC = () => {
                           </div>
                         </div>
                         <div>
-                          <div className="text-[12px] font-bold uppercase tracking-widest text-[#86868B] mb-3">
-                            Overall Rankings
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="text-[12px] font-bold uppercase tracking-widest text-[#86868B]">
+                              Overall Rankings
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => setCountryOverallQuarterPaused((prev) => !prev)}
+                                disabled={!countryOverallQuarterPlaying}
+                                className={`text-[11px] px-3 py-1.5 rounded-full border font-semibold ${
+                                  countryOverallQuarterPlaying
+                                    ? 'border-black/10 text-[#1D1D1F] hover:bg-[#F5F5F7]'
+                                    : 'border-black/10 text-[#B0B0B5] cursor-not-allowed'
+                                }`}
+                              >
+                                {countryOverallQuarterPaused ? 'Continue' : 'Pause'}
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setCountryOverallQuarterPlaying((prev) => {
+                                    const next = !prev;
+                                    if (next) setCountryOverallQuarterPaused(false);
+                                    return next;
+                                  });
+                                }}
+                                className="text-[11px] px-3 py-1.5 rounded-full border border-black/10 text-[#007AFF] hover:bg-[#F5F5F7] font-semibold"
+                              >
+                                {countryOverallQuarterPlaying ? 'Show Total' : 'Play by Quarter'}
+                              </button>
+                            </div>
                           </div>
+                          <p className="text-[11px] text-[#86868B] mb-3">
+                            {countryOverallQuarterPlaying && countryOverallQuarters.length > 0
+                              ? `Playing quarter: ${countryOverallQuarters[countryOverallQuarterIndex]?.label || ''}`
+                              : 'Total within selected filter range'}
+                          </p>
                           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                             <TopCountriesHorizontalBar
                               title="Overall Top 10 Trade Value Ranking"
@@ -1110,7 +1192,7 @@ const App: React.FC = () => {
                               valueFormatter={(value) => `$${(value / 1000000000).toFixed(2)}B`}
                               barColor="#5856D6"
                               metaLines={[
-                                `Time: ${mapCountryFilters.startDate} ~ ${mapCountryFilters.endDate}`,
+                                `Time: ${countryOverallQuarterPlaying && countryOverallQuarters.length > 0 ? countryOverallQuarters[countryOverallQuarterIndex]?.label || '' : `${mapCountryFilters.startDate} ~ ${mapCountryFilters.endDate}`}`,
                                 `Direction: ${mapCountryFilters.tradeDirection === 'import' ? 'Import' : 'Export'}`,
                               ]}
                             />
@@ -1120,7 +1202,7 @@ const App: React.FC = () => {
                               valueFormatter={(value) => Math.round(value).toLocaleString()}
                               barColor="#FF9500"
                               metaLines={[
-                                `Time: ${mapCountryFilters.startDate} ~ ${mapCountryFilters.endDate}`,
+                                `Time: ${countryOverallQuarterPlaying && countryOverallQuarters.length > 0 ? countryOverallQuarters[countryOverallQuarterIndex]?.label || '' : `${mapCountryFilters.startDate} ~ ${mapCountryFilters.endDate}`}`,
                                 `Direction: ${mapCountryFilters.tradeDirection === 'import' ? 'Import' : 'Export'}`,
                               ]}
                             />
