@@ -13,6 +13,8 @@ interface TopCountriesHorizontalBarProps {
   valueFormatter?: (value: number) => string;
   barColor?: string;
   metaLines?: string[];
+  headerActions?: React.ReactNode;
+  headerSubtext?: string;
 }
 
 const TopCountriesHorizontalBar: React.FC<TopCountriesHorizontalBarProps> = ({
@@ -21,10 +23,18 @@ const TopCountriesHorizontalBar: React.FC<TopCountriesHorizontalBarProps> = ({
   valueFormatter = (value) => value.toLocaleString(),
   barColor = '#007AFF',
   metaLines = [],
+  headerActions,
+  headerSubtext,
 }) => {
   return (
     <div className="bg-white border border-black/5 p-6 rounded-[24px] shadow-sm">
-      <h3 className="text-[16px] font-bold text-[#1D1D1F] mb-4">{title}</h3>
+      <div className={`flex items-center justify-between ${headerActions ? 'mb-2' : 'mb-4'}`}>
+        <h3 className="text-[16px] font-bold text-[#1D1D1F]">{title}</h3>
+        {headerActions}
+      </div>
+      {headerSubtext && (
+        <p className="text-[11px] text-[#86868B] mb-3">{headerSubtext}</p>
+      )}
       {metaLines.length > 0 && (
         <div className="mb-3 space-y-1">
           {metaLines.map((line, index) => (

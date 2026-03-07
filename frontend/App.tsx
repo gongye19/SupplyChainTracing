@@ -1273,47 +1273,47 @@ const App: React.FC = () => {
                           </div>
                         </div>
                         <div>
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="text-[12px] font-bold uppercase tracking-widest text-[#86868B]">
-                              Overall Rankings
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => setCountryOverallQuarterPaused((prev) => !prev)}
-                                disabled={!countryOverallQuarterPlaying}
-                                className={`text-[11px] px-3 py-1.5 rounded-full border font-semibold ${
-                                  countryOverallQuarterPlaying
-                                    ? 'border-black/10 text-[#1D1D1F] hover:bg-[#F5F5F7]'
-                                    : 'border-black/10 text-[#B0B0B5] cursor-not-allowed'
-                                }`}
-                              >
-                                {countryOverallQuarterPaused ? 'Continue' : 'Pause'}
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setCountryOverallQuarterPlaying((prev) => {
-                                    const next = !prev;
-                                    if (next) setCountryOverallQuarterPaused(false);
-                                    return next;
-                                  });
-                                }}
-                                className="text-[11px] px-3 py-1.5 rounded-full border border-black/10 text-[#007AFF] hover:bg-[#F5F5F7] font-semibold"
-                              >
-                                {countryOverallQuarterPlaying ? 'Show Total' : 'Play by Quarter'}
-                              </button>
-                            </div>
+                          <div className="text-[12px] font-bold uppercase tracking-widest text-[#86868B] mb-3">
+                            Overall Rankings
                           </div>
-                          <p className="text-[11px] text-[#86868B] mb-3">
-                            {countryOverallQuarterPlaying && countryOverallQuarters.length > 0
-                              ? `Playing quarter: ${countryOverallQuarters[countryOverallQuarterIndex]?.label || ''}`
-                              : 'Total within selected filter range'}
-                          </p>
                           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                             <TopCountriesHorizontalBar
                               title="Overall Top 10 Trade Value Ranking"
                               data={topCountriesByCountryOverallValue}
                               valueFormatter={(value) => `$${(value / 1000000000).toFixed(2)}B`}
                               barColor="#5856D6"
+                              headerActions={
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => setCountryOverallQuarterPaused((prev) => !prev)}
+                                    disabled={!countryOverallQuarterPlaying}
+                                    className={`text-[11px] px-3 py-1.5 rounded-full border font-semibold ${
+                                      countryOverallQuarterPlaying
+                                        ? 'border-black/10 text-[#1D1D1F] hover:bg-[#F5F5F7]'
+                                        : 'border-black/10 text-[#B0B0B5] cursor-not-allowed'
+                                    }`}
+                                  >
+                                    {countryOverallQuarterPaused ? 'Continue' : 'Pause'}
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setCountryOverallQuarterPlaying((prev) => {
+                                        const next = !prev;
+                                        if (next) setCountryOverallQuarterPaused(false);
+                                        return next;
+                                      });
+                                    }}
+                                    className="text-[11px] px-3 py-1.5 rounded-full border border-black/10 text-[#007AFF] hover:bg-[#F5F5F7] font-semibold"
+                                  >
+                                    {countryOverallQuarterPlaying ? 'Show Total' : 'Play by Quarter'}
+                                  </button>
+                                </div>
+                              }
+                              headerSubtext={
+                                countryOverallQuarterPlaying && countryOverallQuarters.length > 0
+                                  ? `Playing quarter: ${countryOverallQuarters[countryOverallQuarterIndex]?.label || ''}`
+                                  : 'Total within selected filter range'
+                              }
                               metaLines={[
                                 `Time: ${countryOverallQuarterPlaying && countryOverallQuarters.length > 0 ? countryOverallQuarters[countryOverallQuarterIndex]?.label || '' : `${mapCountryFilters.startDate} ~ ${mapCountryFilters.endDate}`}`,
                                 `Direction: ${mapCountryFilters.tradeDirection === 'import' ? 'Import' : 'Export'}`,
@@ -1324,6 +1324,38 @@ const App: React.FC = () => {
                               data={topCountriesByCountryOverallCount}
                               valueFormatter={(value) => Math.round(value).toLocaleString()}
                               barColor="#FF9500"
+                              headerActions={
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => setCountryOverallQuarterPaused((prev) => !prev)}
+                                    disabled={!countryOverallQuarterPlaying}
+                                    className={`text-[11px] px-3 py-1.5 rounded-full border font-semibold ${
+                                      countryOverallQuarterPlaying
+                                        ? 'border-black/10 text-[#1D1D1F] hover:bg-[#F5F5F7]'
+                                        : 'border-black/10 text-[#B0B0B5] cursor-not-allowed'
+                                    }`}
+                                  >
+                                    {countryOverallQuarterPaused ? 'Continue' : 'Pause'}
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setCountryOverallQuarterPlaying((prev) => {
+                                        const next = !prev;
+                                        if (next) setCountryOverallQuarterPaused(false);
+                                        return next;
+                                      });
+                                    }}
+                                    className="text-[11px] px-3 py-1.5 rounded-full border border-black/10 text-[#007AFF] hover:bg-[#F5F5F7] font-semibold"
+                                  >
+                                    {countryOverallQuarterPlaying ? 'Show Total' : 'Play by Quarter'}
+                                  </button>
+                                </div>
+                              }
+                              headerSubtext={
+                                countryOverallQuarterPlaying && countryOverallQuarters.length > 0
+                                  ? `Playing quarter: ${countryOverallQuarters[countryOverallQuarterIndex]?.label || ''}`
+                                  : 'Total within selected filter range'
+                              }
                               metaLines={[
                                 `Time: ${countryOverallQuarterPlaying && countryOverallQuarters.length > 0 ? countryOverallQuarters[countryOverallQuarterIndex]?.label || '' : `${mapCountryFilters.startDate} ~ ${mapCountryFilters.endDate}`}`,
                                 `Direction: ${mapCountryFilters.tradeDirection === 'import' ? 'Import' : 'Export'}`,
@@ -1399,47 +1431,47 @@ const App: React.FC = () => {
                         </div>
                       </div>
                       <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="text-[12px] font-bold uppercase tracking-widest text-[#86868B]">
-                            Overall Rankings
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => setHsCodeOverallQuarterPaused((prev) => !prev)}
-                              disabled={!hsCodeOverallQuarterPlaying}
-                              className={`text-[11px] px-3 py-1.5 rounded-full border font-semibold ${
-                                hsCodeOverallQuarterPlaying
-                                  ? 'border-black/10 text-[#1D1D1F] hover:bg-[#F5F5F7]'
-                                  : 'border-black/10 text-[#B0B0B5] cursor-not-allowed'
-                              }`}
-                            >
-                              {hsCodeOverallQuarterPaused ? 'Continue' : 'Pause'}
-                            </button>
-                            <button
-                              onClick={() => {
-                                setHsCodeOverallQuarterPlaying((prev) => {
-                                  const next = !prev;
-                                  if (next) setHsCodeOverallQuarterPaused(false);
-                                  return next;
-                                });
-                              }}
-                              className="text-[11px] px-3 py-1.5 rounded-full border border-black/10 text-[#007AFF] hover:bg-[#F5F5F7] font-semibold"
-                            >
-                              {hsCodeOverallQuarterPlaying ? 'Show Total' : 'Play by Quarter'}
-                            </button>
-                          </div>
+                        <div className="text-[12px] font-bold uppercase tracking-widest text-[#86868B] mb-3">
+                          Overall Rankings
                         </div>
-                        <p className="text-[11px] text-[#86868B] mb-3">
-                          {hsCodeOverallQuarterPlaying && hsCodeOverallQuarters.length > 0
-                            ? `Playing quarter: ${hsCodeOverallQuarters[hsCodeOverallQuarterIndex]?.label || ''}`
-                            : 'Total within selected filter range'}
-                        </p>
                         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                           <TopCountriesHorizontalBar
                             title="Overall Top 10 Categories by Trade Amount"
                             data={topCategoriesByHSCodeOverallCount}
                             valueFormatter={(value) => Math.round(value).toLocaleString()}
                             barColor="#34C759"
+                            headerActions={
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => setHsCodeOverallQuarterPaused((prev) => !prev)}
+                                  disabled={!hsCodeOverallQuarterPlaying}
+                                  className={`text-[11px] px-3 py-1.5 rounded-full border font-semibold ${
+                                    hsCodeOverallQuarterPlaying
+                                      ? 'border-black/10 text-[#1D1D1F] hover:bg-[#F5F5F7]'
+                                      : 'border-black/10 text-[#B0B0B5] cursor-not-allowed'
+                                  }`}
+                                >
+                                  {hsCodeOverallQuarterPaused ? 'Continue' : 'Pause'}
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setHsCodeOverallQuarterPlaying((prev) => {
+                                      const next = !prev;
+                                      if (next) setHsCodeOverallQuarterPaused(false);
+                                      return next;
+                                    });
+                                  }}
+                                  className="text-[11px] px-3 py-1.5 rounded-full border border-black/10 text-[#007AFF] hover:bg-[#F5F5F7] font-semibold"
+                                >
+                                  {hsCodeOverallQuarterPlaying ? 'Show Total' : 'Play by Quarter'}
+                                </button>
+                              </div>
+                            }
+                            headerSubtext={
+                              hsCodeOverallQuarterPlaying && hsCodeOverallQuarters.length > 0
+                                ? `Playing quarter: ${hsCodeOverallQuarters[hsCodeOverallQuarterIndex]?.label || ''}`
+                                : 'Total within selected filter range'
+                            }
                             metaLines={[
                               `Time: ${hsCodeOverallQuarterPlaying && hsCodeOverallQuarters.length > 0 ? hsCodeOverallQuarters[hsCodeOverallQuarterIndex]?.label || '' : hsCodeMapFilterSummary.time}`,
                               `Direction: ${hsCodeMapFilterSummary.direction}`,
@@ -1451,6 +1483,38 @@ const App: React.FC = () => {
                             data={topCategoriesByHSCodeOverallValue}
                             valueFormatter={(value) => `$${(value / 1000000000).toFixed(2)}B`}
                             barColor="#FF9500"
+                            headerActions={
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => setHsCodeOverallQuarterPaused((prev) => !prev)}
+                                  disabled={!hsCodeOverallQuarterPlaying}
+                                  className={`text-[11px] px-3 py-1.5 rounded-full border font-semibold ${
+                                    hsCodeOverallQuarterPlaying
+                                      ? 'border-black/10 text-[#1D1D1F] hover:bg-[#F5F5F7]'
+                                      : 'border-black/10 text-[#B0B0B5] cursor-not-allowed'
+                                  }`}
+                                >
+                                  {hsCodeOverallQuarterPaused ? 'Continue' : 'Pause'}
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setHsCodeOverallQuarterPlaying((prev) => {
+                                      const next = !prev;
+                                      if (next) setHsCodeOverallQuarterPaused(false);
+                                      return next;
+                                    });
+                                  }}
+                                  className="text-[11px] px-3 py-1.5 rounded-full border border-black/10 text-[#007AFF] hover:bg-[#F5F5F7] font-semibold"
+                                >
+                                  {hsCodeOverallQuarterPlaying ? 'Show Total' : 'Play by Quarter'}
+                                </button>
+                              </div>
+                            }
+                            headerSubtext={
+                              hsCodeOverallQuarterPlaying && hsCodeOverallQuarters.length > 0
+                                ? `Playing quarter: ${hsCodeOverallQuarters[hsCodeOverallQuarterIndex]?.label || ''}`
+                                : 'Total within selected filter range'
+                            }
                             metaLines={[
                               `Time: ${hsCodeOverallQuarterPlaying && hsCodeOverallQuarters.length > 0 ? hsCodeOverallQuarters[hsCodeOverallQuarterIndex]?.label || '' : hsCodeMapFilterSummary.time}`,
                               `Direction: ${hsCodeMapFilterSummary.direction}`,
