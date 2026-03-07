@@ -88,7 +88,13 @@ const App: React.FC = () => {
   const [countryOverallQuarterPlaying, setCountryOverallQuarterPlaying] = useState(false);
   const [countryOverallQuarterPaused, setCountryOverallQuarterPaused] = useState(false);
   const [countryOverallQuarterIndex, setCountryOverallQuarterIndex] = useState(0);
-  
+  const [hsCodeMapQuarterPlaying, setHsCodeMapQuarterPlaying] = useState(false);
+  const [hsCodeMapQuarterPaused, setHsCodeMapQuarterPaused] = useState(false);
+  const [hsCodeMapQuarterIndex, setHsCodeMapQuarterIndex] = useState(0);
+  const [hsCodeOverallQuarterPlaying, setHsCodeOverallQuarterPlaying] = useState(false);
+  const [hsCodeOverallQuarterPaused, setHsCodeOverallQuarterPaused] = useState(false);
+  const [hsCodeOverallQuarterIndex, setHsCodeOverallQuarterIndex] = useState(0);
+
   // Refs for preview/final scheduling
   const currentMapFilters = activeView === 'map-country' ? mapCountryFilters : mapHsFilters;
   const filtersRef = useRef(currentMapFilters);
@@ -719,6 +725,121 @@ const App: React.FC = () => {
     }));
   }, [hsCodeMapMonthlyStats]);
 
+  const hsCodeMapQuarters = useMemo(() => {
+    const quarterSet = new Map<string, { year: number; quarter: number; label: string; months: number[] }>();
+    hsCodeMapMonthlyStats.forEach((item) => {
+      const quarter = Math.floor((item.month - 1) / 3) + 1;
+      const key = `${item.year}-Q${quarter}`;
+      if (!quarterSet.has(key)) {
+        const months = quarter === 1 ? [1, 2, 3] : quarter === 2 ? [4, 5, 6] : quarter === 3 ? [7, 8, 9] : [10, 11, 12];
+        const quarterRange = quarter === 1 ? '1-3' : quarter === 2 ? '4-6' : quarter === 3 ? '7-9' : '10-12';
+        quarterSet.set(key, {
+          year: item.year,
+          quarter,
+          months,
+          label: `${item.year} (${quarterRange})`,
+        });
+      }
+    });
+    return Array.from(quarterSet.values()).sort((a, b) => (a.year === b.year ? a.quarter - b.quarter : a.year - b.year));
+  }, [hsCodeMapMonthlyStats]);
+
+  const hsCodeOverallQuarters = useMemo(() => {
+    const quarterSet = new Map<string, { year: number; quarter: number; label: string; months: number[] }>();
+    hsCodeMapOverallMonthlyStats.forEach((item) => {
+      const quarter = Math.floor((item.month - 1) / 3) + 1;
+      const key = `${item.year}-Q${quarter}`;
+      if (!quarterSet.has(key)) {
+        const months = quarter === 1 ? [1, 2, 3] : quarter === 2 ? [4, 5, 6] : quarter === 3 ? [7, 8, 9] : [10, 11, 12];
+        const quarterRange = quarter === 1 ? '1-3' : quarter === 2 ? '4-6' : quarter === 3 ? '7-9' : '10-12';
+        quarterSet.set(key, {
+          year: item.year,
+          quarter,
+          months,
+          label: `${item.year} (${quarterRange})`,
+        });
+      }
+    });
+    return Array.from(quarterSet.values()).sort((a, b) => (a.year === b.year ? a.quarter - b.quarter : a.year - b.year));
+  }, [hsCodeMapOverallMonthlyStats]);
+
+  useEffect(() => {
+    if (hsCodeMapQuarters.length === 0) {
+      setHsCodeMapQuarterIndex(0);
+      return;
+    }
+    if (hsCodeMapQuarterIndex >= hsCodeMapQuarters.length) {
+      setHsCodeMapQuarterIndex(0);
+    }
+  }, [hsCodeMapQuarterIndex, hsCodeMapQuarters.length]);
+
+  useEffect(() => {
+    if (!hsCodeMapQuarterPlaying || hsCodeMapQuarterPaused || hsCodeMapQuarters.length === 0) return;
+    const timer = window.setInterval(() => {
+      setHsCodeMapQuarterIndex((prev) => (prev + 1) % hsCodeMapQuarters.length);
+    }, 1500);
+    return () => window.clearInterval(timer);
+  }, [hsCodeMapQuarterPlaying, hsCodeMapQuarterPaused, hsCodeMapQuarters.length]);
+
+  useEffect(() => {
+    if (hsCodeOverallQuarters.length === 0) {
+      setHsCodeOverallQuarterIndex(0);
+      return;
+    }
+    if (hsCodeOverallQuarterIndex >= hsCodeOverallQuarters.length) {
+      setHsCodeOverallQuarterIndex(0);
+    }
+  }, [hsCodeOverallQuarterIndex, hsCodeOverallQuarters.length]);
+
+  useEffect(() => {
+    if (!hsCodeOverallQuarterPlaying || hsCodeOverallQuarterPaused || hsCodeOverallQuarters.length === 0) return;
+    const timer = window.setInterval(() => {
+      setHsCodeOverallQuarterIndex((prev) => (prev + 1) % hsCodeOverallQuarters.length);
+    }, 1500);
+    return () => window.clearInterval(timer);
+  }, [hsCodeOverallQuarterPlaying, hsCodeOverallQuarterPaused, hsCodeOverallQuarters.length]);
+
+  const displayedHsCodeMapMonthlyStats = useMemo(() => {
+    if (!hsCodeMapQuarterPlaying || hsCodeMapQuarters.length === 0) return hsCodeMapMonthlyStats;
+    const quarter = hsCodeMapQuarters[hsCodeMapQuarterIndex];
+    if (!quarter) return hsCodeMapMonthlyStats;
+    return hsCodeMapMonthlyStats.filter(
+      (item) => item.year === quarter.year && quarter.months.includes(item.month)
+    );
+  }, [hsCodeMapQuarterPlaying, hsCodeMapQuarters, hsCodeMapQuarterIndex, hsCodeMapMonthlyStats]);
+
+  const displayedHsCodeMapStats = useMemo(() => {
+    const countryMap = new Map<string, { sumOfUsd: number; tradeCount: number }>();
+    const source = hsCodeMapQuarterPlaying && hsCodeMapQuarters.length > 0 ? displayedHsCodeMapMonthlyStats : hsCodeMapMonthlyStats;
+    source.forEach((stat) => {
+      const countryCode = stat.countryCode;
+      if (!countryCode) return;
+      const current = countryMap.get(countryCode) || { sumOfUsd: 0, tradeCount: 0 };
+      countryMap.set(countryCode, {
+        sumOfUsd: current.sumOfUsd + (stat.sumOfUsd || 0),
+        tradeCount: current.tradeCount + (stat.tradeCount || 0),
+      });
+    });
+    return Array.from(countryMap.entries()).map(([countryCode, data]) => ({
+      hsCode: 'ALL',
+      year: 0,
+      month: 0,
+      countryCode,
+      sumOfUsd: data.sumOfUsd,
+      tradeCount: data.tradeCount,
+      amountSharePct: 0,
+    }));
+  }, [hsCodeMapQuarterPlaying, hsCodeMapQuarters.length, displayedHsCodeMapMonthlyStats, hsCodeMapMonthlyStats]);
+
+  const displayedHsCodeMapOverallMonthlyStats = useMemo(() => {
+    if (!hsCodeOverallQuarterPlaying || hsCodeOverallQuarters.length === 0) return hsCodeMapOverallMonthlyStats;
+    const quarter = hsCodeOverallQuarters[hsCodeOverallQuarterIndex];
+    if (!quarter) return hsCodeMapOverallMonthlyStats;
+    return hsCodeMapOverallMonthlyStats.filter(
+      (item) => item.year === quarter.year && quarter.months.includes(item.month)
+    );
+  }, [hsCodeOverallQuarterPlaying, hsCodeOverallQuarters, hsCodeOverallQuarterIndex, hsCodeMapOverallMonthlyStats]);
+
   const hsCodeMapFilterSummary = useMemo(() => {
     const selectedHsCodes = mapHsFilters.selectedHSCodes || [];
     const hsLabel =
@@ -771,7 +892,8 @@ const App: React.FC = () => {
   const topCategoriesByHSCodeOverallCount = useMemo(() => {
     if (activeView !== 'map-hscode') return [];
     const aggregate = new Map<string, { tradeCount: number; tradeValue: number }>();
-    hsCodeMapOverallMonthlyStats.forEach((stat) => {
+    const source = hsCodeOverallQuarterPlaying && hsCodeOverallQuarters.length > 0 ? displayedHsCodeMapOverallMonthlyStats : hsCodeMapOverallMonthlyStats;
+    source.forEach((stat) => {
       const hsCode = stat.hsCode || 'Unknown';
       const prev = aggregate.get(hsCode) || { tradeCount: 0, tradeValue: 0 };
       aggregate.set(hsCode, {
@@ -787,12 +909,13 @@ const App: React.FC = () => {
       }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 10);
-  }, [activeView, hsCodeMapOverallMonthlyStats]);
+  }, [activeView, hsCodeMapOverallMonthlyStats, hsCodeOverallQuarterPlaying, hsCodeOverallQuarters.length, displayedHsCodeMapOverallMonthlyStats]);
 
   const topCategoriesByHSCodeOverallValue = useMemo(() => {
     if (activeView !== 'map-hscode') return [];
     const aggregate = new Map<string, { tradeCount: number; tradeValue: number }>();
-    hsCodeMapOverallMonthlyStats.forEach((stat) => {
+    const source = hsCodeOverallQuarterPlaying && hsCodeOverallQuarters.length > 0 ? displayedHsCodeMapOverallMonthlyStats : hsCodeMapOverallMonthlyStats;
+    source.forEach((stat) => {
       const hsCode = stat.hsCode || 'Unknown';
       const prev = aggregate.get(hsCode) || { tradeCount: 0, tradeValue: 0 };
       aggregate.set(hsCode, {
@@ -808,7 +931,7 @@ const App: React.FC = () => {
       }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 10);
-  }, [activeView, hsCodeMapOverallMonthlyStats]);
+  }, [activeView, hsCodeMapOverallMonthlyStats, hsCodeOverallQuarterPlaying, hsCodeOverallQuarters.length, displayedHsCodeMapOverallMonthlyStats]);
 
   const topCountriesByCountryMapValue = useMemo(() => {
     if (activeView !== 'map-country') return [];
@@ -1215,8 +1338,37 @@ const App: React.FC = () => {
                       <div className="bg-white border border-black/5 rounded-[28px] p-6 shadow-sm h-[630px] overflow-hidden">
                         <div className="flex items-center justify-between mb-2">
                           <h3 className="text-[18px] font-bold text-[#1D1D1F]">Trade Map by HSCode</h3>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setHsCodeMapQuarterPaused((prev) => !prev)}
+                              disabled={!hsCodeMapQuarterPlaying}
+                              className={`text-[11px] px-3 py-1.5 rounded-full border font-semibold ${
+                                hsCodeMapQuarterPlaying
+                                  ? 'border-black/10 text-[#1D1D1F] hover:bg-[#F5F5F7]'
+                                  : 'border-black/10 text-[#B0B0B5] cursor-not-allowed'
+                              }`}
+                            >
+                              {hsCodeMapQuarterPaused ? 'Continue' : 'Pause'}
+                            </button>
+                            <button
+                              onClick={() => {
+                                setHsCodeMapQuarterPlaying((prev) => {
+                                  const next = !prev;
+                                  if (next) setHsCodeMapQuarterPaused(false);
+                                  return next;
+                                });
+                              }}
+                              className="text-[11px] px-3 py-1.5 rounded-full border border-black/10 text-[#007AFF] hover:bg-[#F5F5F7] font-semibold"
+                            >
+                              {hsCodeMapQuarterPlaying ? 'Show Total' : 'Play by Quarter'}
+                            </button>
+                          </div>
                         </div>
-                        <p className="text-[11px] text-[#86868B] mb-3">Country intensity by transaction count</p>
+                        <p className="text-[11px] text-[#86868B] mb-3">
+                          {hsCodeMapQuarterPlaying && hsCodeMapQuarters.length > 0
+                            ? `Playing quarter: ${hsCodeMapQuarters[hsCodeMapQuarterIndex]?.label || ''}`
+                            : 'Total within selected filter range'}
+                        </p>
                         <div className="h-[510px] pb-5 relative">
                           <div className="absolute left-3 top-3 z-30 w-fit">
                             <div className="bg-white border border-black/10 rounded-[14px] shadow-md px-4 py-3 text-[11px] text-[#1D1D1F]">
@@ -1231,18 +1383,57 @@ const App: React.FC = () => {
                           </div>
                           <div className="absolute inset-0">
                             <CountryTradeMap
-                              stats={hsCodeMapStats}
+                              stats={displayedHsCodeMapStats}
                               countries={countries}
                               selectedHSCodes={[]}
                               colorMetric="tradeCount"
                             />
+                            {hsCodeMapQuarterPlaying && hsCodeMapQuarters.length > 0 && (
+                              <div className="absolute left-5 bottom-4 pointer-events-none">
+                                <div className="text-[72px] font-black text-[#1D1D1F]/20 tracking-wide select-none leading-none">
+                                  {hsCodeMapQuarters[hsCodeMapQuarterIndex]?.label}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
                       <div>
-                        <div className="text-[12px] font-bold uppercase tracking-widest text-[#86868B] mb-3">
-                          Overall Rankings
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="text-[12px] font-bold uppercase tracking-widest text-[#86868B]">
+                            Overall Rankings
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setHsCodeOverallQuarterPaused((prev) => !prev)}
+                              disabled={!hsCodeOverallQuarterPlaying}
+                              className={`text-[11px] px-3 py-1.5 rounded-full border font-semibold ${
+                                hsCodeOverallQuarterPlaying
+                                  ? 'border-black/10 text-[#1D1D1F] hover:bg-[#F5F5F7]'
+                                  : 'border-black/10 text-[#B0B0B5] cursor-not-allowed'
+                              }`}
+                            >
+                              {hsCodeOverallQuarterPaused ? 'Continue' : 'Pause'}
+                            </button>
+                            <button
+                              onClick={() => {
+                                setHsCodeOverallQuarterPlaying((prev) => {
+                                  const next = !prev;
+                                  if (next) setHsCodeOverallQuarterPaused(false);
+                                  return next;
+                                });
+                              }}
+                              className="text-[11px] px-3 py-1.5 rounded-full border border-black/10 text-[#007AFF] hover:bg-[#F5F5F7] font-semibold"
+                            >
+                              {hsCodeOverallQuarterPlaying ? 'Show Total' : 'Play by Quarter'}
+                            </button>
+                          </div>
                         </div>
+                        <p className="text-[11px] text-[#86868B] mb-3">
+                          {hsCodeOverallQuarterPlaying && hsCodeOverallQuarters.length > 0
+                            ? `Playing quarter: ${hsCodeOverallQuarters[hsCodeOverallQuarterIndex]?.label || ''}`
+                            : 'Total within selected filter range'}
+                        </p>
                         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                           <TopCountriesHorizontalBar
                             title="Overall Top 10 Categories by Trade Amount"
@@ -1250,7 +1441,7 @@ const App: React.FC = () => {
                             valueFormatter={(value) => Math.round(value).toLocaleString()}
                             barColor="#34C759"
                             metaLines={[
-                              `Time: ${hsCodeMapFilterSummary.time}`,
+                              `Time: ${hsCodeOverallQuarterPlaying && hsCodeOverallQuarters.length > 0 ? hsCodeOverallQuarters[hsCodeOverallQuarterIndex]?.label || '' : hsCodeMapFilterSummary.time}`,
                               `Direction: ${hsCodeMapFilterSummary.direction}`,
                               'HS Code: All',
                             ]}
@@ -1261,7 +1452,7 @@ const App: React.FC = () => {
                             valueFormatter={(value) => `$${(value / 1000000000).toFixed(2)}B`}
                             barColor="#FF9500"
                             metaLines={[
-                              `Time: ${hsCodeMapFilterSummary.time}`,
+                              `Time: ${hsCodeOverallQuarterPlaying && hsCodeOverallQuarters.length > 0 ? hsCodeOverallQuarters[hsCodeOverallQuarterIndex]?.label || '' : hsCodeMapFilterSummary.time}`,
                               `Direction: ${hsCodeMapFilterSummary.direction}`,
                               'HS Code: All',
                             ]}

@@ -190,11 +190,8 @@ const CountryTradeMap: React.FC<CountryTradeMapProps> = React.memo(({
             .style('visibility', 'visible')
             .html(`
               <div style="font-weight: 600; margin-bottom: 6px; font-size: 14px;">${countryName || 'Unknown'}</div>
-              <div style="margin-bottom: 4px;">
-                ${colorMetric === 'tradeCount' ? t('countryTrade.transactionCount') : t('countryTrade.tradeValue')}:
-                <strong>${colorMetric === 'tradeCount' ? tradeData.tradeCount.toLocaleString() : `$${(tradeData.sumOfUsd / 1000000).toFixed(2)}M`}</strong>
-              </div>
-              <div>${t('countryTrade.transactionCount')}: <strong>${tradeData.tradeCount.toLocaleString()}</strong></div>
+              <div style="margin-bottom: 4px;">${t('countryTrade.transactionCount')}: <strong>${tradeData.tradeCount.toLocaleString()}</strong></div>
+              <div>${t('countryTrade.tradeValue')}: <strong>$${(tradeData.sumOfUsd / 1000000).toFixed(2)}M</strong></div>
             `);
         } else if (countryName) {
           d3Tooltip
