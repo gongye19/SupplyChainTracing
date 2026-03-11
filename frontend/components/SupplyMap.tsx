@@ -91,8 +91,8 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
     // 创建分层结构
     const g = svg.append('g');
     const gMap = g.append('g').attr('class', 'map-layer');
-    const gNodes = g.append('g').attr('class', 'nodes-layer');
     const gFlows = g.append('g').attr('class', 'flows-layer');
+    const gNodes = g.append('g').attr('class', 'nodes-layer');
     
     gMapRef.current = gMap;
     gNodesRef.current = gNodes;
@@ -303,6 +303,8 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
     const svgNode = svgRef.current;
     const currentScale = svgNode ? d3.zoomTransform(svgNode)?.k || 1 : 1;
     
+    const selectedCountryNodes: d3.Selection<SVGGElement, unknown, null, undefined>[] = [];
+
     countryPositionsMap.forEach((countryInfo, countryCode) => {
       const countryNode = gNodes.append('g')
         .attr('class', 'country-node')
@@ -374,6 +376,10 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
       
       // 添加阴影效果
       iconGroup.style('filter', 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25))');
+
+      if (isSelectedCountry) {
+        selectedCountryNodes.push(countryNode);
+      }
       
       // 鼠标悬停效果
       countryNode.on('mouseover', function(event) {
@@ -413,6 +419,9 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
         }
       });
     });
+
+    // 将被选中国家节点提升到 nodes-layer 顶层，避免被其他国家节点遮挡
+    selectedCountryNodes.forEach((node) => node.raise());
 
     // 绘制路径和粒子（preview 模式限制粒子数量）
     if (shipments.length > 0) {
@@ -759,7 +768,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
                 {/* 国家 */}
                 {filters.selectedCountries.length > 0 && (
                   <div className="flex items-start gap-2">
-                    <span className="text-[#86868B] font-semibold min-w-[60px]">Country:</span>
+                    <span className="text-[#86868B] font-semibold min-w-[60px]">Country/Region:</span>
                     <span className="text-[#1D1D1F]">
                       {(() => {
                         const selectedCountryNames = filters.selectedCountries.map(
