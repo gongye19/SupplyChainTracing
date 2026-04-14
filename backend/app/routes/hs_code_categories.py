@@ -13,9 +13,22 @@ router = APIRouter()
 def get_hs_code_categories(db: Session = Depends(get_db)):
     """获取所有 HS Code 品类"""
     try:
-        query = "SELECT * FROM hs_code_categories ORDER BY hs_code" if False else "SELECT DISTINCT hs_code FROM country_origin_trade_stats WHERE hs_code IS NOT NULL ORDER BY hs_code"
+        query = """
+            SELECT DISTINCT hs_code
+            FROM country_origin_trade_stats
+            WHERE hs_code IS NOT NULL AND hs_code <> ''
+            ORDER BY hs_code
+        """
         result = db.execute(text(query))
-        return rows_to_dicts(result, result.fetchall())
+        rows = rows_to_dicts(result, result.fetchall())
+        # 兼容前端响应模型：补齐 chapter_name
+        return [
+            {
+                "hs_code": row["hs_code"],
+                "chapter_name": f"HS {row['hs_code'][:2]}",
+            }
+            for row in rows
+        ]
     except Exception as e:
         if is_missing_table_error(e):
             return []
