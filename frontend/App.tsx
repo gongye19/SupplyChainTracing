@@ -534,7 +534,7 @@ const App: React.FC = () => {
         
         // 计算唯一品类数量（HS Code 前2位）
         const uniqueCategories = new Set<string>();
-        countryMapData.forEach(s => {
+        data.forEach(s => {
           if (s.hsCode && s.hsCode.length >= 2) {
             uniqueCategories.add(s.hsCode.slice(0, 2));
           }
