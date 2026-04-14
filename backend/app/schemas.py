@@ -2,7 +2,8 @@ from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
 
-# Category Schemas
+# ── 旧版 Schema（保留，但不再有对应数据表） ──
+
 class CategoryBase(BaseModel):
     id: str
     name: str
@@ -16,11 +17,9 @@ class CategoryBase(BaseModel):
 class Category(CategoryBase):
     created_at: datetime
     updated_at: datetime
-    
     class Config:
         from_attributes = True
 
-# Company Schemas
 class CompanyBase(BaseModel):
     id: str
     name: str
@@ -34,11 +33,9 @@ class CompanyBase(BaseModel):
 class Company(CompanyBase):
     created_at: datetime
     updated_at: datetime
-    
     class Config:
         from_attributes = True
 
-# Location Schemas
 class LocationBase(BaseModel):
     id: str
     type: str
@@ -54,11 +51,9 @@ class LocationBase(BaseModel):
 class Location(LocationBase):
     created_at: datetime
     updated_at: datetime
-    
     class Config:
         from_attributes = True
 
-# Company with Location (for API responses)
 class CompanyWithLocation(BaseModel):
     id: str
     name: str
@@ -72,11 +67,9 @@ class CompanyWithLocation(BaseModel):
     longitude: float
     region: Optional[str] = None
     continent: Optional[str] = None
-    
     class Config:
         from_attributes = True
 
-# Transaction Schemas
 class TransactionBase(BaseModel):
     id: str
     exporter_company_id: Optional[str] = None
@@ -98,11 +91,9 @@ class TransactionBase(BaseModel):
 class Transaction(TransactionBase):
     created_at: datetime
     updated_at: datetime
-    
     class Config:
         from_attributes = True
 
-# Transaction with related data (for API responses)
 class TransactionResponse(BaseModel):
     id: str
     exporter_company_id: Optional[str] = None
@@ -124,11 +115,9 @@ class TransactionResponse(BaseModel):
     transaction_date: datetime
     status: str
     notes: Optional[str] = None
-    
     class Config:
         from_attributes = True
 
-# Pagination
 class PaginationInfo(BaseModel):
     total: int
     page: int
@@ -139,7 +128,6 @@ class TransactionListResponse(BaseModel):
     transactions: List[TransactionResponse]
     pagination: PaginationInfo
 
-# Stats Schemas
 class CategoryBreakdown(BaseModel):
     category_id: str
     category_name: str
@@ -160,7 +148,6 @@ class StatsResponse(BaseModel):
     category_breakdown: List[CategoryBreakdown]
     top_routes: List[TopRoute]
 
-# Monthly Company Flow Schemas
 class MonthlyCompanyFlow(BaseModel):
     year_month: str
     exporter_name: str
@@ -176,50 +163,32 @@ class MonthlyCompanyFlow(BaseModel):
     total_quantity: Optional[float] = None
     first_transaction_date: Optional[str] = None
     last_transaction_date: Optional[str] = None
-    
     class Config:
         from_attributes = True
 
-# HS Code Category Schemas
 class HSCodeCategory(BaseModel):
     hs_code: str
     chapter_name: str
-    
     class Config:
         from_attributes = True
 
-# Shipment Schema (from country_origin_trade_stats table - 聚合统计数据)
+# ── 核心 Schema：国家贸易配对数据 ──────────────────────────────────
+
 class Shipment(BaseModel):
-    # 时间维度（改为年月）
     year: int
     month: int
-    
-    # HS编码和行业
-    hs_code: str  # 6位 HS Code
-    industry: Optional[str] = None
-    
-    # 国家维度
-    origin_country_code: str  # 原产国代码
-    destination_country_code: str  # 目的地国家代码
-    
-    # 统计指标
-    weight: Optional[float] = None
-    quantity: Optional[float] = None
-    total_value_usd: Optional[float] = None  # sum_of_usd
-    weight_avg_price: Optional[float] = None
-    quantity_avg_price: Optional[float] = None
+    hs_code: str
+    origin_country_code: str
+    destination_country_code: str
+    total_value_usd: Optional[float] = None
     trade_count: int
-    amount_share_pct: Optional[float] = None
-    
-    # 向后兼容字段（用于前端显示）
-    country_of_origin: Optional[str] = None  # 原产国名称（从代码映射）
-    destination_country: Optional[str] = None  # 目的地国家名称（从代码映射）
-    date: Optional[str] = None  # 格式化为 YYYY-MM-DD（从 year, month 生成）
-    
+    # 向后兼容字段
+    country_of_origin: Optional[str] = None
+    destination_country: Optional[str] = None
+    date: Optional[str] = None
     class Config:
         from_attributes = True
 
-# Port Location Schemas
 class PortLocation(BaseModel):
     port_name: str
     country_code: str
@@ -228,11 +197,9 @@ class PortLocation(BaseModel):
     longitude: float
     region: Optional[str] = None
     continent: Optional[str] = None
-    
     class Config:
         from_attributes = True
 
-# Country Location Schemas (保留用于兼容性，但建议使用 PortLocation)
 class CountryLocation(BaseModel):
     country_code: str
     country_name: str
@@ -240,48 +207,34 @@ class CountryLocation(BaseModel):
     longitude: float
     region: Optional[str] = None
     continent: Optional[str] = None
-    
     class Config:
         from_attributes = True
 
-# Country Monthly Trade Stat Schemas
+# ── 国家贸易统计（从 pair 表聚合后的结果） ──────────────────────
+
 class CountryMonthlyTradeStat(BaseModel):
     hs_code: str
     year: int
     month: int
     country_code: str
-    industry: Optional[str] = None
-    weight: Optional[float] = None
-    quantity: Optional[float] = None
     sum_of_usd: float
-    weight_avg_price: Optional[float] = None
-    quantity_avg_price: Optional[float] = None
     trade_count: int
-    amount_share_pct: float
-    
     class Config:
         from_attributes = True
 
 class CountryTradeStatSummary(BaseModel):
     total_countries: int
     total_trade_value: float
-    total_weight: Optional[float] = None
-    total_quantity: Optional[float] = None
     total_trade_count: int
-    avg_share_pct: float
+    avg_share_pct: float = 0.0
 
 class CountryTradeTrend(BaseModel):
-    year_month: str  # YYYY-MM
+    year_month: str
     sum_of_usd: float
-    weight: Optional[float] = None
-    quantity: Optional[float] = None
     trade_count: int
 
 class TopCountry(BaseModel):
     country_code: str
     sum_of_usd: float
-    weight: Optional[float] = None
-    quantity: Optional[float] = None
     trade_count: int
     amount_share_pct: float
-

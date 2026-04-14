@@ -81,8 +81,12 @@ logs/
 data/*.xlsx
 data/*.xls
 data/*.csv
+data/*.json
+data/**/*.json
+data/**/*.xlsx
 *.zip
 processed_tables/
+gdelt_test/
 check_db_data.py
 
 # Frontend build

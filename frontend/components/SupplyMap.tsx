@@ -42,17 +42,6 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
   const tooltipRef = useRef<d3.Selection<HTMLDivElement, unknown, null, undefined> | null>(null);
   const particleAnimationsRef = useRef<Set<d3.Transition<any, unknown, null, undefined>>>(new Set());
 
-  // 构建品类颜色映射
-  const categoryColors = useMemo(() => {
-    const colorMap: Record<string, string> = {};
-    categories.forEach(cat => {
-      colorMap[cat.displayName] = cat.color;
-      colorMap[cat.name] = cat.color;
-      colorMap[cat.id] = cat.color;
-    });
-    return colorMap;
-  }, [categories]);
-
   // 注意：聚合数据不包含公司信息，所以返回空数组
   const activeCompanies = useMemo(() => {
     return [];
@@ -545,10 +534,9 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
         const lineData = `M${sx},${sy} Q${cx},${cy} ${tx},${ty}`;
           
         const colorDepth = Math.max(0, Math.min(1, colorScale(routeGroup.totalValue)));
-        // 用非线性增强中低值区间的可见差异，避免“看起来都差不多”
+        // 线条颜色按 HS2 固定色板；透明度按交易价值变化
         const enhancedDepth = Math.pow(colorDepth, 0.45);
-        // 恢复统一蓝色方案：深浅由交易金额决定
-        const color = d3.interpolateRgbBasis(['#78B6FF', '#4A97FF', '#1F73F1', '#0A3FA8'])(enhancedDepth);
+        const color = routeGroup.mainColor || '#8E8E93';
         const baseArcOpacity = 0.34 + enhancedDepth * 0.42;
         const haloOpacity = 0.08 + enhancedDepth * 0.14;
         const directionText =
@@ -658,8 +646,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
               : translatedMaterials.join('、');
             
             // 获取品类显示名称
-            const category = categories.find(c => c.displayName === routeGroup.mainCategory);
-            const categoryDisplayName = category?.displayName || routeGroup.mainCategory;
+            const categoryDisplayName = routeGroup.mainCategory;
             
             // 计算实际交易数量（从原始shipments数据中统计）
             const actualTransactionCount = routeGroup.shipments.length;
@@ -717,7 +704,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
 
       });
       }
-  }, [shipments, selectedCountries, activeCompanies, companies, countries, categoryColors, categories, isPreview, countryCodeToName]);
+  }, [shipments, selectedCountries, activeCompanies, companies, countries, categories, isPreview, countryCodeToName]);
 
   // 将筛选卡片做成“随滚动吸顶”的浮层，避免下滑后看不到配置
   useEffect(() => {
@@ -830,8 +817,8 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
         <div className="bg-white/95 backdrop-blur-xl p-3 rounded-[14px] border border-black/[0.05] shadow-md text-[10px] text-[#1D1D1F] leading-relaxed">
           <div className="font-bold uppercase tracking-wide text-[#86868B] mb-1">Legend</div>
           <div>Line width: trade amount</div>
-          <div>Line depth: trade value</div>
-          <div>Line color: unified blue</div>
+          <div>Line opacity: trade value</div>
+          <div>Line color: HS2 category</div>
         </div>
       </div>
       <svg ref={svgRef} className="w-full h-full cursor-grab active:cursor-grabbing" />

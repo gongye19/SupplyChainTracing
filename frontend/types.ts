@@ -84,34 +84,25 @@ export interface Filters {
 
 // 国家原产地贸易统计数据（从 country_origin_trade_stats 表）和地图组件使用的合并接口
 export interface Shipment {
-  // 聚合统计数据字段（从 country_origin_trade_stats 表）
   year: number;
   month: number;
-  hsCode: string; // 6位 HS Code
-  industry?: string;
-  originCountryCode: string; // 原产国代码
-  destinationCountryCode: string; // 目的地国家代码
-  weight?: number;
-  quantity?: number;
-  totalValueUsd?: number; // sum_of_usd
-  weightAvgPrice?: number;
-  quantityAvgPrice?: number;
+  hsCode: string;
+  originCountryCode: string;
+  destinationCountryCode: string;
+  totalValueUsd?: number;
   tradeCount: number;
-  amountSharePct?: number;
-  
-  // 向后兼容字段（用于前端显示）
-  countryOfOrigin?: string; // 原产国名称（从代码映射）
-  destinationCountry?: string; // 目的地国家名称（从代码映射）
-  date?: string; // YYYY-MM-DD（从 year, month 生成）
-  
+  // 向后兼容字段
+  countryOfOrigin?: string;
+  destinationCountry?: string;
+  date?: string;
   // 地图组件需要的字段
-  categoryColor?: string; // 品类颜色
+  categoryColor?: string;
   id?: string;
-  originId?: string; // 原产国代码（用于地图）
-  destinationId?: string; // 目的地国家代码（用于地图）
+  originId?: string;
+  destinationId?: string;
   material?: string;
   category?: string;
-  value?: number; // 总价值（百万美元）
+  value?: number;
   status?: string;
   timestamp?: string;
 }
@@ -157,22 +148,14 @@ export interface CountryMonthlyTradeStat {
   year: number;
   month: number;
   countryCode: string;
-  industry?: string;
-  weight?: number;
-  quantity?: number;
   sumOfUsd: number;
-  weightAvgPrice?: number;
-  quantityAvgPrice?: number;
   tradeCount: number;
-  amountSharePct: number;
 }
 
 // 国家贸易统计汇总
 export interface CountryTradeStatSummary {
   totalCountries: number;
   totalTradeValue: number;
-  totalWeight?: number;
-  totalQuantity?: number;
   totalTradeCount: number;
   avgSharePct: number;
 }
@@ -181,8 +164,6 @@ export interface CountryTradeStatSummary {
 export interface CountryTradeTrend {
   yearMonth: string; // YYYY-MM
   sumOfUsd: number;
-  weight?: number;
-  quantity?: number;
   tradeCount: number;
 }
 
@@ -190,8 +171,6 @@ export interface CountryTradeTrend {
 export interface TopCountry {
   countryCode: string;
   sumOfUsd: number;
-  weight?: number;
-  quantity?: number;
   tradeCount: number;
   amountSharePct: number;
 }

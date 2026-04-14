@@ -12,101 +12,76 @@ from ..utils.logger import get_logger
 router = APIRouter()
 logger = get_logger(__name__)
 
+TABLE = "country_origin_trade_stats"
+
+
 @router.get("", response_model=List[Shipment])
 def get_shipments(
     start_year_month: Optional[str] = Query(None, description="起始年月 (YYYY-MM)"),
     end_year_month: Optional[str] = Query(None, description="结束年月 (YYYY-MM)"),
-    country: Optional[List[str]] = Query(None, description="国家代码筛选（可多个，ISO3，如 CHN, USA, JPN）"),
-    hs_code_prefix: Optional[List[str]] = Query(None, description="HS Code 2位大类筛选（可多个，如 85, 84）"),
-    hs_code: Optional[List[str]] = Query(None, description="完整 HS Code 6位筛选（可多个，如 854231）"),
-    industry: Optional[str] = Query(None, description="行业筛选（如 SemiConductor）"),
-    limit: Optional[int] = Query(10000, description="返回记录数限制（默认10000）"),
-    db: Session = Depends(get_db)
+    country: Optional[List[str]] = Query(None, description="国家代码筛选（可多个）"),
+    hs_code_prefix: Optional[List[str]] = Query(None, description="HS Code 2位大类筛选"),
+    hs_code: Optional[List[str]] = Query(None, description="完整 HS Code 6位筛选"),
+    limit: Optional[int] = Query(10000, description="返回记录数限制"),
+    db: Session = Depends(get_db),
 ):
-    """获取国家原产地贸易统计数据（从 country_origin_trade_stats 表）"""
+    """获取国家对贸易配对数据（从 country_origin_trade_stats 表）"""
     try:
-        query = "SELECT * FROM country_origin_trade_stats WHERE 1=1"
+        query = f"SELECT * FROM {TABLE} WHERE 1=1"
         params = {}
-        
-        # 年月筛选
+
         if start_year_month:
-            year_val, month_val = start_year_month.split('-')
-            query += " AND (year > :start_year OR (year = :start_year AND month >= :start_month))"
-            params['start_year'] = int(year_val)
-            params['start_month'] = int(month_val)
-        
+            y, m = start_year_month.split("-")
+            query += " AND (year > :sy OR (year = :sy AND month >= :sm))"
+            params["sy"], params["sm"] = int(y), int(m)
+
         if end_year_month:
-            year_val, month_val = end_year_month.split('-')
-            query += " AND (year < :end_year OR (year = :end_year AND month <= :end_month))"
-            params['end_year'] = int(year_val)
-            params['end_month'] = int(month_val)
-        
-        # 国家筛选（原产国或目的地国家）
+            y, m = end_year_month.split("-")
+            query += " AND (year < :ey OR (year = :ey AND month <= :em))"
+            params["ey"], params["em"] = int(y), int(m)
+
         if country:
-            placeholders = ', '.join([f':country_{i}' for i in range(len(country))])
-            query += f" AND (origin_country_code IN ({placeholders}) OR destination_country_code IN ({placeholders}))"
+            ph = ", ".join([f":c_{i}" for i in range(len(country))])
+            query += f" AND (origin_country_code IN ({ph}) OR destination_country_code IN ({ph}))"
             for i, c in enumerate(country):
-                params[f'country_{i}'] = c
-        
-        # HS Code 筛选（优先级：完整6位 > 大类）
+                params[f"c_{i}"] = c
+
         if hs_code:
-            # 完整6位 HS Code 筛选
-            placeholders = ', '.join([f':hs_code_{i}' for i in range(len(hs_code))])
-            query += f" AND hs_code IN ({placeholders})"
+            ph = ", ".join([f":hs_{i}" for i in range(len(hs_code))])
+            query += f" AND hs_code IN ({ph})"
             for i, c in enumerate(hs_code):
-                params[f'hs_code_{i}'] = c
+                params[f"hs_{i}"] = c
         elif hs_code_prefix:
-            # 只按大类筛选（前2位）- 使用 PostgreSQL 的 SUBSTRING 函数
-            placeholders = ', '.join([f':hs_prefix_{i}' for i in range(len(hs_code_prefix))])
-            query += f" AND SUBSTRING(hs_code, 1, 2) IN ({placeholders})"
-            for i, prefix in enumerate(hs_code_prefix):
-                params[f'hs_prefix_{i}'] = prefix
-        
-        # 行业筛选
-        if industry:
-            query += " AND industry = :industry"
-            params['industry'] = industry
-        
-        # 添加排序和限制
+            ph = ", ".join([f":hsp_{i}" for i in range(len(hs_code_prefix))])
+            query += f" AND SUBSTRING(hs_code, 1, 2) IN ({ph})"
+            for i, p in enumerate(hs_code_prefix):
+                params[f"hsp_{i}"] = p
+
         query += " ORDER BY year DESC, month DESC, sum_of_usd DESC"
         if limit:
-            query += f" LIMIT :limit"
-            params['limit'] = limit
-        
+            query += " LIMIT :lim"
+            params["lim"] = limit
+
         result = db.execute(text(query), params)
         rows = result.fetchall()
-        
-        # 转换为字典列表（适配新的 Schema）
+
         shipments = []
         for row in rows:
-            # 生成日期字符串（用于向后兼容）
-            date_str = f"{row.year}-{row.month:02d}-01"
-            
-            shipment_dict = {
-                'year': row.year,
-                'month': row.month,
-                'hs_code': row.hs_code,
-                'industry': row.industry,
-                'origin_country_code': row.origin_country_code,
-                'destination_country_code': row.destination_country_code,
-                'weight': float(row.weight) if row.weight else None,
-                'quantity': float(row.quantity) if row.quantity else None,
-                'total_value_usd': float(row.sum_of_usd) if row.sum_of_usd else None,
-                'weight_avg_price': float(row.weight_avg_price) if row.weight_avg_price else None,
-                'quantity_avg_price': float(row.quantity_avg_price) if row.quantity_avg_price else None,
-                'trade_count': int(row.trade_count) if row.trade_count else 0,
-                'amount_share_pct': float(row.amount_share_pct) if row.amount_share_pct else None,
-                # 向后兼容字段（从代码映射，这里先设为代码，前端可以进一步映射）
-                'country_of_origin': row.origin_country_code,
-                'destination_country': row.destination_country_code,
-                'date': date_str,
-            }
-            shipments.append(shipment_dict)
-        
+            shipments.append({
+                "year": row.year,
+                "month": row.month,
+                "hs_code": row.hs_code,
+                "origin_country_code": row.origin_country_code,
+                "destination_country_code": row.destination_country_code,
+                "total_value_usd": float(row.sum_of_usd) if row.sum_of_usd else None,
+                "trade_count": int(row.trade_count) if row.trade_count else 0,
+                "country_of_origin": row.origin_country_code,
+                "destination_country": row.destination_country_code,
+                "date": f"{row.year}-{row.month:02d}-01",
+            })
         return shipments
     except Exception as e:
         if is_missing_table_error(e):
             logger.warning("country_origin_trade_stats not available: %s", e)
             return []
         raise HTTPException(status_code=500, detail=f"数据库查询错误: {str(e)}")
-

@@ -12,9 +12,20 @@ import { Transaction, Filters, HSCodeCategory, CountryLocation, Location, Shipme
 import { shipmentsAPI, hsCodeCategoriesAPI, countryLocationsAPI, chatAPI, ChatMessage, countryTradeStatsAPI } from './services/api';
 import { Globe, Map as MapIcon, Package, TrendingUp, Users, ChevronRight, Filter } from 'lucide-react';
 import { useLanguage } from './contexts/LanguageContext';
-import { getHSCodeColorCached } from './utils/hsCodeColors';
 import { getCountriesFromCodes } from './utils/countryCoordinates';
 import { logger } from './utils/logger';
+
+const HS2_COLOR_PALETTE = [
+  '#007AFF', '#34C759', '#FF9500', '#AF52DE', '#FF2D55', '#30B0C7',
+  '#5856D6', '#FF3B30', '#64D2FF', '#FFD60A', '#32D74B', '#BF5AF2',
+];
+
+const getHs2Color = (hs2: string): string => {
+  if (!hs2) return '#8E8E93';
+  const numeric = Number.parseInt(hs2, 10);
+  if (Number.isNaN(numeric)) return '#8E8E93';
+  return HS2_COLOR_PALETTE[numeric % HS2_COLOR_PALETTE.length];
+};
 
 const App: React.FC = () => {
   const { language, setLanguage, t } = useLanguage();
@@ -436,24 +447,24 @@ const App: React.FC = () => {
     if (cached) {
       setShipments(cached);
       if (mode === 'final') {
-        const countryMapData = cached.filter((item) => item.hsCode === '854231');
         const uniqueCountries = new Set<string>();
-        countryMapData.forEach(s => {
+        cached.forEach(s => {
           uniqueCountries.add(s.countryOfOrigin);
           uniqueCountries.add(s.destinationCountry);
         });
-        const countryPairs = new Set<string>();
-        countryMapData.forEach(s => {
+        const countryPairHs2 = new Set<string>();
+        cached.forEach(s => {
           const originCode = s.originCountryCode || getCountryCode(s.countryOfOrigin || '');
           const destCode = s.destinationCountryCode || getCountryCode(s.destinationCountry || '');
-          if (originCode && destCode) countryPairs.add(`${originCode}-${destCode}`);
+          const hs2 = s.hsCode?.slice(0, 2) || '';
+          if (originCode && destCode && hs2) countryPairHs2.add(`${originCode}-${destCode}-${hs2}`);
         });
         const uniqueCategories = new Set<string>();
-        countryMapData.forEach(s => {
+        cached.forEach(s => {
           if (s.hsCode && s.hsCode.length >= 2) uniqueCategories.add(s.hsCode.slice(0, 2));
         });
         setStats({
-          transactions: countryPairs.size,
+          transactions: countryPairHs2.size,
           suppliers: uniqueCountries.size,
           categories: uniqueCategories.size,
         });
@@ -502,22 +513,22 @@ const App: React.FC = () => {
       
       // 更新统计
       if (mode === 'final') {
-        const countryMapData = data.filter((item) => item.hsCode === '854231');
         const uniqueCountries = new Set<string>();
-        countryMapData.forEach(s => {
+        data.forEach(s => {
           uniqueCountries.add(s.countryOfOrigin);
           uniqueCountries.add(s.destinationCountry);
         });
         
-        // 按国家对聚合，计算唯一国家对数量（用于 Transaction Flow）
-        const countryPairs = new Set<string>();
-        countryMapData.forEach(s => {
+        // 按国家对+HS2 聚合，计算唯一连线数
+        const countryPairHs2 = new Set<string>();
+        data.forEach(s => {
           // 使用国家代码作为键（顺序固定：原产国-目的地国家）
           const originCode = s.originCountryCode || getCountryCode(s.countryOfOrigin || '');
           const destCode = s.destinationCountryCode || getCountryCode(s.destinationCountry || '');
-          if (originCode && destCode) {
-            const pair = `${originCode}-${destCode}`;
-            countryPairs.add(pair);
+          const hs2 = s.hsCode?.slice(0, 2) || '';
+          if (originCode && destCode && hs2) {
+            const pair = `${originCode}-${destCode}-${hs2}`;
+            countryPairHs2.add(pair);
           }
         });
         
@@ -530,7 +541,7 @@ const App: React.FC = () => {
         });
         
         setStats({
-          transactions: countryPairs.size, // 显示国家对数量（应该画的线数）
+          transactions: countryPairHs2.size, // 显示国家对+HS2 数量（线数）
           suppliers: uniqueCountries.size, // 国家数量（Nodes）
           categories: uniqueCategories.size // HS Code 大类数量（Categories）
         });
@@ -585,8 +596,6 @@ const App: React.FC = () => {
   const filteredShipmentsForCurrentMap = useMemo(() => {
     const activeFilters = currentMapFilters;
     const isHsCodeMapView = activeView === 'map-hscode';
-    const isCountryMapView = activeView === 'map-country';
-    const fixedCountryMapHsCode = '854231';
     const focusCountries = new Set(activeFilters.selectedCountries || []);
     const hs4Set = new Set(activeFilters.selectedHSCode4Digit || []);
     const hasHs4Filter = hs4Set.size > 0;
@@ -595,9 +604,6 @@ const App: React.FC = () => {
     const direction = activeFilters.tradeDirection || 'import';
 
     return shipments.filter((shipment) => {
-      if (isCountryMapView && shipment.hsCode !== fixedCountryMapHsCode) {
-        return false;
-      }
       if (isHsCodeMapView && !hasHs4Filter) {
         return false;
       }
@@ -626,12 +632,10 @@ const App: React.FC = () => {
     const countryPairGroups = new Map<string, {
       originCountryCode: string;
       destinationCountryCode: string;
+      hs2: string;
       shipments: Shipment[];
       totalValue: number;
-      totalQuantity: number;
-      totalWeight: number;
       totalTradeCount: number;
-      hsCodes: Set<string>;
     }>();
     
     filteredShipmentsForCurrentMap.forEach(shipment => {
@@ -643,43 +647,31 @@ const App: React.FC = () => {
         return; // 跳过没有国家代码的交易
       }
       
-      // 使用国家对作为聚合键（顺序固定，不能相反）
-      const pairKey = `${originCountryCode}-${destinationCountryCode}`;
+      const hs2 = shipment.hsCode?.slice(0, 2) || '00';
+      // 使用国家对+HS2 作为聚合键，同一国家对不同品类显示不同线条
+      const pairKey = `${originCountryCode}-${destinationCountryCode}-${hs2}`;
       
       if (!countryPairGroups.has(pairKey)) {
         countryPairGroups.set(pairKey, {
           originCountryCode,
           destinationCountryCode,
+          hs2,
           shipments: [],
           totalValue: 0,
-          totalQuantity: 0,
-          totalWeight: 0,
           totalTradeCount: 0,
-          hsCodes: new Set()
         });
       }
       
       const group = countryPairGroups.get(pairKey)!;
       group.shipments.push(shipment);
       group.totalValue += shipment.totalValueUsd || 0;
-      group.totalQuantity += shipment.quantity || 0;
-      group.totalWeight += shipment.weight || 0;
       group.totalTradeCount += shipment.tradeCount || 0;
-      if (shipment.hsCode) {
-        group.hsCodes.add(shipment.hsCode);
-      }
     });
     
     // 转换为地图组件格式
     return Array.from(countryPairGroups.values()).map((group, index) => {
-      // 获取所有品类（HS Code 前2位）
-      const categoryCodes = Array.from(group.hsCodes).map(code => code.slice(0, 2));
-      const uniqueCategories = Array.from(new Set(categoryCodes));
-      
-      // 使用第一个品类作为主要品类（用于颜色）
-      const mainCategoryCode = uniqueCategories[0] || '';
-      const hsCategory = hsCodeCategories.find(cat => cat.hsCode === mainCategoryCode);
-      const categoryColor = getHSCodeColorCached(mainCategoryCode);
+      const hsCategory = hsCodeCategories.find(cat => cat.hsCode === group.hs2);
+      const categoryColor = getHs2Color(group.hs2);
       
       // 获取国家名称（用于显示）
       const originCountry = countries.find(c => c.countryCode === group.originCountryCode);
@@ -691,16 +683,14 @@ const App: React.FC = () => {
         destinationId: group.destinationCountryCode,
         countryOfOrigin: originCountry?.countryName || group.originCountryCode,
         destinationCountry: destCountry?.countryName || group.destinationCountryCode,
-        material: Array.from(group.hsCodes).join(','),
-        category: hsCategory?.chapterName || 'Unknown',
+        material: `HS2-${group.hs2}`,
+        category: hsCategory?.chapterName || `HS ${group.hs2}`,
         categoryColor,
-        quantity: group.totalQuantity,
         value: group.totalValue / 1000000, // 转换为百万美元
         status: 'completed',
         timestamp: group.shipments[0]?.date || `${group.shipments[0]?.year}-${String(group.shipments[0]?.month).padStart(2, '0')}-01`,
-        // 新增字段
         tradeCount: group.totalTradeCount,
-        weight: group.totalWeight,
+        hsCode: `${group.hs2}0000`,
       };
     });
   }, [filteredShipmentsForCurrentMap, hsCodeCategories, countries, getCountryCode]);
@@ -1067,7 +1057,7 @@ const App: React.FC = () => {
           { signal: controller.signal }
         );
         if (!controller.signal.aborted) {
-          setCountryOverallShipments(data.filter((item) => item.hsCode === '854231'));
+          setCountryOverallShipments(data);
         }
       } catch (error: any) {
         if (error?.name === 'AbortError') return;
@@ -1122,21 +1112,13 @@ const App: React.FC = () => {
     const statsForYear = displayedCountryTradeStats;
     const totalCountries = new Set(statsForYear.map((s) => s.countryCode)).size;
     const totalTradeValue = statsForYear.reduce((acc, s) => acc + s.sumOfUsd, 0);
-    const totalWeightVal = statsForYear.reduce((acc, s) => acc + (s.weight || 0), 0);
-    const totalQuantityVal = statsForYear.reduce((acc, s) => acc + (s.quantity || 0), 0);
     const totalTradeCount = statsForYear.reduce((acc, s) => acc + s.tradeCount, 0);
-    const avgSharePct =
-      statsForYear.length > 0
-        ? statsForYear.reduce((acc, s) => acc + s.amountSharePct, 0) / statsForYear.length
-        : 0;
 
     return {
       totalCountries,
       totalTradeValue,
-      totalWeight: totalWeightVal || undefined,
-      totalQuantity: totalQuantityVal || undefined,
       totalTradeCount,
-      avgSharePct,
+      avgSharePct: 0,
     };
   }, [countryMapYearPlaying, countryTradeSummary, displayedCountryTradeStats]);
 
