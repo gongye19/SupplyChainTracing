@@ -245,10 +245,8 @@ const App: React.FC = () => {
   // 加载国家贸易统计数据
   useEffect(() => {
     if (activeView !== 'global-stats') return;
-
     const requestFilters: CountryTradeFilters = {
       ...countryTradeFilters,
-      tradeDirection: 'all',
     };
 
     const buildCountryTradeKey = () => {
@@ -291,7 +289,7 @@ const App: React.FC = () => {
           countryTradeStatsAPI.getTrends({
             hsCode: requestFilters.hsCode?.[0],
             industry: requestFilters.industry,
-            tradeDirection: 'all',
+            tradeDirection: requestFilters.tradeDirection,
             startYearMonth: requestFilters.startYearMonth,
             endYearMonth: requestFilters.endYearMonth,
           }),
@@ -299,7 +297,7 @@ const App: React.FC = () => {
             hsCode: requestFilters.hsCode,
             country: requestFilters.country,
             industry: requestFilters.industry,
-            tradeDirection: 'all',
+            tradeDirection: requestFilters.tradeDirection,
             startYearMonth: requestFilters.startYearMonth,
             endYearMonth: requestFilters.endYearMonth,
             limit: 10,
@@ -364,11 +362,13 @@ const App: React.FC = () => {
       requestFilters.startYearMonth || '',
       requestFilters.endYearMonth || '',
       selectedHsCodes.join(','),
+      requestFilters.tradeDirection || '',
       requestFilters.industry || '',
     ].join('|');
     const overallKey = [
       requestFilters.startYearMonth || '',
       requestFilters.endYearMonth || '',
+      requestFilters.tradeDirection || '',
       requestFilters.industry || '',
     ].join('|');
     const overallFilters: CountryTradeFilters = {
