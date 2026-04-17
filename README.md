@@ -11,10 +11,9 @@ supplychain/
 │   └── synthetic_data.csv     # 交易数据CSV
 ├── backend/                    # 后端服务
 │   ├── app/                    # FastAPI应用
-│   ├── scripts/                # 脚本目录
-│   │   └── import_data_local.py # 数据导入脚本（宿主机版本）
-│   ├── Dockerfile
-│   └── init.sql                # 数据库初始化脚本
+│   └── Dockerfile
+├── scripts/                    # 项目脚本
+│   └── upload_pure_country_pair.py # 唯一数据上传脚本
 ├── frontend/                   # 前端应用
 │   ├── components/            # React组件
 │   ├── services/              # API服务
@@ -43,19 +42,20 @@ docker-compose up -d db
 ```bash
 cd backend
 pip install -r requirements.txt
+cd ..
 ```
 
 运行导入脚本：
 
 ```bash
-python scripts/import_data_local.py
+python scripts/upload_pure_country_pair.py
 ```
 
 或者指定CSV路径：
 
 ```bash
 DATABASE_URL=postgresql://postgres:123456@localhost:5433/supplychain \
-python scripts/import_data_local.py
+python scripts/upload_pure_country_pair.py
 ```
 
 #### 3. 启动所有服务
@@ -112,11 +112,8 @@ docker-compose restart frontend
 # 停止服务（可选，仅停止数据库即可）
 docker-compose stop backend frontend
 
-# 清空数据库（可选）
-docker-compose exec db psql -U postgres -d supplychain -c "TRUNCATE TABLE transactions, companies CASCADE;"
-
-# 重新导入
-python backend/scripts/import_data_local.py
+# 重新导入（会先清理旧表再导入）
+python scripts/upload_pure_country_pair.py --clear
 ```
 
 ### 查看数据库
@@ -171,7 +168,7 @@ docker-compose ps db
 docker-compose exec db pg_isready -U postgres
 ```
 
-检查CSV文件路径是否正确。
+检查 `data/pure_country_pair_usd_count` 路径是否正确。
 
 ### 前端无法连接后端
 
