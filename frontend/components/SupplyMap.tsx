@@ -1,5 +1,5 @@
 
-import React, { useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useRef, useMemo, useState } from 'react';
 import * as d3 from 'd3';
 import { Shipment, CountryLocation, Category, Transaction, CompanyWithLocation, Filters } from '../types';
 import { translateMaterials } from '../utils/materialTranslations';
@@ -62,7 +62,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
 
   const selectedCountryCategoryLegend = useMemo(() => {
     const selectedSet = new Set(selectedCountries || []);
-    const legendMap = new Map<string, string>();
+    const legendMap = new Map<string, { color: string; totalValue: number }>();
 
     shipments.forEach((shipment) => {
       const origin = shipment.originId || shipment.originCountryCode;
@@ -74,16 +74,29 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
         shipment.category ||
         (shipment.hsCode ? `HS ${shipment.hsCode.slice(0, 2)}` : 'Unknown');
       const categoryColor = shipment.categoryColor || '#8E8E93';
-      if (!legendMap.has(categoryLabel)) {
-        legendMap.set(categoryLabel, categoryColor);
-      }
+      const prev = legendMap.get(categoryLabel);
+      legendMap.set(categoryLabel, {
+        color: prev?.color || categoryColor,
+        totalValue: (prev?.totalValue || 0) + (shipment.value || (shipment.totalValueUsd || 0) / 1000000),
+      });
     });
 
     return Array.from(legendMap.entries())
-      .map(([label, color]) => ({ label, color }))
-      .sort((a, b) => a.label.localeCompare(b.label))
+      .map(([label, meta]) => ({ label, color: meta.color, totalValue: meta.totalValue }))
+      .sort((a, b) => b.totalValue - a.totalValue)
       .slice(0, 14);
   }, [shipments, selectedCountries]);
+
+  const [visibleCategories, setVisibleCategories] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (selectedCountryCategoryLegend.length === 0) {
+      setVisibleCategories([]);
+      return;
+    }
+    // 每次筛选变化默认只展示第一个品类
+    setVisibleCategories([selectedCountryCategoryLegend[0].label]);
+  }, [selectedCountryCategoryLegend]);
 
   // 初始化：只执行一次（创建 SVG 结构、底图、zoom、tooltip）
   useEffect(() => {
@@ -497,7 +510,12 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
 
       // preview 模式：只显示少量路径，不画粒子
       // final 模式：限制最大路径数，避免大数据量时 SVG 过载
-      const routeGroupsArray = routeGroups
+      const routeGroupsByCategory = routeGroups.filter((route) => {
+        if (visibleCategories.length === 0) return false;
+        return visibleCategories.includes(route.mainCategory || 'Unknown');
+      });
+
+      const routeGroupsArray = routeGroupsByCategory
         .sort((a, b) => b.totalValue - a.totalValue); // 按交易价值降序
       const maxPaths = isPreview
         ? Math.min(90, routeGroupsArray.length)
@@ -628,20 +646,19 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
         const pathLength = (arc.node() as SVGPathElement).getTotalLength();
         const glowLength = Math.max(16, Math.min(72, pathLength * 0.22));
         const glowStrokeWidth = Math.max(1.0, thickness * 0.72);
-        const highlight = gFlows.append('path')
-          .attr('d', lineData)
-          .attr('fill', 'none')
-          .attr('stroke', '#A7DEFF')
-          .attr('stroke-width', glowStrokeWidth)
-          .attr('data-base-stroke-width', glowStrokeWidth)
-          .attr('stroke-linecap', 'round')
-          .attr('opacity', 0.92)
-          .attr('stroke-dasharray', `${glowLength} ${Math.max(8, pathLength)}`)
-          .attr('stroke-dashoffset', pathLength)
-          .attr('class', 'shipment-highlight')
-          .style('pointer-events', 'none');
-
         if (!isPreview && routeIndex < flowAnimationLimit) {
+          const highlight = gFlows.append('path')
+            .attr('d', lineData)
+            .attr('fill', 'none')
+            .attr('stroke', '#A7DEFF')
+            .attr('stroke-width', glowStrokeWidth)
+            .attr('data-base-stroke-width', glowStrokeWidth)
+            .attr('stroke-linecap', 'round')
+            .attr('opacity', 0.92)
+            .attr('stroke-dasharray', `${glowLength} ${Math.max(8, pathLength)}`)
+            .attr('stroke-dashoffset', pathLength)
+            .attr('class', 'shipment-highlight')
+            .style('pointer-events', 'none');
           const flow = () => {
             const transition = highlight.transition()
               .duration(2200 + Math.random() * 1100)
@@ -736,7 +753,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
 
       });
       }
-  }, [shipments, selectedCountries, activeCompanies, companies, countries, categories, isPreview, countryCodeToName]);
+  }, [shipments, selectedCountries, activeCompanies, companies, countries, categories, isPreview, countryCodeToName, visibleCategories]);
 
   // 将筛选卡片做成“随滚动吸顶”的浮层，避免下滑后看不到配置
   useEffect(() => {
@@ -845,7 +862,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
           </div>
         </div>
       </div>
-      <div className="absolute top-4 right-4 z-10 pointer-events-none">
+      <div className="absolute top-4 right-4 z-10 pointer-events-auto">
         <div className="bg-white/95 backdrop-blur-xl p-3 rounded-[14px] border border-black/[0.05] shadow-md text-[10px] text-[#1D1D1F] leading-relaxed">
           <div className="font-bold uppercase tracking-wide text-[#86868B] mb-1">Legend</div>
           <div>Line width: trade amount</div>
@@ -857,13 +874,31 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
           {selectedCountryCategoryLegend.length > 0 ? (
             <div className="max-h-[180px] overflow-y-auto pr-1 space-y-1 pointer-events-auto">
               {selectedCountryCategoryLegend.map((item) => (
-                <div key={item.label} className="flex items-center gap-2">
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={() => {
+                    setVisibleCategories((prev) => {
+                      if (prev.includes(item.label)) {
+                        // 至少保留一个可见品类，避免全空
+                        if (prev.length <= 1) return prev;
+                        return prev.filter((name) => name !== item.label);
+                      }
+                      return [...prev, item.label];
+                    });
+                  }}
+                  className={`w-full text-left flex items-center gap-2 px-2 py-1 rounded transition-colors ${
+                    visibleCategories.includes(item.label)
+                      ? 'bg-black/10'
+                      : 'hover:bg-black/5'
+                  }`}
+                >
                   <span
                     className="w-2.5 h-2.5 rounded-full shrink-0"
                     style={{ backgroundColor: item.color }}
                   />
                   <span className="truncate">{item.label}</span>
-                </div>
+                </button>
               ))}
             </div>
           ) : (

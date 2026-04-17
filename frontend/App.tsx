@@ -354,7 +354,7 @@ const App: React.FC = () => {
 
     const requestFilters: CountryTradeFilters = {
       hsCode: selectedHsCodes,
-      tradeDirection: 'all',
+      tradeDirection: mapHsFilters.tradeDirection || 'import',
       industry: 'SemiConductor',
       startYearMonth: mapHsFilters.startDate,
       endYearMonth: mapHsFilters.endDate,
@@ -372,7 +372,7 @@ const App: React.FC = () => {
       requestFilters.industry || '',
     ].join('|');
     const overallFilters: CountryTradeFilters = {
-      tradeDirection: 'all',
+      tradeDirection: requestFilters.tradeDirection,
       industry: requestFilters.industry,
       startYearMonth: requestFilters.startYearMonth,
       endYearMonth: requestFilters.endYearMonth,
@@ -418,7 +418,7 @@ const App: React.FC = () => {
     return () => {
       if (hsCodeMapTimerRef.current) window.clearTimeout(hsCodeMapTimerRef.current);
     };
-  }, [activeView, mapHsFilters.endDate, mapHsFilters.selectedHSCodes, mapHsFilters.startDate]);
+  }, [activeView, mapHsFilters.endDate, mapHsFilters.selectedHSCodes, mapHsFilters.startDate, mapHsFilters.tradeDirection]);
 
   // 国家名称到国家代码的映射函数
   const getCountryCode = useCallback((countryName: string): string => {
