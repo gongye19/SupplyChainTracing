@@ -4,7 +4,17 @@ from sqlalchemy import text
 from typing import List, Optional
 
 from ..database import get_db
-from ..schemas import CountryMonthlyTradeStat, CountryTradeStatSummary, CountryTradeTrend, TopCountry
+from ..schemas import (
+    CountryMonthlyTradeStat,
+    CountryTradeStatSummary,
+    CountryTradeTrend,
+    TopCountry,
+    CountryQuarterTop,
+    CountryAggregate,
+    CountryQuarterAggregate,
+    HSAggregate,
+    HSQuarterAggregate,
+)
 from ..utils.db_helpers import is_missing_table_error, rows_to_dicts
 
 router = APIRouter()
@@ -303,11 +313,16 @@ def get_top_countries(
     trade_direction: Optional[str] = Query("all"),
     start_year_month: Optional[str] = Query(None),
     end_year_month: Optional[str] = Query(None),
+    metric: Optional[str] = Query("trade_value"),
     limit: int = Query(10),
     db: Session = Depends(get_db),
 ):
     td = trade_direction or "all"
+    metric_key = "trade_count" if metric == "trade_count" else "trade_value"
     params: dict = {}
+    share_numerator = "SUM(trade_count)" if metric_key == "trade_count" else "SUM(sum_of_usd)"
+    share_denominator = "SUM(SUM(trade_count)) OVER()" if metric_key == "trade_count" else "SUM(SUM(sum_of_usd)) OVER()"
+    order_metric = "trade_count" if metric_key == "trade_count" else "sum_of_usd"
 
     if td == "all":
         base_where = " WHERE 1=1"
@@ -323,9 +338,193 @@ def get_top_countries(
                 country_code,
                 SUM(sum_of_usd) AS sum_of_usd,
                 SUM(trade_count) AS trade_count,
-                CASE WHEN SUM(SUM(sum_of_usd)) OVER() = 0 THEN 0
-                     ELSE SUM(sum_of_usd) / SUM(SUM(sum_of_usd)) OVER()
+                CASE WHEN {share_denominator} = 0 THEN 0
+                     ELSE {share_numerator} / {share_denominator}
                 END AS amount_share_pct
+            FROM (
+                SELECT origin_country_code AS country_code, sum_of_usd, trade_count
+                FROM {TABLE}{base_where}
+                UNION ALL
+                SELECT destination_country_code AS country_code, sum_of_usd, trade_count
+                FROM {TABLE}{base_where}
+            ) sub
+            GROUP BY country_code
+            ORDER BY {order_metric} DESC
+            LIMIT :lim
+        """
+    else:
+        cc = _country_col(td)
+        query = f"""
+            SELECT
+                {cc} AS country_code,
+                SUM(sum_of_usd) AS sum_of_usd,
+                SUM(trade_count) AS trade_count,
+                CASE WHEN {share_denominator} = 0 THEN 0
+                     ELSE {share_numerator} / {share_denominator}
+                END AS amount_share_pct
+            FROM {TABLE} WHERE 1=1
+        """
+        query, params = _apply_filters(
+            query, params,
+            hs_code=hs_code, hs_code_prefix=hs_code_prefix,
+            year=year, month=month, country=country,
+            start_year_month=start_year_month, end_year_month=end_year_month,
+            trade_direction=td,
+        )
+        query += f" GROUP BY {cc} ORDER BY {order_metric} DESC LIMIT :lim"
+
+    params["lim"] = limit
+
+    result = _safe(db, query, params, fallback=[])
+    if result == []:
+        return []
+    return rows_to_dicts(result, result.fetchall())
+
+
+@router.get("/top-countries-quarterly", response_model=List[CountryQuarterTop])
+def get_top_countries_quarterly(
+    hs_code: Optional[List[str]] = Query(None),
+    hs_code_prefix: Optional[List[str]] = Query(None),
+    country: Optional[List[str]] = Query(None),
+    trade_direction: Optional[str] = Query("all"),
+    start_year_month: Optional[str] = Query(None),
+    end_year_month: Optional[str] = Query(None),
+    metric: Optional[str] = Query("trade_value"),
+    limit: int = Query(10),
+    db: Session = Depends(get_db),
+):
+    td = trade_direction or "all"
+    metric_key = "trade_count" if metric == "trade_count" else "trade_value"
+    order_expr = "trade_count" if metric_key == "trade_count" else "sum_of_usd"
+    params: dict = {"lim": limit}
+
+    if td == "all":
+        base_where = " WHERE 1=1"
+        base_where, params = _apply_filters(
+            base_where, params,
+            hs_code=hs_code, hs_code_prefix=hs_code_prefix,
+            country=country,
+            start_year_month=start_year_month, end_year_month=end_year_month,
+            trade_direction=td,
+        )
+        query = f"""
+            WITH base AS (
+                SELECT
+                    year,
+                    ((month - 1) / 3 + 1) AS quarter,
+                    country_code,
+                    SUM(sum_of_usd) AS sum_of_usd,
+                    SUM(trade_count) AS trade_count
+                FROM (
+                    SELECT year, month, origin_country_code AS country_code, sum_of_usd, trade_count
+                    FROM {TABLE}{base_where}
+                    UNION ALL
+                    SELECT year, month, destination_country_code AS country_code, sum_of_usd, trade_count
+                    FROM {TABLE}{base_where}
+                ) merged
+                GROUP BY year, quarter, country_code
+            ),
+            ranked AS (
+                SELECT
+                    year,
+                    quarter,
+                    country_code,
+                    sum_of_usd,
+                    trade_count,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY year, quarter
+                        ORDER BY {order_expr} DESC
+                    ) AS rn
+                FROM base
+            )
+            SELECT
+                year,
+                quarter,
+                country_code,
+                sum_of_usd,
+                trade_count
+            FROM ranked
+            WHERE rn <= :lim
+            ORDER BY year, quarter, rn
+        """
+    else:
+        cc = _country_col(td)
+        where = f" WHERE 1=1"
+        where, params = _apply_filters(
+            where, params,
+            hs_code=hs_code, hs_code_prefix=hs_code_prefix,
+            country=country,
+            start_year_month=start_year_month, end_year_month=end_year_month,
+            trade_direction=td,
+        )
+        query = f"""
+            WITH base AS (
+                SELECT
+                    year,
+                    ((month - 1) / 3 + 1) AS quarter,
+                    {cc} AS country_code,
+                    SUM(sum_of_usd) AS sum_of_usd,
+                    SUM(trade_count) AS trade_count
+                FROM {TABLE}{where}
+                GROUP BY year, quarter, {cc}
+            ),
+            ranked AS (
+                SELECT
+                    year,
+                    quarter,
+                    country_code,
+                    sum_of_usd,
+                    trade_count,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY year, quarter
+                        ORDER BY {order_expr} DESC
+                    ) AS rn
+                FROM base
+            )
+            SELECT
+                year,
+                quarter,
+                country_code,
+                sum_of_usd,
+                trade_count
+            FROM ranked
+            WHERE rn <= :lim
+            ORDER BY year, quarter, rn
+        """
+
+    result = _safe(db, query, params, fallback=[])
+    if result == []:
+        return []
+    return rows_to_dicts(result, result.fetchall())
+
+
+@router.get("/country-aggregate", response_model=List[CountryAggregate])
+def get_country_aggregate(
+    hs_code: Optional[List[str]] = Query(None),
+    hs_code_prefix: Optional[List[str]] = Query(None),
+    country: Optional[List[str]] = Query(None),
+    trade_direction: Optional[str] = Query("all"),
+    start_year_month: Optional[str] = Query(None),
+    end_year_month: Optional[str] = Query(None),
+    limit: int = Query(300),
+    db: Session = Depends(get_db),
+):
+    td = trade_direction or "all"
+    params: dict = {"lim": limit}
+    if td == "all":
+        base_where = " WHERE 1=1"
+        base_where, params = _apply_filters(
+            base_where, params,
+            hs_code=hs_code, hs_code_prefix=hs_code_prefix,
+            country=country,
+            start_year_month=start_year_month, end_year_month=end_year_month,
+            trade_direction=td,
+        )
+        query = f"""
+            SELECT
+                country_code,
+                SUM(sum_of_usd) AS sum_of_usd,
+                SUM(trade_count) AS trade_count
             FROM (
                 SELECT origin_country_code AS country_code, sum_of_usd, trade_count
                 FROM {TABLE}{base_where}
@@ -339,27 +538,168 @@ def get_top_countries(
         """
     else:
         cc = _country_col(td)
+        where = " WHERE 1=1"
+        where, params = _apply_filters(
+            where, params,
+            hs_code=hs_code, hs_code_prefix=hs_code_prefix,
+            country=country,
+            start_year_month=start_year_month, end_year_month=end_year_month,
+            trade_direction=td,
+        )
         query = f"""
             SELECT
                 {cc} AS country_code,
                 SUM(sum_of_usd) AS sum_of_usd,
-                SUM(trade_count) AS trade_count,
-                CASE WHEN SUM(SUM(sum_of_usd)) OVER() = 0 THEN 0
-                     ELSE SUM(sum_of_usd) / SUM(SUM(sum_of_usd)) OVER()
-                END AS amount_share_pct
-            FROM {TABLE} WHERE 1=1
+                SUM(trade_count) AS trade_count
+            FROM {TABLE}{where}
+            GROUP BY {cc}
+            ORDER BY sum_of_usd DESC
+            LIMIT :lim
         """
-        query, params = _apply_filters(
-            query, params,
+    result = _safe(db, query, params, fallback=[])
+    if result == []:
+        return []
+    return rows_to_dicts(result, result.fetchall())
+
+
+@router.get("/country-quarterly", response_model=List[CountryQuarterAggregate])
+def get_country_quarterly(
+    hs_code: Optional[List[str]] = Query(None),
+    hs_code_prefix: Optional[List[str]] = Query(None),
+    country: Optional[List[str]] = Query(None),
+    trade_direction: Optional[str] = Query("all"),
+    start_year_month: Optional[str] = Query(None),
+    end_year_month: Optional[str] = Query(None),
+    limit: int = Query(4000),
+    db: Session = Depends(get_db),
+):
+    td = trade_direction or "all"
+    params: dict = {"lim": limit}
+    if td == "all":
+        base_where = " WHERE 1=1"
+        base_where, params = _apply_filters(
+            base_where, params,
             hs_code=hs_code, hs_code_prefix=hs_code_prefix,
-            year=year, month=month, country=country,
+            country=country,
             start_year_month=start_year_month, end_year_month=end_year_month,
             trade_direction=td,
         )
-        query += f" GROUP BY {cc} ORDER BY sum_of_usd DESC LIMIT :lim"
+        query = f"""
+            SELECT
+                year,
+                ((month - 1) / 3 + 1) AS quarter,
+                country_code,
+                SUM(sum_of_usd) AS sum_of_usd,
+                SUM(trade_count) AS trade_count
+            FROM (
+                SELECT year, month, origin_country_code AS country_code, sum_of_usd, trade_count
+                FROM {TABLE}{base_where}
+                UNION ALL
+                SELECT year, month, destination_country_code AS country_code, sum_of_usd, trade_count
+                FROM {TABLE}{base_where}
+            ) sub
+            GROUP BY year, quarter, country_code
+            ORDER BY year, quarter, sum_of_usd DESC
+            LIMIT :lim
+        """
+    else:
+        cc = _country_col(td)
+        where = " WHERE 1=1"
+        where, params = _apply_filters(
+            where, params,
+            hs_code=hs_code, hs_code_prefix=hs_code_prefix,
+            country=country,
+            start_year_month=start_year_month, end_year_month=end_year_month,
+            trade_direction=td,
+        )
+        query = f"""
+            SELECT
+                year,
+                ((month - 1) / 3 + 1) AS quarter,
+                {cc} AS country_code,
+                SUM(sum_of_usd) AS sum_of_usd,
+                SUM(trade_count) AS trade_count
+            FROM {TABLE}{where}
+            GROUP BY year, quarter, {cc}
+            ORDER BY year, quarter, sum_of_usd DESC
+            LIMIT :lim
+        """
+    result = _safe(db, query, params, fallback=[])
+    if result == []:
+        return []
+    return rows_to_dicts(result, result.fetchall())
 
-    params["lim"] = limit
 
+@router.get("/hs-aggregate", response_model=List[HSAggregate])
+def get_hs_aggregate(
+    hs_code: Optional[List[str]] = Query(None),
+    hs_code_prefix: Optional[List[str]] = Query(None),
+    country: Optional[List[str]] = Query(None),
+    trade_direction: Optional[str] = Query("all"),
+    start_year_month: Optional[str] = Query(None),
+    end_year_month: Optional[str] = Query(None),
+    limit: int = Query(200),
+    db: Session = Depends(get_db),
+):
+    td = trade_direction or "all"
+    params: dict = {"lim": limit}
+    where = " WHERE 1=1"
+    where, params = _apply_filters(
+        where, params,
+        hs_code=hs_code, hs_code_prefix=hs_code_prefix,
+        country=country,
+        start_year_month=start_year_month, end_year_month=end_year_month,
+        trade_direction=td,
+    )
+    query = f"""
+        SELECT
+            hs_code,
+            SUM(sum_of_usd) AS sum_of_usd,
+            SUM(trade_count) AS trade_count
+        FROM {TABLE}{where}
+        GROUP BY hs_code
+        ORDER BY sum_of_usd DESC
+        LIMIT :lim
+    """
+    result = _safe(db, query, params, fallback=[])
+    if result == []:
+        return []
+    return rows_to_dicts(result, result.fetchall())
+
+
+@router.get("/hs-quarterly", response_model=List[HSQuarterAggregate])
+def get_hs_quarterly(
+    hs_code: Optional[List[str]] = Query(None),
+    hs_code_prefix: Optional[List[str]] = Query(None),
+    country: Optional[List[str]] = Query(None),
+    trade_direction: Optional[str] = Query("all"),
+    start_year_month: Optional[str] = Query(None),
+    end_year_month: Optional[str] = Query(None),
+    limit: int = Query(4000),
+    db: Session = Depends(get_db),
+):
+    td = trade_direction or "all"
+    params: dict = {"lim": limit}
+    where = " WHERE 1=1"
+    where, params = _apply_filters(
+        where, params,
+        hs_code=hs_code, hs_code_prefix=hs_code_prefix,
+        country=country,
+        start_year_month=start_year_month, end_year_month=end_year_month,
+        trade_direction=td,
+    )
+    query = f"""
+        SELECT
+            year,
+            ((month - 1) / 3 + 1) AS quarter,
+            hs_code,
+            SUM(sum_of_usd) AS sum_of_usd,
+            SUM(trade_count) AS trade_count
+        FROM {TABLE}{where}
+        GROUP BY year, quarter, hs_code
+        ORDER BY year, quarter, sum_of_usd DESC
+        LIMIT :lim
+    """
     result = _safe(db, query, params, fallback=[])
     if result == []:
         return []

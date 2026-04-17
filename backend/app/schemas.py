@@ -238,3 +238,34 @@ class TopCountry(BaseModel):
     sum_of_usd: float
     trade_count: int
     amount_share_pct: float
+
+class CountryQuarterTop(BaseModel):
+    year: int
+    quarter: int
+    country_code: str
+    sum_of_usd: float
+    trade_count: int
+
+class CountryAggregate(BaseModel):
+    country_code: str
+    sum_of_usd: float
+    trade_count: int
+
+class CountryQuarterAggregate(BaseModel):
+    year: int
+    quarter: int
+    country_code: str
+    sum_of_usd: float
+    trade_count: int
+
+class HSAggregate(BaseModel):
+    hs_code: str
+    sum_of_usd: float
+    trade_count: int
+
+class HSQuarterAggregate(BaseModel):
+    year: int
+    quarter: int
+    hs_code: str
+    sum_of_usd: float
+    trade_count: int

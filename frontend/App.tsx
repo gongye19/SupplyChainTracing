@@ -1,19 +1,21 @@
 
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import SupplyMap from './components/SupplyMap';
+import React, { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense } from 'react';
 import StatsPanel from './components/StatsPanel';
 import SidebarFilters from './components/SidebarFilters';
 import CountryTradeSidebar from './components/CountryTradeSidebar';
-import AIAssistant from './components/AIAssistant';
-import CountryTradeMap from './components/CountryTradeMap';
-import CountryTradeStatsPanel from './components/CountryTradeStatsPanel';
-import TopCountriesHorizontalBar, { TopCountriesDatum } from './components/TopCountriesHorizontalBar';
-import { Transaction, Filters, HSCodeCategory, CountryLocation, Location, Shipment, CountryMonthlyTradeStat, CountryTradeStatSummary, CountryTradeTrend, TopCountry, CountryTradeFilters } from './types';
+import type { TopCountriesDatum } from './components/TopCountriesHorizontalBar';
+import { Transaction, Filters, HSCodeCategory, CountryLocation, Location, Shipment, CountryMonthlyTradeStat, CountryTradeStatSummary, CountryTradeTrend, TopCountry, CountryTradeFilters, CountryQuarterTop, CountryAggregate, CountryQuarterAggregate, HSAggregate, HSQuarterAggregate } from './types';
 import { shipmentsAPI, hsCodeCategoriesAPI, countryLocationsAPI, chatAPI, ChatMessage, countryTradeStatsAPI } from './services/api';
 import { Globe, Map as MapIcon, Package, TrendingUp, Users, ChevronRight, Filter } from 'lucide-react';
 import { useLanguage } from './contexts/LanguageContext';
 import { getCountriesFromCodes } from './utils/countryCoordinates';
 import { logger } from './utils/logger';
+
+const SupplyMap = lazy(() => import('./components/SupplyMap'));
+const AIAssistant = lazy(() => import('./components/AIAssistant'));
+const CountryTradeMap = lazy(() => import('./components/CountryTradeMap'));
+const CountryTradeStatsPanel = lazy(() => import('./components/CountryTradeStatsPanel'));
+const TopCountriesHorizontalBar = lazy(() => import('./components/TopCountriesHorizontalBar'));
 
 const HS2_COLOR_PALETTE = [
   '#007AFF', '#34C759', '#FF9500', '#AF52DE', '#FF2D55', '#30B0C7',
@@ -25,6 +27,14 @@ const getHs2Color = (hs2: string): string => {
   const numeric = Number.parseInt(hs2, 10);
   if (Number.isNaN(numeric)) return '#8E8E93';
   return HS2_COLOR_PALETTE[numeric % HS2_COLOR_PALETTE.length];
+};
+
+const CACHE_TTL_MS = 5 * 60 * 1000;
+const MAX_CACHE_ENTRIES = 24;
+
+type CacheEntry<T> = {
+  data: T;
+  ts: number;
 };
 
 const App: React.FC = () => {
@@ -63,7 +73,10 @@ const App: React.FC = () => {
   const [mapHsFilters, setMapHsFilters] = useState<Filters>(defaultHsMapFilters);
 
   const [shipments, setShipments] = useState<Shipment[]>([]);
-  const [countryOverallShipments, setCountryOverallShipments] = useState<Shipment[]>([]);
+  const [countryOverallQuarterlyValue, setCountryOverallQuarterlyValue] = useState<CountryQuarterTop[]>([]);
+  const [countryOverallQuarterlyCount, setCountryOverallQuarterlyCount] = useState<CountryQuarterTop[]>([]);
+  const [countryOverallTotalValueTop, setCountryOverallTotalValueTop] = useState<TopCountriesDatum[]>([]);
+  const [countryOverallTotalCountTop, setCountryOverallTotalCountTop] = useState<TopCountriesDatum[]>([]);
   const [hsCodeCategories, setHsCodeCategories] = useState<HSCodeCategory[]>([]);
   const [availableHSCodes, setAvailableHSCodes] = useState<string[]>([]);
   const [countries, setCountries] = useState<CountryLocation[]>([]);
@@ -82,8 +95,11 @@ const App: React.FC = () => {
   const [countryTradeSummary, setCountryTradeSummary] = useState<CountryTradeStatSummary | null>(null);
   const [countryTradeTrends, setCountryTradeTrends] = useState<CountryTradeTrend[]>([]);
   const [topCountries, setTopCountries] = useState<TopCountry[]>([]);
-  const [hsCodeMapMonthlyStats, setHsCodeMapMonthlyStats] = useState<CountryMonthlyTradeStat[]>([]);
-  const [hsCodeMapOverallMonthlyStats, setHsCodeMapOverallMonthlyStats] = useState<CountryMonthlyTradeStat[]>([]);
+  const [topCountriesQuarterly, setTopCountriesQuarterly] = useState<CountryQuarterTop[]>([]);
+  const [hsCodeMapCountryTotals, setHsCodeMapCountryTotals] = useState<CountryAggregate[]>([]);
+  const [hsCodeMapCountryQuarterly, setHsCodeMapCountryQuarterly] = useState<CountryQuarterAggregate[]>([]);
+  const [hsCodeMapOverallTotals, setHsCodeMapOverallTotals] = useState<HSAggregate[]>([]);
+  const [hsCodeMapOverallQuarterly, setHsCodeMapOverallQuarterly] = useState<HSQuarterAggregate[]>([]);
   const [countryTradeFilters, setCountryTradeFilters] = useState<CountryTradeFilters>({
     hsCode: [],
     tradeDirection: 'import',
@@ -124,23 +140,48 @@ const App: React.FC = () => {
   const countryTradeCacheRef = useRef<
     Map<
       string,
-      {
+      CacheEntry<{
         statsData: CountryMonthlyTradeStat[];
         summaryData: CountryTradeStatSummary;
         trendsData: CountryTradeTrend[];
         topCountriesData: TopCountry[];
-      }
+        topCountriesQuarterlyData: CountryQuarterTop[];
+      }>
     >
   >(new Map());
   const lastCountryTradeKeyRef = useRef<string>('');
-  const shipmentsCacheRef = useRef<Map<string, Shipment[]>>(new Map());
-  const hsCodeMapCacheRef = useRef<Map<string, CountryMonthlyTradeStat[]>>(new Map());
-  const hsCodeMapOverallCacheRef = useRef<Map<string, CountryMonthlyTradeStat[]>>(new Map());
+  const shipmentsCacheRef = useRef<Map<string, CacheEntry<Shipment[]>>>(new Map());
+  const hsCodeMapCacheRef = useRef<Map<string, CacheEntry<{
+    countryTotals: CountryAggregate[];
+    countryQuarterly: CountryQuarterAggregate[];
+  }>>>(new Map());
+  const hsCodeMapOverallCacheRef = useRef<Map<string, CacheEntry<{
+    hsTotals: HSAggregate[];
+    hsQuarterly: HSQuarterAggregate[];
+  }>>>(new Map());
   const lastRequestedKeyRef = useRef<string>('');
   const lastHsCodeMapKeyRef = useRef<string>('');
   const lastHsCodeMapOverallKeyRef = useRef<string>('');
   // 标记是否正在拖动（用于时间滑块）
   const isDraggingRef = useRef<boolean>(false);
+
+  const getCached = useCallback(<T,>(cache: Map<string, CacheEntry<T>>, key: string): T | null => {
+    const hit = cache.get(key);
+    if (!hit) return null;
+    if (Date.now() - hit.ts > CACHE_TTL_MS) {
+      cache.delete(key);
+      return null;
+    }
+    return hit.data;
+  }, []);
+
+  const setCached = useCallback(<T,>(cache: Map<string, CacheEntry<T>>, key: string, data: T) => {
+    cache.set(key, { data, ts: Date.now() });
+    if (cache.size > MAX_CACHE_ENTRIES) {
+      const oldestKey = cache.keys().next().value;
+      if (oldestKey) cache.delete(oldestKey);
+    }
+  }, []);
 
   const buildShipmentsCacheKey = useCallback((filtersToUse: Filters) => {
     const sortedCountries = [...(filtersToUse.selectedCountries || [])].sort().join(',');
@@ -148,6 +189,7 @@ const App: React.FC = () => {
     return [
       filtersToUse.startDate || '',
       filtersToUse.endDate || '',
+      filtersToUse.tradeDirection || '',
       sortedCountries,
       sortedCategories,
     ].join('|');
@@ -247,6 +289,7 @@ const App: React.FC = () => {
     if (activeView !== 'global-stats') return;
     const requestFilters: CountryTradeFilters = {
       ...countryTradeFilters,
+      limit: 8000,
     };
 
     const buildCountryTradeKey = () => {
@@ -272,19 +315,28 @@ const App: React.FC = () => {
         }
         lastCountryTradeKeyRef.current = requestKey;
 
-        const cached = countryTradeCacheRef.current.get(requestKey);
+        const cached = getCached(countryTradeCacheRef.current, requestKey);
         if (cached) {
           setCountryTradeStats(cached.statsData);
           setCountryTradeSummary(cached.summaryData);
           setCountryTradeTrends(cached.trendsData);
           setTopCountries(cached.topCountriesData);
+          setTopCountriesQuarterly(cached.topCountriesQuarterlyData);
           return;
         }
 
         setCountryTradeLoading(true);
         
-        const [statsData, summaryData, trendsData, topCountriesData] = await Promise.all([
-          countryTradeStatsAPI.getAll(requestFilters),
+        const [quarterlyCountryData, summaryData, trendsData, topCountriesData, topCountriesQuarterlyData] = await Promise.all([
+          countryTradeStatsAPI.getCountryQuarterly({
+            hsCode: requestFilters.hsCode,
+            hsCodePrefix: requestFilters.hsCodePrefix,
+            country: requestFilters.country,
+            tradeDirection: requestFilters.tradeDirection,
+            startYearMonth: requestFilters.startYearMonth,
+            endYearMonth: requestFilters.endYearMonth,
+            limit: requestFilters.limit,
+          }),
           countryTradeStatsAPI.getSummary(requestFilters),
           countryTradeStatsAPI.getTrends({
             hsCode: requestFilters.hsCode?.[0],
@@ -302,25 +354,45 @@ const App: React.FC = () => {
             endYearMonth: requestFilters.endYearMonth,
             limit: 10,
           }),
+          countryTradeStatsAPI.getTopCountriesQuarterly({
+            hsCode: requestFilters.hsCode,
+            country: requestFilters.country,
+            tradeDirection: requestFilters.tradeDirection,
+            startYearMonth: requestFilters.startYearMonth,
+            endYearMonth: requestFilters.endYearMonth,
+            metric: 'trade_value',
+            limit: 10,
+          }),
         ]);
+        const statsData: CountryMonthlyTradeStat[] = quarterlyCountryData.map((item) => ({
+          hsCode: 'ALL',
+          year: item.year,
+          month: (item.quarter - 1) * 3 + 1,
+          countryCode: item.countryCode,
+          sumOfUsd: item.sumOfUsd,
+          tradeCount: item.tradeCount,
+        }));
         logger.debug('[Country Trade] loaded', {
           stats: statsData.length,
           summary: summaryData,
           trends: trendsData.length,
           topCountries: topCountriesData.length,
+          topCountriesQuarterly: topCountriesQuarterlyData.length,
         });
 
-        countryTradeCacheRef.current.set(requestKey, {
+        setCached(countryTradeCacheRef.current, requestKey, {
           statsData,
           summaryData,
           trendsData,
           topCountriesData,
+          topCountriesQuarterlyData,
         });
         
         setCountryTradeStats(statsData);
         setCountryTradeSummary(summaryData);
         setCountryTradeTrends(trendsData);
         setTopCountries(topCountriesData);
+        setTopCountriesQuarterly(topCountriesQuarterlyData);
       } catch (error) {
         logger.error('Failed to load country trade data:', error);
         // 显示错误信息给用户
@@ -330,12 +402,6 @@ const App: React.FC = () => {
       }
     };
 
-    // 确保 countries 数据已加载
-    if (countries.length === 0) {
-      logger.warn('Countries data not loaded yet, waiting...');
-      return;
-    }
-
     if (countryTradeTimerRef.current) window.clearTimeout(countryTradeTimerRef.current);
     countryTradeTimerRef.current = window.setTimeout(() => {
     loadCountryTradeData();
@@ -343,40 +409,31 @@ const App: React.FC = () => {
     return () => {
       if (countryTradeTimerRef.current) window.clearTimeout(countryTradeTimerRef.current);
     };
-  }, [activeView, countryTradeFilters, countries.length]);
+  }, [activeView, countryTradeFilters, getCached, setCached]);
 
   useEffect(() => {
     if (activeView !== 'map-hscode') return;
 
     const selectedHsCodes = [...(mapHsFilters.selectedHSCodes || [])].sort();
 
-    const requestFilters: CountryTradeFilters = {
+    const baseFilters = {
       hsCode: selectedHsCodes,
       tradeDirection: mapHsFilters.tradeDirection || 'import',
-      industry: 'SemiConductor',
       startYearMonth: mapHsFilters.startDate,
       endYearMonth: mapHsFilters.endDate,
-    };
+    } as const;
 
     const requestKey = [
-      requestFilters.startYearMonth || '',
-      requestFilters.endYearMonth || '',
+      baseFilters.startYearMonth || '',
+      baseFilters.endYearMonth || '',
       selectedHsCodes.join(','),
-      requestFilters.tradeDirection || '',
-      requestFilters.industry || '',
+      baseFilters.tradeDirection || '',
     ].join('|');
     const overallKey = [
-      requestFilters.startYearMonth || '',
-      requestFilters.endYearMonth || '',
-      requestFilters.tradeDirection || '',
-      requestFilters.industry || '',
+      baseFilters.startYearMonth || '',
+      baseFilters.endYearMonth || '',
+      baseFilters.tradeDirection || '',
     ].join('|');
-    const overallFilters: CountryTradeFilters = {
-      tradeDirection: requestFilters.tradeDirection,
-      industry: requestFilters.industry,
-      startYearMonth: requestFilters.startYearMonth,
-      endYearMonth: requestFilters.endYearMonth,
-    };
 
     const loadHsCodeMapData = async () => {
       try {
@@ -386,23 +443,45 @@ const App: React.FC = () => {
         lastHsCodeMapKeyRef.current = requestKey;
         lastHsCodeMapOverallKeyRef.current = overallKey;
 
-        const cachedSelected = hsCodeMapCacheRef.current.get(requestKey);
-        const cachedOverall = hsCodeMapOverallCacheRef.current.get(overallKey);
+        const cachedSelected = getCached(hsCodeMapCacheRef.current, requestKey);
+        const cachedOverall = getCached(hsCodeMapOverallCacheRef.current, overallKey);
         if (cachedSelected && cachedOverall) {
-          setHsCodeMapMonthlyStats(cachedSelected);
-          setHsCodeMapOverallMonthlyStats(cachedOverall);
+          setHsCodeMapCountryTotals(cachedSelected.countryTotals);
+          setHsCodeMapCountryQuarterly(cachedSelected.countryQuarterly);
+          setHsCodeMapOverallTotals(cachedOverall.hsTotals);
+          setHsCodeMapOverallQuarterly(cachedOverall.hsQuarterly);
           return;
         }
 
         setHsCodeMapLoading(true);
-        const [selectedData, overallData] = await Promise.all([
-          selectedHsCodes.length > 0 ? countryTradeStatsAPI.getAll(requestFilters) : Promise.resolve([]),
-          countryTradeStatsAPI.getAll(overallFilters),
+        const [countryTotals, countryQuarterly, hsTotals, hsQuarterly] = await Promise.all([
+          selectedHsCodes.length > 0 ? countryTradeStatsAPI.getCountryAggregate({
+            ...baseFilters,
+            limit: 300,
+          }) : Promise.resolve([]),
+          selectedHsCodes.length > 0 ? countryTradeStatsAPI.getCountryQuarterly({
+            ...baseFilters,
+            limit: 5000,
+          }) : Promise.resolve([]),
+          countryTradeStatsAPI.getHSAggregate({
+            tradeDirection: baseFilters.tradeDirection,
+            startYearMonth: baseFilters.startYearMonth,
+            endYearMonth: baseFilters.endYearMonth,
+            limit: 200,
+          }),
+          countryTradeStatsAPI.getHSQuarterly({
+            tradeDirection: baseFilters.tradeDirection,
+            startYearMonth: baseFilters.startYearMonth,
+            endYearMonth: baseFilters.endYearMonth,
+            limit: 5000,
+          }),
         ]);
-        hsCodeMapCacheRef.current.set(requestKey, selectedData);
-        hsCodeMapOverallCacheRef.current.set(overallKey, overallData);
-        setHsCodeMapMonthlyStats(selectedData);
-        setHsCodeMapOverallMonthlyStats(overallData);
+        setCached(hsCodeMapCacheRef.current, requestKey, { countryTotals, countryQuarterly });
+        setCached(hsCodeMapOverallCacheRef.current, overallKey, { hsTotals, hsQuarterly });
+        setHsCodeMapCountryTotals(countryTotals);
+        setHsCodeMapCountryQuarterly(countryQuarterly);
+        setHsCodeMapOverallTotals(hsTotals);
+        setHsCodeMapOverallQuarterly(hsQuarterly);
       } catch (error) {
         logger.error('Failed to load HSCode map monthly stats:', error);
       } finally {
@@ -418,21 +497,38 @@ const App: React.FC = () => {
     return () => {
       if (hsCodeMapTimerRef.current) window.clearTimeout(hsCodeMapTimerRef.current);
     };
-  }, [activeView, mapHsFilters.endDate, mapHsFilters.selectedHSCodes, mapHsFilters.startDate, mapHsFilters.tradeDirection]);
+  }, [activeView, mapHsFilters.endDate, mapHsFilters.selectedHSCodes, mapHsFilters.startDate, mapHsFilters.tradeDirection, getCached, setCached]);
+
+  const countryNameToCodeMap = useMemo(() => {
+    const map = new Map<string, string>();
+    countries.forEach((country) => {
+      map.set(country.countryName, country.countryCode);
+      map.set(country.countryName.toLowerCase(), country.countryCode);
+    });
+    return map;
+  }, [countries]);
+
+  const countryCodeToNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    countries.forEach((country) => {
+      map.set(country.countryCode, country.countryName);
+    });
+    return map;
+  }, [countries]);
+
+  const hsCodeCategoryNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    hsCodeCategories.forEach((cat) => {
+      map.set(cat.hsCode, cat.chapterName);
+    });
+    return map;
+  }, [hsCodeCategories]);
 
   // 国家名称到国家代码的映射函数
   const getCountryCode = useCallback((countryName: string): string => {
     if (!countryName) return '';
-
-    // 从 countries 列表中查找匹配的国家
-    const country = countries.find(c => 
-      c.countryName.toLowerCase() === countryName.toLowerCase() ||
-      c.countryName === countryName
-    );
-
-    // 统一使用国家代码，不回退到国家名称
-    return country?.countryCode || '';
-  }, [countries]);
+    return countryNameToCodeMap.get(countryName) || countryNameToCodeMap.get(countryName.toLowerCase()) || '';
+  }, [countryNameToCodeMap]);
 
   // 加载原始交易数据
   const loadShipments = useCallback(async (filtersToUse: Filters, mode: 'preview' | 'final') => {
@@ -443,7 +539,7 @@ const App: React.FC = () => {
     }
     lastRequestedKeyRef.current = `${mode}:${requestKey}`;
 
-    const cached = shipmentsCacheRef.current.get(requestKey);
+    const cached = getCached(shipmentsCacheRef.current, requestKey);
     if (cached) {
       setShipments(cached);
       if (mode === 'final') {
@@ -490,7 +586,7 @@ const App: React.FC = () => {
       const startTime = performance.now();
       const data = await shipmentsAPI.getAll(filtersToUse, {
         signal: controller.signal,
-        limit: mode === 'preview' ? 15000 : 50000,
+        limit: mode === 'preview' ? 5000 : 20000,
       });
       const duration = performance.now() - startTime;
 
@@ -504,7 +600,7 @@ const App: React.FC = () => {
       }
 
       logger.debug(`[Shipments] Loaded (${mode}) in ${duration.toFixed(0)}ms:`, data.length);
-      shipmentsCacheRef.current.set(requestKey, data);
+      setCached(shipmentsCacheRef.current, requestKey, data);
       setShipments(data);
       
       // 注意：不再从筛选结果中更新公司列表
@@ -557,17 +653,22 @@ const App: React.FC = () => {
         setFilterLoading(false);
       }
     }
-  }, [buildShipmentsCacheKey, getCountryCode]);
+  }, [buildShipmentsCacheKey, getCountryCode, getCached, setCached]);
 
-  // 调度器：map filters 变化 => 立刻 preview + 延迟 final
+  // 调度器：拖动时 preview + final，点击时仅 final
   const scheduleFetch = useCallback((nextFilters: Filters, reason: 'drag' | 'click') => {
-    setIsInteracting(true);
-    loadShipments(nextFilters, 'preview');
     if (finalTimerRef.current) window.clearTimeout(finalTimerRef.current);
-    finalTimerRef.current = window.setTimeout(() => {
-      setIsInteracting(false);
-      loadShipments(filtersRef.current, 'final');
-    }, reason === 'drag' ? 180 : 120);
+    if (reason === 'drag') {
+      setIsInteracting(true);
+      loadShipments(nextFilters, 'preview');
+      finalTimerRef.current = window.setTimeout(() => {
+        setIsInteracting(false);
+        loadShipments(filtersRef.current, 'final');
+      }, 220);
+      return;
+    }
+    setIsInteracting(false);
+    loadShipments(nextFilters, 'final');
   }, [loadShipments]);
 
   // 暴露拖动状态控制函数给子组件
@@ -670,21 +771,16 @@ const App: React.FC = () => {
     
     // 转换为地图组件格式
     return Array.from(countryPairGroups.values()).map((group, index) => {
-      const hsCategory = hsCodeCategories.find(cat => cat.hsCode === group.hs2);
       const categoryColor = getHs2Color(group.hs2);
-      
-      // 获取国家名称（用于显示）
-      const originCountry = countries.find(c => c.countryCode === group.originCountryCode);
-      const destCountry = countries.find(c => c.countryCode === group.destinationCountryCode);
       
       return {
         id: `country-pair-${index}-${group.originCountryCode}-${group.destinationCountryCode}`,
         originId: group.originCountryCode,
         destinationId: group.destinationCountryCode,
-        countryOfOrigin: originCountry?.countryName || group.originCountryCode,
-        destinationCountry: destCountry?.countryName || group.destinationCountryCode,
+        countryOfOrigin: countryCodeToNameMap.get(group.originCountryCode) || group.originCountryCode,
+        destinationCountry: countryCodeToNameMap.get(group.destinationCountryCode) || group.destinationCountryCode,
         material: `HS2-${group.hs2}`,
-        category: hsCategory?.chapterName || `HS ${group.hs2}`,
+        category: hsCodeCategoryNameMap.get(group.hs2) || `HS ${group.hs2}`,
         categoryColor,
         value: group.totalValue / 1000000, // 转换为百万美元
         status: 'completed',
@@ -693,71 +789,41 @@ const App: React.FC = () => {
         hsCode: `${group.hs2}0000`,
       };
     });
-  }, [filteredShipmentsForCurrentMap, hsCodeCategories, countries, getCountryCode]);
-
-  const hsCodeMapStats = useMemo(() => {
-    const countryMap = new Map<string, { sumOfUsd: number; tradeCount: number }>();
-
-    hsCodeMapMonthlyStats.forEach((stat) => {
-      const countryCode = stat.countryCode;
-      if (!countryCode) {
-        return;
-      }
-      const current = countryMap.get(countryCode) || { sumOfUsd: 0, tradeCount: 0 };
-      countryMap.set(countryCode, {
-        sumOfUsd: current.sumOfUsd + (stat.sumOfUsd || 0),
-        tradeCount: current.tradeCount + (stat.tradeCount || 0),
-      });
-    });
-
-    return Array.from(countryMap.entries()).map(([countryCode, data]) => ({
-      hsCode: 'ALL',
-      year: 0,
-      month: 0,
-      countryCode,
-      sumOfUsd: data.sumOfUsd,
-      tradeCount: data.tradeCount,
-      amountSharePct: 0,
-    }));
-  }, [hsCodeMapMonthlyStats]);
+  }, [filteredShipmentsForCurrentMap, hsCodeCategoryNameMap, countryCodeToNameMap, getCountryCode]);
 
   const hsCodeMapQuarters = useMemo(() => {
-    const quarterSet = new Map<string, { year: number; quarter: number; label: string; months: number[] }>();
-    hsCodeMapMonthlyStats.forEach((item) => {
-      const quarter = Math.floor((item.month - 1) / 3) + 1;
+    const quarterSet = new Map<string, { year: number; quarter: number; label: string }>();
+    hsCodeMapCountryQuarterly.forEach((item) => {
+      const quarter = item.quarter;
       const key = `${item.year}-Q${quarter}`;
       if (!quarterSet.has(key)) {
-        const months = quarter === 1 ? [1, 2, 3] : quarter === 2 ? [4, 5, 6] : quarter === 3 ? [7, 8, 9] : [10, 11, 12];
         const quarterRange = quarter === 1 ? '1-3' : quarter === 2 ? '4-6' : quarter === 3 ? '7-9' : '10-12';
         quarterSet.set(key, {
           year: item.year,
           quarter,
-          months,
           label: `${item.year} (${quarterRange})`,
         });
       }
     });
     return Array.from(quarterSet.values()).sort((a, b) => (a.year === b.year ? a.quarter - b.quarter : a.year - b.year));
-  }, [hsCodeMapMonthlyStats]);
+  }, [hsCodeMapCountryQuarterly]);
 
   const hsCodeOverallQuarters = useMemo(() => {
-    const quarterSet = new Map<string, { year: number; quarter: number; label: string; months: number[] }>();
-    hsCodeMapOverallMonthlyStats.forEach((item) => {
-      const quarter = Math.floor((item.month - 1) / 3) + 1;
+    const quarterSet = new Map<string, { year: number; quarter: number; label: string }>();
+    hsCodeMapOverallQuarterly.forEach((item) => {
+      const quarter = item.quarter;
       const key = `${item.year}-Q${quarter}`;
       if (!quarterSet.has(key)) {
-        const months = quarter === 1 ? [1, 2, 3] : quarter === 2 ? [4, 5, 6] : quarter === 3 ? [7, 8, 9] : [10, 11, 12];
         const quarterRange = quarter === 1 ? '1-3' : quarter === 2 ? '4-6' : quarter === 3 ? '7-9' : '10-12';
         quarterSet.set(key, {
           year: item.year,
           quarter,
-          months,
           label: `${item.year} (${quarterRange})`,
         });
       }
     });
     return Array.from(quarterSet.values()).sort((a, b) => (a.year === b.year ? a.quarter - b.quarter : a.year - b.year));
-  }, [hsCodeMapOverallMonthlyStats]);
+  }, [hsCodeMapOverallQuarterly]);
 
   useEffect(() => {
     if (hsCodeMapQuarters.length === 0) {
@@ -807,55 +873,39 @@ const App: React.FC = () => {
     return () => window.clearInterval(timer);
   }, [hsCodeOverallValueQuarterPlaying, hsCodeOverallValueQuarterPaused, hsCodeOverallQuarters.length]);
 
-  const displayedHsCodeMapMonthlyStats = useMemo(() => {
-    if (!hsCodeMapQuarterPlaying || hsCodeMapQuarters.length === 0) return hsCodeMapMonthlyStats;
-    const quarter = hsCodeMapQuarters[hsCodeMapQuarterIndex];
-    if (!quarter) return hsCodeMapMonthlyStats;
-    return hsCodeMapMonthlyStats.filter(
-      (item) => item.year === quarter.year && quarter.months.includes(item.month)
-    );
-  }, [hsCodeMapQuarterPlaying, hsCodeMapQuarters, hsCodeMapQuarterIndex, hsCodeMapMonthlyStats]);
-
   const displayedHsCodeMapStats = useMemo(() => {
-    const countryMap = new Map<string, { sumOfUsd: number; tradeCount: number }>();
-    const source = hsCodeMapQuarterPlaying && hsCodeMapQuarters.length > 0 ? displayedHsCodeMapMonthlyStats : hsCodeMapMonthlyStats;
-    source.forEach((stat) => {
-      const countryCode = stat.countryCode;
-      if (!countryCode) return;
-      const current = countryMap.get(countryCode) || { sumOfUsd: 0, tradeCount: 0 };
-      countryMap.set(countryCode, {
-        sumOfUsd: current.sumOfUsd + (stat.sumOfUsd || 0),
-        tradeCount: current.tradeCount + (stat.tradeCount || 0),
-      });
-    });
-    return Array.from(countryMap.entries()).map(([countryCode, data]) => ({
+    if (!hsCodeMapQuarterPlaying || hsCodeMapQuarters.length === 0) {
+      return hsCodeMapCountryTotals.map((item) => ({
+        hsCode: 'ALL',
+        year: 0,
+        month: 0,
+        countryCode: item.countryCode,
+        sumOfUsd: item.sumOfUsd,
+        tradeCount: item.tradeCount,
+      }));
+    }
+    const quarter = hsCodeMapQuarters[hsCodeMapQuarterIndex];
+    if (!quarter) {
+      return hsCodeMapCountryTotals.map((item) => ({
+        hsCode: 'ALL',
+        year: 0,
+        month: 0,
+        countryCode: item.countryCode,
+        sumOfUsd: item.sumOfUsd,
+        tradeCount: item.tradeCount,
+      }));
+    }
+    return hsCodeMapCountryQuarterly
+      .filter((item) => item.year === quarter.year && item.quarter === quarter.quarter)
+      .map((item) => ({
       hsCode: 'ALL',
       year: 0,
       month: 0,
-      countryCode,
-      sumOfUsd: data.sumOfUsd,
-      tradeCount: data.tradeCount,
-      amountSharePct: 0,
+      countryCode: item.countryCode,
+      sumOfUsd: item.sumOfUsd,
+      tradeCount: item.tradeCount,
     }));
-  }, [hsCodeMapQuarterPlaying, hsCodeMapQuarters.length, displayedHsCodeMapMonthlyStats, hsCodeMapMonthlyStats]);
-
-  const displayedHsCodeMapOverallMonthlyStatsForCount = useMemo(() => {
-    if (!hsCodeOverallCountQuarterPlaying || hsCodeOverallQuarters.length === 0) return hsCodeMapOverallMonthlyStats;
-    const quarter = hsCodeOverallQuarters[hsCodeOverallCountQuarterIndex];
-    if (!quarter) return hsCodeMapOverallMonthlyStats;
-    return hsCodeMapOverallMonthlyStats.filter(
-      (item) => item.year === quarter.year && quarter.months.includes(item.month)
-    );
-  }, [hsCodeOverallCountQuarterPlaying, hsCodeOverallQuarters, hsCodeOverallCountQuarterIndex, hsCodeMapOverallMonthlyStats]);
-
-  const displayedHsCodeMapOverallMonthlyStatsForValue = useMemo(() => {
-    if (!hsCodeOverallValueQuarterPlaying || hsCodeOverallQuarters.length === 0) return hsCodeMapOverallMonthlyStats;
-    const quarter = hsCodeOverallQuarters[hsCodeOverallValueQuarterIndex];
-    if (!quarter) return hsCodeMapOverallMonthlyStats;
-    return hsCodeMapOverallMonthlyStats.filter(
-      (item) => item.year === quarter.year && quarter.months.includes(item.month)
-    );
-  }, [hsCodeOverallValueQuarterPlaying, hsCodeOverallQuarters, hsCodeOverallValueQuarterIndex, hsCodeMapOverallMonthlyStats]);
+  }, [hsCodeMapCountryQuarterly, hsCodeMapCountryTotals, hsCodeMapQuarterIndex, hsCodeMapQuarterPlaying, hsCodeMapQuarters]);
 
   const hsCodeMapFilterSummary = useMemo(() => {
     const selectedHsCodes = mapHsFilters.selectedHSCodes || [];
@@ -893,7 +943,7 @@ const App: React.FC = () => {
 
       return Array.from(aggregate.entries())
         .map(([countryCode, value]) => {
-          const countryName = countries.find((item) => item.countryCode === countryCode)?.countryName || countryCode;
+          const countryName = countryCodeToNameMap.get(countryCode) || countryCode;
           return {
             countryCode,
             countryName,
@@ -903,52 +953,58 @@ const App: React.FC = () => {
         .sort((a, b) => b.value - a.value)
         .slice(0, 10);
     },
-    [countries]
+    [countryCodeToNameMap]
   );
 
   const topCategoriesByHSCodeOverallCount = useMemo(() => {
     if (activeView !== 'map-hscode') return [];
-    const aggregate = new Map<string, { tradeCount: number; tradeValue: number }>();
-    const source = hsCodeOverallCountQuarterPlaying && hsCodeOverallQuarters.length > 0 ? displayedHsCodeMapOverallMonthlyStatsForCount : hsCodeMapOverallMonthlyStats;
-    source.forEach((stat) => {
-      const hsCode = stat.hsCode || 'Unknown';
-      const prev = aggregate.get(hsCode) || { tradeCount: 0, tradeValue: 0 };
-      aggregate.set(hsCode, {
-        tradeCount: prev.tradeCount + (stat.tradeCount || 0),
-        tradeValue: prev.tradeValue + (stat.sumOfUsd || 0),
-      });
-    });
-    return Array.from(aggregate.entries())
-      .map(([hsCode, value]) => ({
-        countryCode: hsCode,
-        countryName: `HS ${hsCode}`,
-        value: value.tradeCount,
+    if (!hsCodeOverallCountQuarterPlaying || hsCodeOverallQuarters.length === 0) {
+      return hsCodeMapOverallTotals
+        .map((item) => ({
+          countryCode: item.hsCode,
+          countryName: `HS ${item.hsCode}`,
+          value: item.tradeCount,
+        }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 10);
+    }
+    const quarter = hsCodeOverallQuarters[hsCodeOverallCountQuarterIndex];
+    if (!quarter) return [];
+    return hsCodeMapOverallQuarterly
+      .filter((item) => item.year === quarter.year && item.quarter === quarter.quarter)
+      .map((item) => ({
+        countryCode: item.hsCode,
+        countryName: `HS ${item.hsCode}`,
+        value: item.tradeCount,
       }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 10);
-  }, [activeView, hsCodeMapOverallMonthlyStats, hsCodeOverallCountQuarterPlaying, hsCodeOverallQuarters.length, displayedHsCodeMapOverallMonthlyStatsForCount]);
+  }, [activeView, hsCodeMapOverallQuarterly, hsCodeMapOverallTotals, hsCodeOverallCountQuarterIndex, hsCodeOverallCountQuarterPlaying, hsCodeOverallQuarters]);
 
   const topCategoriesByHSCodeOverallValue = useMemo(() => {
     if (activeView !== 'map-hscode') return [];
-    const aggregate = new Map<string, { tradeCount: number; tradeValue: number }>();
-    const source = hsCodeOverallValueQuarterPlaying && hsCodeOverallQuarters.length > 0 ? displayedHsCodeMapOverallMonthlyStatsForValue : hsCodeMapOverallMonthlyStats;
-    source.forEach((stat) => {
-      const hsCode = stat.hsCode || 'Unknown';
-      const prev = aggregate.get(hsCode) || { tradeCount: 0, tradeValue: 0 };
-      aggregate.set(hsCode, {
-        tradeCount: prev.tradeCount + (stat.tradeCount || 0),
-        tradeValue: prev.tradeValue + (stat.sumOfUsd || 0),
-      });
-    });
-    return Array.from(aggregate.entries())
-      .map(([hsCode, value]) => ({
-        countryCode: hsCode,
-        countryName: `HS ${hsCode}`,
-        value: value.tradeValue,
+    if (!hsCodeOverallValueQuarterPlaying || hsCodeOverallQuarters.length === 0) {
+      return hsCodeMapOverallTotals
+        .map((item) => ({
+          countryCode: item.hsCode,
+          countryName: `HS ${item.hsCode}`,
+          value: item.sumOfUsd,
+        }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 10);
+    }
+    const quarter = hsCodeOverallQuarters[hsCodeOverallValueQuarterIndex];
+    if (!quarter) return [];
+    return hsCodeMapOverallQuarterly
+      .filter((item) => item.year === quarter.year && item.quarter === quarter.quarter)
+      .map((item) => ({
+        countryCode: item.hsCode,
+        countryName: `HS ${item.hsCode}`,
+        value: item.sumOfUsd,
       }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 10);
-  }, [activeView, hsCodeMapOverallMonthlyStats, hsCodeOverallValueQuarterPlaying, hsCodeOverallQuarters.length, displayedHsCodeMapOverallMonthlyStatsForValue]);
+  }, [activeView, hsCodeMapOverallQuarterly, hsCodeMapOverallTotals, hsCodeOverallQuarters, hsCodeOverallValueQuarterIndex, hsCodeOverallValueQuarterPlaying]);
 
   const topCountriesByCountryMapValue = useMemo(() => {
     if (activeView !== 'map-country') return [];
@@ -960,29 +1016,27 @@ const App: React.FC = () => {
     return buildTopCountries(filteredShipmentsForCurrentMap, mapCountryFilters.tradeDirection || 'import', 'tradeCount');
   }, [activeView, buildTopCountries, filteredShipmentsForCurrentMap, mapCountryFilters.tradeDirection]);
 
-  const countryOverallSourceShipments = useMemo(
-    () => (countryOverallShipments.length > 0 ? countryOverallShipments : filteredShipmentsForCurrentMap),
-    [countryOverallShipments, filteredShipmentsForCurrentMap]
-  );
+  const formatQuarterLabel = useCallback((year: number, quarter: number) => {
+    const quarterRange = quarter === 1 ? '1-3' : quarter === 2 ? '4-6' : quarter === 3 ? '7-9' : '10-12';
+    return `${year} (${quarterRange})`;
+  }, []);
+
+  const buildQuarterKey = useCallback((year: number, quarter: number) => `${year}-Q${quarter}`, []);
 
   const countryOverallQuarters = useMemo(() => {
-    const quarterSet = new Map<string, { year: number; quarter: number; label: string; months: number[] }>();
-    countryOverallSourceShipments.forEach((item) => {
-      const quarter = Math.floor((item.month - 1) / 3) + 1;
-      const key = `${item.year}-Q${quarter}`;
+    const quarterSet = new Map<string, { year: number; quarter: number; label: string }>();
+    [...countryOverallQuarterlyValue, ...countryOverallQuarterlyCount].forEach((item) => {
+      const key = buildQuarterKey(item.year, item.quarter);
       if (!quarterSet.has(key)) {
-        const months = quarter === 1 ? [1, 2, 3] : quarter === 2 ? [4, 5, 6] : quarter === 3 ? [7, 8, 9] : [10, 11, 12];
-        const quarterRange = quarter === 1 ? '1-3' : quarter === 2 ? '4-6' : quarter === 3 ? '7-9' : '10-12';
         quarterSet.set(key, {
           year: item.year,
-          quarter,
-          months,
-          label: `${item.year} (${quarterRange})`,
+          quarter: item.quarter,
+          label: formatQuarterLabel(item.year, item.quarter),
         });
       }
     });
     return Array.from(quarterSet.values()).sort((a, b) => (a.year === b.year ? a.quarter - b.quarter : a.year - b.year));
-  }, [countryOverallSourceShipments]);
+  }, [buildQuarterKey, countryOverallQuarterlyCount, countryOverallQuarterlyValue, formatQuarterLabel]);
 
   useEffect(() => {
     if (countryOverallQuarters.length === 0) {
@@ -1014,31 +1068,39 @@ const App: React.FC = () => {
     return () => window.clearInterval(timer);
   }, [countryOverallCountQuarterPlaying, countryOverallCountQuarterPaused, countryOverallQuarters.length]);
 
-  const displayedCountryOverallSourceShipmentsForValue = useMemo(() => {
-    if (!countryOverallValueQuarterPlaying || countryOverallQuarters.length === 0) return countryOverallSourceShipments;
-    const quarter = countryOverallQuarters[countryOverallValueQuarterIndex];
-    if (!quarter) return countryOverallSourceShipments;
-    return countryOverallSourceShipments.filter(
-      (item) => item.year === quarter.year && quarter.months.includes(item.month)
-    );
-  }, [countryOverallValueQuarterPlaying, countryOverallQuarters, countryOverallValueQuarterIndex, countryOverallSourceShipments]);
-
-  const displayedCountryOverallSourceShipmentsForCount = useMemo(() => {
-    if (!countryOverallCountQuarterPlaying || countryOverallQuarters.length === 0) return countryOverallSourceShipments;
-    const quarter = countryOverallQuarters[countryOverallCountQuarterIndex];
-    if (!quarter) return countryOverallSourceShipments;
-    return countryOverallSourceShipments.filter(
-      (item) => item.year === quarter.year && quarter.months.includes(item.month)
-    );
-  }, [countryOverallCountQuarterPlaying, countryOverallQuarters, countryOverallCountQuarterIndex, countryOverallSourceShipments]);
-
   const topCountriesByCountryOverallValue = useMemo(() => {
-    return buildTopCountries(displayedCountryOverallSourceShipmentsForValue, mapCountryFilters.tradeDirection || 'import', 'tradeValue');
-  }, [buildTopCountries, displayedCountryOverallSourceShipmentsForValue, mapCountryFilters.tradeDirection]);
+    if (!countryOverallValueQuarterPlaying || countryOverallQuarters.length === 0) {
+      return countryOverallTotalValueTop;
+    }
+    const quarter = countryOverallQuarters[countryOverallValueQuarterIndex];
+    if (!quarter) return countryOverallTotalValueTop;
+    return countryOverallQuarterlyValue
+      .filter((item) => item.year === quarter.year && item.quarter === quarter.quarter)
+      .map((item) => ({
+        countryCode: item.countryCode,
+        countryName: countryCodeToNameMap.get(item.countryCode) || item.countryCode,
+        value: item.sumOfUsd,
+      }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
+  }, [countryCodeToNameMap, countryOverallQuarters, countryOverallQuarterlyValue, countryOverallTotalValueTop, countryOverallValueQuarterIndex, countryOverallValueQuarterPlaying]);
 
   const topCountriesByCountryOverallCount = useMemo(() => {
-    return buildTopCountries(displayedCountryOverallSourceShipmentsForCount, mapCountryFilters.tradeDirection || 'import', 'tradeCount');
-  }, [buildTopCountries, displayedCountryOverallSourceShipmentsForCount, mapCountryFilters.tradeDirection]);
+    if (!countryOverallCountQuarterPlaying || countryOverallQuarters.length === 0) {
+      return countryOverallTotalCountTop;
+    }
+    const quarter = countryOverallQuarters[countryOverallCountQuarterIndex];
+    if (!quarter) return countryOverallTotalCountTop;
+    return countryOverallQuarterlyCount
+      .filter((item) => item.year === quarter.year && item.quarter === quarter.quarter)
+      .map((item) => ({
+        countryCode: item.countryCode,
+        countryName: countryCodeToNameMap.get(item.countryCode) || item.countryCode,
+        value: item.tradeCount,
+      }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
+  }, [countryCodeToNameMap, countryOverallCountQuarterIndex, countryOverallCountQuarterPlaying, countryOverallQuarterlyCount, countryOverallQuarters, countryOverallTotalCountTop]);
 
   useEffect(() => {
     if (activeView !== 'map-country') return;
@@ -1046,18 +1108,45 @@ const App: React.FC = () => {
     const controller = new AbortController();
     countryOverallAbortRef.current = controller;
 
-    const loadOverallCountryShipments = async () => {
+    const loadOverallCountryStats = async () => {
       try {
-        const data = await shipmentsAPI.getAll(
-          {
-            startDate: mapCountryFilters.startDate,
-            endDate: mapCountryFilters.endDate,
-            selectedCountries: [],
-          },
-          { signal: controller.signal }
-        );
+        const baseFilters = {
+          tradeDirection: mapCountryFilters.tradeDirection || 'import',
+          startYearMonth: mapCountryFilters.startDate,
+          endYearMonth: mapCountryFilters.endDate,
+          limit: 10,
+        } as const;
+        const [totalValueTop, totalCountTop, quarterlyValue, quarterlyCount] = await Promise.all([
+          countryTradeStatsAPI.getTopCountries({
+            ...baseFilters,
+            metric: 'trade_value',
+          }),
+          countryTradeStatsAPI.getTopCountries({
+            ...baseFilters,
+            metric: 'trade_count',
+          }),
+          countryTradeStatsAPI.getTopCountriesQuarterly({
+            ...baseFilters,
+            metric: 'trade_value',
+          }),
+          countryTradeStatsAPI.getTopCountriesQuarterly({
+            ...baseFilters,
+            metric: 'trade_count',
+          }),
+        ]);
         if (!controller.signal.aborted) {
-          setCountryOverallShipments(data);
+          setCountryOverallTotalValueTop(totalValueTop.map((item) => ({
+            countryCode: item.countryCode,
+            countryName: countryCodeToNameMap.get(item.countryCode) || item.countryCode,
+            value: item.sumOfUsd,
+          })));
+          setCountryOverallTotalCountTop(totalCountTop.map((item) => ({
+            countryCode: item.countryCode,
+            countryName: countryCodeToNameMap.get(item.countryCode) || item.countryCode,
+            value: item.tradeCount,
+          })));
+          setCountryOverallQuarterlyValue(quarterlyValue);
+          setCountryOverallQuarterlyCount(quarterlyCount);
         }
       } catch (error: any) {
         if (error?.name === 'AbortError') return;
@@ -1065,9 +1154,9 @@ const App: React.FC = () => {
       }
     };
 
-    loadOverallCountryShipments();
+    loadOverallCountryStats();
     return () => controller.abort();
-  }, [activeView, mapCountryFilters.startDate, mapCountryFilters.endDate]);
+  }, [activeView, mapCountryFilters.startDate, mapCountryFilters.endDate, mapCountryFilters.tradeDirection, countryCodeToNameMap]);
 
   const countryTradeQuarters = useMemo(() => {
     const quarterSet = new Map<string, { year: number; quarter: number; label: string; months: number[] }>();
@@ -1121,6 +1210,12 @@ const App: React.FC = () => {
       avgSharePct: 0,
     };
   }, [countryMapYearPlaying, countryTradeSummary, displayedCountryTradeStats]);
+
+  const lazyFallback = (
+    <div className="h-full flex items-center justify-center text-sm text-[#86868B]">
+      Loading visualization...
+    </div>
+  );
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F5F5F7] text-[#1D1D1F]">
@@ -1240,6 +1335,7 @@ const App: React.FC = () => {
 
         {/* Main Content Area */}
         <section className="flex-1 flex flex-col p-6 relative">
+          <Suspense fallback={lazyFallback}>
           {activeView === 'map-country' || activeView === 'map-hscode' ? (
             <div className="flex flex-col gap-6 pr-4">
               {/* 地图内容 */}
@@ -1624,6 +1720,7 @@ const App: React.FC = () => {
                     summary={displayedCountryTradeSummary}
                     trends={countryTradeTrends}
                     topCountries={topCountries}
+                    topCountriesQuarterly={topCountriesQuarterly}
                   />
                 )}
                 </>
@@ -1643,6 +1740,7 @@ const App: React.FC = () => {
               )}
             </div>
           )}
+          </Suspense>
 
         </section>
       </main>
@@ -1654,17 +1752,19 @@ const App: React.FC = () => {
       )}
 
       {/* AI 助手 */}
-      <AIAssistant 
-        onSendMessage={async (
-          message: string,
-          history: ChatMessage[],
-          onChunk: (chunk: string) => void,
-          onComplete: () => void,
-          onError: (error: string) => void
-        ) => {
-          await chatAPI.sendMessage(message, history, onChunk, onComplete, onError);
-        }}
-      />
+      <Suspense fallback={null}>
+        <AIAssistant 
+          onSendMessage={async (
+            message: string,
+            history: ChatMessage[],
+            onChunk: (chunk: string) => void,
+            onComplete: () => void,
+            onError: (error: string) => void
+          ) => {
+            await chatAPI.sendMessage(message, history, onChunk, onComplete, onError);
+          }}
+        />
+      </Suspense>
     </div>
   );
 };

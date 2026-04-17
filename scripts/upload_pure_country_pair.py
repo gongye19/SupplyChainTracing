@@ -77,6 +77,8 @@ CREATE INDEX IF NOT EXISTS idx_cots_ym ON country_origin_trade_stats(year, month
 CREATE INDEX IF NOT EXISTS idx_cots_origin ON country_origin_trade_stats(origin_country_code);
 CREATE INDEX IF NOT EXISTS idx_cots_dest ON country_origin_trade_stats(destination_country_code);
 CREATE INDEX IF NOT EXISTS idx_cots_hs_ym ON country_origin_trade_stats(hs_code, year, month);
+CREATE INDEX IF NOT EXISTS idx_cots_dest_ym ON country_origin_trade_stats(destination_country_code, year, month);
+CREATE INDEX IF NOT EXISTS idx_cots_origin_ym ON country_origin_trade_stats(origin_country_code, year, month);
 """
 
 INSERT_COLS = [

@@ -175,6 +175,42 @@ export interface TopCountry {
   amountSharePct: number;
 }
 
+export interface CountryQuarterTop {
+  year: number;
+  quarter: number;
+  countryCode: string;
+  sumOfUsd: number;
+  tradeCount: number;
+}
+
+export interface CountryAggregate {
+  countryCode: string;
+  sumOfUsd: number;
+  tradeCount: number;
+}
+
+export interface CountryQuarterAggregate {
+  year: number;
+  quarter: number;
+  countryCode: string;
+  sumOfUsd: number;
+  tradeCount: number;
+}
+
+export interface HSAggregate {
+  hsCode: string;
+  sumOfUsd: number;
+  tradeCount: number;
+}
+
+export interface HSQuarterAggregate {
+  year: number;
+  quarter: number;
+  hsCode: string;
+  sumOfUsd: number;
+  tradeCount: number;
+}
+
 // 国家贸易统计筛选条件
 export interface CountryTradeFilters {
   hsCode?: string[];
@@ -186,4 +222,5 @@ export interface CountryTradeFilters {
   industry?: string;
   startYearMonth?: string; // YYYY-MM
   endYearMonth?: string; // YYYY-MM
+  limit?: number;
 }

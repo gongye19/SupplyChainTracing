@@ -52,5 +52,18 @@ export default defineConfig({
       alias: {
         '@': path.resolve(__dirname, '.'),
       }
-    }
+    },
+    build: {
+      chunkSizeWarningLimit: 700,
+      rollupOptions: {
+        output: {
+          manualChunks(id: string) {
+            if (id.includes('node_modules/recharts')) return 'vendor-recharts';
+            if (id.includes('node_modules/d3')) return 'vendor-d3';
+            if (id.includes('node_modules/topojson')) return 'vendor-d3';
+            return undefined;
+          },
+        },
+      },
+    },
 });

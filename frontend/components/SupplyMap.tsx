@@ -41,11 +41,9 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
   const gFlowsRef = useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
   const tooltipRef = useRef<d3.Selection<HTMLDivElement, unknown, null, undefined> | null>(null);
   const particleAnimationsRef = useRef<Set<d3.Transition<any, unknown, null, undefined>>>(new Set());
-
-  // 注意：聚合数据不包含公司信息，所以返回空数组
-  const activeCompanies = useMemo(() => {
-    return [];
-  }, []);
+  const countryNodePositionsRef = useRef<Map<string, [number, number]>>(new Map());
+  const countryPositionsMapRef = useRef<Map<string, { pos: [number, number]; countryCode: string; countryName: string }>>(new Map());
+  const lastNodeKeyRef = useRef<string>('');
 
   const countryCodeToName = useMemo(() => {
     const map = new Map<string, string>();
@@ -277,67 +275,50 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
     });
     particleAnimationsRef.current.clear();
 
-    // 清理之前的 nodes 和 flows（保留底图）
-    gNodes.selectAll('*').remove();
+    // 仅流线层每次都重绘；节点层尽量复用，降低重排成本
     gFlows.selectAll('*').remove();
 
-    // 创建节点位置映射 - 使用国家中心点
-    const countryNodePositions = new Map<string, [number, number]>(); // 存储国家节点位置（使用 countryCode 作为键）
-    const countryPositionsMap = new Map<string, { pos: [number, number]; countryCode: string; countryName: string }>();
-    
-    // 从 shipments 中提取国家信息并创建国家节点位置
-    shipments.forEach(shipment => {
-      // 处理原产国
+    const countryLookup = new Map<string, CountryLocation>();
+    countries.forEach((country) => countryLookup.set(country.countryCode, country));
+    const involvedCountryCodes = new Set<string>();
+    shipments.forEach((shipment) => {
       const originCountryCode = shipment.originId || shipment.originCountryCode;
-      if (originCountryCode) {
-        if (!countryPositionsMap.has(originCountryCode)) {
-          const country = countries.find(c => c.countryCode === originCountryCode);
-          if (country) {
-            const lat = country.capitalLat || (country as any).latitude || 0;
-            const lng = country.capitalLng || (country as any).longitude || 0;
-            const pos = projection([lng, lat]);
-            if (pos) {
-              countryPositionsMap.set(originCountryCode, {
-                pos,
-                countryCode: originCountryCode,
-                countryName: country.countryName
-              });
-              countryNodePositions.set(originCountryCode, pos);
-            }
-          }
-        }
-      }
-      
-      // 处理目的地国家
       const destCountryCode = shipment.destinationId || shipment.destinationCountryCode;
-      if (destCountryCode) {
-        if (!countryPositionsMap.has(destCountryCode)) {
-          const country = countries.find(c => c.countryCode === destCountryCode);
-          if (country) {
-            const lat = country.capitalLat || (country as any).latitude || 0;
-            const lng = country.capitalLng || (country as any).longitude || 0;
-            const pos = projection([lng, lat]);
-            if (pos) {
-              countryPositionsMap.set(destCountryCode, {
-                pos,
-                countryCode: destCountryCode,
-                countryName: country.countryName
-              });
-              countryNodePositions.set(destCountryCode, pos);
-            }
-          }
-        }
-      }
+      if (originCountryCode) involvedCountryCodes.add(originCountryCode);
+      if (destCountryCode) involvedCountryCodes.add(destCountryCode);
     });
-    
-    // 显示国家节点（带标签和图标）
-    // 获取当前缩放级别
-    const svgNode = svgRef.current;
-    const currentScale = svgNode ? d3.zoomTransform(svgNode)?.k || 1 : 1;
-    
-    const selectedCountryNodes: d3.Selection<SVGGElement, unknown, null, undefined>[] = [];
+    const nodeKey = `${countries.length}|${selectedCountries.slice().sort().join(',')}|${Array.from(involvedCountryCodes).sort().join(',')}`;
+    const shouldRebuildNodes = lastNodeKeyRef.current !== nodeKey;
 
-    countryPositionsMap.forEach((countryInfo, countryCode) => {
+    if (shouldRebuildNodes) {
+      lastNodeKeyRef.current = nodeKey;
+      gNodes.selectAll('*').remove();
+      countryNodePositionsRef.current.clear();
+      countryPositionsMapRef.current.clear();
+
+      involvedCountryCodes.forEach((countryCode) => {
+        const country = countryLookup.get(countryCode);
+        if (!country) return;
+        const lat = country.capitalLat || (country as any).latitude || 0;
+        const lng = country.capitalLng || (country as any).longitude || 0;
+        const pos = projection([lng, lat]);
+        if (!pos) return;
+        countryPositionsMapRef.current.set(countryCode, {
+          pos,
+          countryCode,
+          countryName: country.countryName,
+        });
+        countryNodePositionsRef.current.set(countryCode, pos);
+      });
+
+      // 显示国家节点（带标签和图标）
+      // 获取当前缩放级别
+      const svgNode = svgRef.current;
+      const currentScale = svgNode ? d3.zoomTransform(svgNode)?.k || 1 : 1;
+
+      const selectedCountryNodes: d3.Selection<SVGGElement, unknown, null, undefined>[] = [];
+
+      countryPositionsMapRef.current.forEach((countryInfo, countryCode) => {
       const countryNode = gNodes.append('g')
         .attr('class', 'country-node')
         .attr('transform', `translate(${countryInfo.pos[0]}, ${countryInfo.pos[1]})`)
@@ -450,17 +431,18 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
           tooltipRef.current.style('visibility', 'hidden');
         }
       });
-    });
+      });
 
-    // 将被选中国家节点提升到 nodes-layer 顶层，避免被其他国家节点遮挡
-    selectedCountryNodes.forEach((node) => node.raise());
+      // 将被选中国家节点提升到 nodes-layer 顶层，避免被其他国家节点遮挡
+      selectedCountryNodes.forEach((node) => node.raise());
+    }
 
     // 绘制路径和粒子（preview 模式限制粒子数量）
     if (shipments.length > 0) {
       // shipments 已经是按国家对聚合的，每个国家对一条线
       // 直接使用 shipments 作为 routeGroups
-      const countryLookup = new Map<string, CountryLocation>();
-      countries.forEach((c) => countryLookup.set(c.countryCode, c));
+      const countryPositionsMap = countryPositionsMapRef.current;
+      const countryNodePositions = countryNodePositionsRef.current;
 
       const routeGroups = shipments.map(shipment => {
         // 获取国家名称
@@ -753,7 +735,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
 
       });
       }
-  }, [shipments, selectedCountries, activeCompanies, companies, countries, categories, isPreview, countryCodeToName, visibleCategories]);
+  }, [shipments, selectedCountries, countries, isPreview, visibleCategories]);
 
   // 将筛选卡片做成“随滚动吸顶”的浮层，避免下滑后看不到配置
   useEffect(() => {

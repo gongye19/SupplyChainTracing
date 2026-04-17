@@ -6,6 +6,11 @@ import {
   CountryTradeStatSummary,
   CountryTradeTrend,
   TopCountry,
+  CountryQuarterTop,
+  CountryAggregate,
+  CountryQuarterAggregate,
+  HSAggregate,
+  HSQuarterAggregate,
   CountryTradeFilters,
   Location,
 } from '../types';
@@ -73,6 +78,10 @@ export const shipmentsAPI = {
     if (filters?.selectedCountries?.length) {
       // 这里假设 selectedCountries 已经是国家代码，如果不是需要转换
       filters.selectedCountries.forEach(code => params.append('country', code));
+    }
+
+    if (filters?.tradeDirection) {
+      params.append('trade_direction', filters.tradeDirection);
     }
     
     // HS Code 筛选：使用2位大类前缀
@@ -325,8 +334,8 @@ export const countryTradeStatsAPI = {
     if (filters?.endYearMonth) {
       params.append('end_year_month', filters.endYearMonth);
     }
-    // 年度回放需要覆盖完整筛选时间范围，避免默认限制只拿到最近年份
-    params.append('limit', '200000');
+    const limit = filters?.limit ?? 50000;
+    params.append('limit', String(limit));
 
     const data = await fetchAPI<any[]>(`/api/country-trade-stats?${params.toString()}`);
     return data.map((item: any) => ({
@@ -429,6 +438,7 @@ export const countryTradeStatsAPI = {
       country?: string[];
       industry?: string;
       tradeDirection?: 'import' | 'export' | 'all';
+      metric?: 'trade_value' | 'trade_count';
       startYearMonth?: string;
       endYearMonth?: string;
       limit?: number;
@@ -453,6 +463,9 @@ export const countryTradeStatsAPI = {
     if (filters?.tradeDirection) {
       params.append('trade_direction', filters.tradeDirection);
     }
+    if (filters?.metric) {
+      params.append('metric', filters.metric);
+    }
     if (filters?.startYearMonth) {
       params.append('start_year_month', filters.startYearMonth);
     }
@@ -474,6 +487,212 @@ export const countryTradeStatsAPI = {
 
   getAvailableHSCodes: async (): Promise<string[]> => {
     return fetchAPI<string[]>(`/api/country-trade-stats/hs-codes`);
+  },
+
+  getTopCountriesQuarterly: async (
+    filters?: {
+      hsCode?: string[];
+      hsCodePrefix?: string[];
+      country?: string[];
+      tradeDirection?: 'import' | 'export' | 'all';
+      metric?: 'trade_value' | 'trade_count';
+      startYearMonth?: string;
+      endYearMonth?: string;
+      limit?: number;
+    }
+  ): Promise<CountryQuarterTop[]> => {
+    const params = new URLSearchParams();
+    if (filters?.hsCode?.length) {
+      filters.hsCode.forEach((code) => params.append('hs_code', code));
+    }
+    if (filters?.hsCodePrefix?.length) {
+      filters.hsCodePrefix.forEach((prefix) => params.append('hs_code_prefix', prefix));
+    }
+    if (filters?.country?.length) {
+      filters.country.forEach((c) => params.append('country', c));
+    }
+    if (filters?.tradeDirection) {
+      params.append('trade_direction', filters.tradeDirection);
+    }
+    if (filters?.metric) {
+      params.append('metric', filters.metric);
+    }
+    if (filters?.startYearMonth) {
+      params.append('start_year_month', filters.startYearMonth);
+    }
+    if (filters?.endYearMonth) {
+      params.append('end_year_month', filters.endYearMonth);
+    }
+    params.append('limit', String(filters?.limit ?? 10));
+
+    const data = await fetchAPI<any[]>(`/api/country-trade-stats/top-countries-quarterly?${params.toString()}`);
+    return data.map((item: any) => ({
+      year: item.year,
+      quarter: item.quarter,
+      countryCode: item.country_code,
+      sumOfUsd: parseFloat(item.sum_of_usd) || 0,
+      tradeCount: parseInt(item.trade_count) || 0,
+    }));
+  },
+
+  getCountryAggregate: async (
+    filters?: {
+      hsCode?: string[];
+      hsCodePrefix?: string[];
+      country?: string[];
+      tradeDirection?: 'import' | 'export' | 'all';
+      startYearMonth?: string;
+      endYearMonth?: string;
+      limit?: number;
+    }
+  ): Promise<CountryAggregate[]> => {
+    const params = new URLSearchParams();
+    if (filters?.hsCode?.length) {
+      filters.hsCode.forEach((code) => params.append('hs_code', code));
+    }
+    if (filters?.hsCodePrefix?.length) {
+      filters.hsCodePrefix.forEach((prefix) => params.append('hs_code_prefix', prefix));
+    }
+    if (filters?.country?.length) {
+      filters.country.forEach((c) => params.append('country', c));
+    }
+    if (filters?.tradeDirection) {
+      params.append('trade_direction', filters.tradeDirection);
+    }
+    if (filters?.startYearMonth) {
+      params.append('start_year_month', filters.startYearMonth);
+    }
+    if (filters?.endYearMonth) {
+      params.append('end_year_month', filters.endYearMonth);
+    }
+    params.append('limit', String(filters?.limit ?? 300));
+    const data = await fetchAPI<any[]>(`/api/country-trade-stats/country-aggregate?${params.toString()}`);
+    return data.map((item: any) => ({
+      countryCode: item.country_code,
+      sumOfUsd: parseFloat(item.sum_of_usd) || 0,
+      tradeCount: parseInt(item.trade_count) || 0,
+    }));
+  },
+
+  getCountryQuarterly: async (
+    filters?: {
+      hsCode?: string[];
+      hsCodePrefix?: string[];
+      country?: string[];
+      tradeDirection?: 'import' | 'export' | 'all';
+      startYearMonth?: string;
+      endYearMonth?: string;
+      limit?: number;
+    }
+  ): Promise<CountryQuarterAggregate[]> => {
+    const params = new URLSearchParams();
+    if (filters?.hsCode?.length) {
+      filters.hsCode.forEach((code) => params.append('hs_code', code));
+    }
+    if (filters?.hsCodePrefix?.length) {
+      filters.hsCodePrefix.forEach((prefix) => params.append('hs_code_prefix', prefix));
+    }
+    if (filters?.country?.length) {
+      filters.country.forEach((c) => params.append('country', c));
+    }
+    if (filters?.tradeDirection) {
+      params.append('trade_direction', filters.tradeDirection);
+    }
+    if (filters?.startYearMonth) {
+      params.append('start_year_month', filters.startYearMonth);
+    }
+    if (filters?.endYearMonth) {
+      params.append('end_year_month', filters.endYearMonth);
+    }
+    params.append('limit', String(filters?.limit ?? 4000));
+    const data = await fetchAPI<any[]>(`/api/country-trade-stats/country-quarterly?${params.toString()}`);
+    return data.map((item: any) => ({
+      year: item.year,
+      quarter: item.quarter,
+      countryCode: item.country_code,
+      sumOfUsd: parseFloat(item.sum_of_usd) || 0,
+      tradeCount: parseInt(item.trade_count) || 0,
+    }));
+  },
+
+  getHSAggregate: async (
+    filters?: {
+      hsCode?: string[];
+      hsCodePrefix?: string[];
+      country?: string[];
+      tradeDirection?: 'import' | 'export' | 'all';
+      startYearMonth?: string;
+      endYearMonth?: string;
+      limit?: number;
+    }
+  ): Promise<HSAggregate[]> => {
+    const params = new URLSearchParams();
+    if (filters?.hsCode?.length) {
+      filters.hsCode.forEach((code) => params.append('hs_code', code));
+    }
+    if (filters?.hsCodePrefix?.length) {
+      filters.hsCodePrefix.forEach((prefix) => params.append('hs_code_prefix', prefix));
+    }
+    if (filters?.country?.length) {
+      filters.country.forEach((c) => params.append('country', c));
+    }
+    if (filters?.tradeDirection) {
+      params.append('trade_direction', filters.tradeDirection);
+    }
+    if (filters?.startYearMonth) {
+      params.append('start_year_month', filters.startYearMonth);
+    }
+    if (filters?.endYearMonth) {
+      params.append('end_year_month', filters.endYearMonth);
+    }
+    params.append('limit', String(filters?.limit ?? 200));
+    const data = await fetchAPI<any[]>(`/api/country-trade-stats/hs-aggregate?${params.toString()}`);
+    return data.map((item: any) => ({
+      hsCode: item.hs_code,
+      sumOfUsd: parseFloat(item.sum_of_usd) || 0,
+      tradeCount: parseInt(item.trade_count) || 0,
+    }));
+  },
+
+  getHSQuarterly: async (
+    filters?: {
+      hsCode?: string[];
+      hsCodePrefix?: string[];
+      country?: string[];
+      tradeDirection?: 'import' | 'export' | 'all';
+      startYearMonth?: string;
+      endYearMonth?: string;
+      limit?: number;
+    }
+  ): Promise<HSQuarterAggregate[]> => {
+    const params = new URLSearchParams();
+    if (filters?.hsCode?.length) {
+      filters.hsCode.forEach((code) => params.append('hs_code', code));
+    }
+    if (filters?.hsCodePrefix?.length) {
+      filters.hsCodePrefix.forEach((prefix) => params.append('hs_code_prefix', prefix));
+    }
+    if (filters?.country?.length) {
+      filters.country.forEach((c) => params.append('country', c));
+    }
+    if (filters?.tradeDirection) {
+      params.append('trade_direction', filters.tradeDirection);
+    }
+    if (filters?.startYearMonth) {
+      params.append('start_year_month', filters.startYearMonth);
+    }
+    if (filters?.endYearMonth) {
+      params.append('end_year_month', filters.endYearMonth);
+    }
+    params.append('limit', String(filters?.limit ?? 4000));
+    const data = await fetchAPI<any[]>(`/api/country-trade-stats/hs-quarterly?${params.toString()}`);
+    return data.map((item: any) => ({
+      year: item.year,
+      quarter: item.quarter,
+      hsCode: item.hs_code,
+      sumOfUsd: parseFloat(item.sum_of_usd) || 0,
+      tradeCount: parseInt(item.trade_count) || 0,
+    }));
   },
 };
 

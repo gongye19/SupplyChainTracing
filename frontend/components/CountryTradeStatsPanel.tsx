@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
 import { TrendingUp, Globe, DollarSign, Package } from 'lucide-react';
-import { CountryMonthlyTradeStat, CountryTradeStatSummary, CountryTradeTrend, TopCountry } from '../types';
+import { CountryMonthlyTradeStat, CountryTradeStatSummary, CountryTradeTrend, TopCountry, CountryQuarterTop } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface CountryTradeStatsPanelProps {
@@ -9,6 +9,7 @@ interface CountryTradeStatsPanelProps {
   summary: CountryTradeStatSummary;
   trends: CountryTradeTrend[];
   topCountries: TopCountry[];
+  topCountriesQuarterly?: CountryQuarterTop[];
 }
 
 const COLORS = ['#007AFF', '#5856D6', '#34C759', '#FF9500', '#FF2D55', '#30B0C7', '#AF52DE', '#FF3B30'];
@@ -24,6 +25,7 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
   summary,
   trends,
   topCountries,
+  topCountriesQuarterly = [],
 }) => {
   const { t } = useLanguage();
   const [marketByQuarterPlaying, setMarketByQuarterPlaying] = useState(false);
@@ -65,6 +67,38 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
   }, [topCountries]);
 
   const quarterlyTopData = useMemo(() => {
+    if (topCountriesQuarterly.length > 0) {
+      const quarterMap = new Map<string, { year: number; quarter: number; topItems: CountryQuarterTop[] }>();
+      topCountriesQuarterly.forEach((item) => {
+        const key = `${item.year}-Q${item.quarter}`;
+        if (!quarterMap.has(key)) {
+          quarterMap.set(key, { year: item.year, quarter: item.quarter, topItems: [] });
+        }
+        quarterMap.get(key)!.topItems.push(item);
+      });
+
+      return Array.from(quarterMap.values())
+        .sort((a, b) => (a.year === b.year ? a.quarter - b.quarter : a.year - b.year))
+        .map((period) => {
+          const sorted = [...period.topItems].sort((a, b) => b.sumOfUsd - a.sumOfUsd).slice(0, 10);
+          const total = sorted.reduce((acc, item) => acc + item.sumOfUsd, 0) || 1;
+          return {
+            label: `${period.year} (${quarterLabelMap[period.quarter]})`,
+            marketShare: sorted.slice(0, 8).map((item, index) => ({
+              name: item.countryCode,
+              value: item.sumOfUsd,
+              percentage: (item.sumOfUsd / total) * 100,
+              color: COLORS[index % COLORS.length],
+            })),
+            topCountries: sorted.map((item) => ({
+              name: item.countryCode,
+              value: item.sumOfUsd / 1000000000,
+              share: (item.sumOfUsd / total) * 100,
+            })),
+          };
+        });
+    }
+
     const quarterMap = new Map<string, { year: number; quarter: number; countryMap: Map<string, number> }>();
     stats.forEach((item) => {
       const quarter = Math.floor((item.month - 1) / 3) + 1;
