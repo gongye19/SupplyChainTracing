@@ -55,6 +55,36 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
     return map;
   }, [countries]);
 
+  const selectedCountryNames = useMemo(() => {
+    if (!selectedCountries || selectedCountries.length === 0) return [];
+    return selectedCountries.map((code) => countryCodeToName.get(code) || code);
+  }, [selectedCountries, countryCodeToName]);
+
+  const selectedCountryCategoryLegend = useMemo(() => {
+    const selectedSet = new Set(selectedCountries || []);
+    const legendMap = new Map<string, string>();
+
+    shipments.forEach((shipment) => {
+      const origin = shipment.originId || shipment.originCountryCode;
+      const destination = shipment.destinationId || shipment.destinationCountryCode;
+      const related = selectedSet.size === 0 || selectedSet.has(origin) || selectedSet.has(destination);
+      if (!related) return;
+
+      const categoryLabel =
+        shipment.category ||
+        (shipment.hsCode ? `HS ${shipment.hsCode.slice(0, 2)}` : 'Unknown');
+      const categoryColor = shipment.categoryColor || '#8E8E93';
+      if (!legendMap.has(categoryLabel)) {
+        legendMap.set(categoryLabel, categoryColor);
+      }
+    });
+
+    return Array.from(legendMap.entries())
+      .map(([label, color]) => ({ label, color }))
+      .sort((a, b) => a.label.localeCompare(b.label))
+      .slice(0, 14);
+  }, [shipments, selectedCountries]);
+
   // 初始化：只执行一次（创建 SVG 结构、底图、zoom、tooltip）
   useEffect(() => {
     if (!svgRef.current || countries.length === 0) return;
@@ -473,6 +503,8 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
         ? Math.min(90, routeGroupsArray.length)
         : Math.min(420, routeGroupsArray.length);
       const isDenseMode = routeGroupsArray.length > 250;
+      const pulseAnimationLimit = isDenseMode ? 36 : 120;
+      const flowAnimationLimit = isDenseMode ? 48 : 140;
 
       // 获取翻译文本（在循环外部）
       const materialNameLabel = t('map.materialName');
@@ -567,7 +599,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
             .attr('opacity', baseArcOpacity)
           .attr('class', 'shipment-path');
 
-        if (!isDenseMode && routeIndex < 120) {
+        if (!isPreview && routeIndex < pulseAnimationLimit) {
           const breathUpOpacity = Math.min(0.96, baseArcOpacity + 0.18);
           const breathDownOpacity = Math.max(0.28, baseArcOpacity - 0.1);
           const breath = () => {
@@ -609,7 +641,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
           .attr('class', 'shipment-highlight')
           .style('pointer-events', 'none');
 
-        if (!isDenseMode && !isPreview && routeIndex < 140) {
+        if (!isPreview && routeIndex < flowAnimationLimit) {
           const flow = () => {
             const transition = highlight.transition()
               .duration(2200 + Math.random() * 1100)
@@ -818,7 +850,25 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
           <div className="font-bold uppercase tracking-wide text-[#86868B] mb-1">Legend</div>
           <div>Line width: trade amount</div>
           <div>Line opacity: trade value</div>
-          <div>Line color: HS2 category</div>
+          <div className="mb-2">Line color: HS2 category</div>
+          <div className="text-[#86868B] font-semibold mb-1">
+            Country: {selectedCountryNames.length > 0 ? selectedCountryNames.join(', ') : 'All'}
+          </div>
+          {selectedCountryCategoryLegend.length > 0 ? (
+            <div className="max-h-[180px] overflow-y-auto pr-1 space-y-1 pointer-events-auto">
+              {selectedCountryCategoryLegend.map((item) => (
+                <div key={item.label} className="flex items-center gap-2">
+                  <span
+                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                    style={{ backgroundColor: item.color }}
+                  />
+                  <span className="truncate">{item.label}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-[#86868B]">No category lines</div>
+          )}
         </div>
       </div>
       <svg ref={svgRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
