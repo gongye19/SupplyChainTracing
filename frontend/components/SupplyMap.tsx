@@ -280,14 +280,19 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
 
     const countryLookup = new Map<string, CountryLocation>();
     countries.forEach((country) => countryLookup.set(country.countryCode, country));
+
+    // 只收集当前可见品类有贸易的国家，使点随品类筛选同步变化
+    const visibleCategorySet = new Set(visibleCategories);
     const involvedCountryCodes = new Set<string>();
     shipments.forEach((shipment) => {
+      const category = shipment.category || (shipment.hsCode ? `HS ${shipment.hsCode.slice(0, 2)}` : 'Unknown');
+      if (visibleCategorySet.size > 0 && !visibleCategorySet.has(category)) return;
       const originCountryCode = shipment.originId || shipment.originCountryCode;
       const destCountryCode = shipment.destinationId || shipment.destinationCountryCode;
       if (originCountryCode) involvedCountryCodes.add(originCountryCode);
       if (destCountryCode) involvedCountryCodes.add(destCountryCode);
     });
-    const nodeKey = `${countries.length}|${selectedCountries.slice().sort().join(',')}|${Array.from(involvedCountryCodes).sort().join(',')}`;
+    const nodeKey = `${countries.length}|${selectedCountries.slice().sort().join(',')}|${visibleCategories.slice().sort().join(',')}|${Array.from(involvedCountryCodes).sort().join(',')}`;
     const shouldRebuildNodes = lastNodeKeyRef.current !== nodeKey;
 
     if (shouldRebuildNodes) {
