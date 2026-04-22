@@ -169,7 +169,7 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
     });
   };
 
-  const showCountries = mode === 'all' || mode === 'country' || mode === 'hscode';
+  const showCountries = mode === 'all' || mode === 'country';
   const showHsCategories = mode === 'all' || mode === 'hscode';
   const showHsSubcategories = mode === 'all' || mode === 'hscode';
   const showTradeDirection = mode === 'country' || mode === 'hscode';
@@ -191,7 +191,7 @@ const SidebarFilters: React.FC<SidebarFiltersProps> = ({
               startDate: '2021-01',
               endDate: `${currentYear}-${currentMonth}`,
               tradeDirection: 'import',
-              selectedCountries: mode === 'country' || mode === 'hscode' ? ['CHN'] : [],
+              selectedCountries: mode === 'country' ? ['CHN'] : mode === 'hscode' ? prev.selectedCountries : [],
               selectedHSCodes: mode === 'hscode' ? ['854231'] : [],
               selectedHSCode4Digit: mode === 'hscode' ? ['8542'] : [],
               selectedHSCodeCategories: mode === 'hscode' ? ['85'] : [],
