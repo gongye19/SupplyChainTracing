@@ -6,8 +6,9 @@ import CountryTradeSidebar from './components/CountryTradeSidebar';
 import type { TopCountriesDatum } from './components/TopCountriesHorizontalBar';
 import { Transaction, Filters, HSCodeCategory, CountryLocation, Location, Shipment, CountryMonthlyTradeStat, CountryTradeStatSummary, CountryTradeTrend, TopCountry, CountryTradeFilters, CountryQuarterTop, CountryAggregate, CountryQuarterAggregate, HSAggregate, HSQuarterAggregate } from './types';
 import { shipmentsAPI, hsCodeCategoriesAPI, countryLocationsAPI, chatAPI, ChatMessage, countryTradeStatsAPI } from './services/api';
-import { Globe, Map as MapIcon, Package, TrendingUp, Users, ChevronRight, Filter } from 'lucide-react';
+import { Globe, Map as MapIcon, Package, TrendingUp, Users, ChevronRight, Filter, Building2 } from 'lucide-react';
 import { useLanguage } from './contexts/LanguageContext';
+import MonthRangeSlider from './components/MonthRangeSlider';
 import { getCountriesFromCodes } from './utils/countryCoordinates';
 import { logger } from './utils/logger';
 
@@ -16,6 +17,7 @@ const AIAssistant = lazy(() => import('./components/AIAssistant'));
 const CountryTradeMap = lazy(() => import('./components/CountryTradeMap'));
 const CountryTradeStatsPanel = lazy(() => import('./components/CountryTradeStatsPanel'));
 const TopCountriesHorizontalBar = lazy(() => import('./components/TopCountriesHorizontalBar'));
+const CompanyDashboard = lazy(() => import('./components/CompanyDashboard'));
 
 const HS2_COLOR_PALETTE = [
   '#007AFF', '#34C759', '#FF9500', '#AF52DE', '#FF2D55', '#30B0C7',
@@ -37,9 +39,44 @@ type CacheEntry<T> = {
   ts: number;
 };
 
+const CompanyDashboardSidebar: React.FC<{
+  filters: Filters;
+  setFilters: React.Dispatch<React.SetStateAction<Filters>>;
+}> = ({ filters, setFilters }) => {
+  const now = new Date();
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  return (
+    <div className="flex flex-col gap-8 p-1">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-[#007AFF]">
+          <Filter className="w-4 h-4" />
+          <span className="text-[12px] font-bold uppercase tracking-widest text-[#1D1D1F]">Filter Control</span>
+        </div>
+        <button
+          onClick={() => setFilters((prev) => ({ ...prev, startDate: '2021-01', endDate: currentMonth }))}
+          className="text-[12px] text-[#007AFF] hover:underline font-semibold"
+        >
+          Reset
+        </button>
+      </div>
+      <div className="flex flex-col gap-3">
+        <MonthRangeSlider
+          title="Time Range"
+          startLabel="START"
+          endLabel="END"
+          minMonth="2021-01"
+          startMonth={filters.startDate || '2021-01'}
+          endMonth={filters.endDate}
+          onChange={(startMonth, endMonth) => setFilters((prev) => ({ ...prev, startDate: startMonth, endDate: endMonth }))}
+        />
+      </div>
+    </div>
+  );
+};
+
 const App: React.FC = () => {
   const { language, setLanguage, t } = useLanguage();
-  const [activeView, setActiveView] = useState<'map-country' | 'map-hscode' | 'global-stats'>('global-stats');
+  const [activeView, setActiveView] = useState<'map-country' | 'map-hscode' | 'global-stats' | 'company-dashboard'>('global-stats');
   
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -71,6 +108,7 @@ const App: React.FC = () => {
   };
   const [mapCountryFilters, setMapCountryFilters] = useState<Filters>(defaultCountryMapFilters);
   const [mapHsFilters, setMapHsFilters] = useState<Filters>(defaultHsMapFilters);
+  const [companyDashboardFilters, setCompanyDashboardFilters] = useState<Filters>(defaultFilters);
 
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [countryOverallQuarterlyValue, setCountryOverallQuarterlyValue] = useState<CountryQuarterTop[]>([]);
@@ -1283,6 +1321,16 @@ const App: React.FC = () => {
                </div>
                {activeView === 'map-hscode' && <ChevronRight className="w-3.5 h-3.5" />}
              </button>
+             <button
+               onClick={() => setActiveView('company-dashboard')}
+               className={`flex items-center justify-between px-4 py-3 rounded-[12px] transition-all text-[14px] font-semibold ${activeView === 'company-dashboard' ? 'bg-[#007AFF] text-white shadow-lg shadow-blue-500/20' : 'text-[#86868B] hover:bg-black/5'}`}
+             >
+               <div className="flex items-center gap-3 min-w-0">
+                 <Building2 className="w-4 h-4" />
+                 <span className="whitespace-nowrap">Company Dashboard</span>
+               </div>
+               {activeView === 'company-dashboard' && <ChevronRight className="w-3.5 h-3.5" />}
+             </button>
            </div>
 
           <div className="h-[0.5px] bg-black/5"></div>
@@ -1301,7 +1349,7 @@ const App: React.FC = () => {
               shipments={shipments}
               mode="country"
             />
-          ) : (
+          ) : activeView === 'map-hscode' ? (
             <SidebarFilters 
               filters={mapHsFilters} 
               setFilters={setMapHsFilters}
@@ -1310,6 +1358,11 @@ const App: React.FC = () => {
               countries={countries}
               shipments={shipments}
               mode="hscode"
+            />
+          ) : (
+            <CompanyDashboardSidebar
+              filters={companyDashboardFilters}
+              setFilters={setCompanyDashboardFilters}
             />
           )}
           
@@ -1748,7 +1801,12 @@ const App: React.FC = () => {
                 <StatsPanel transactions={[]} />
               )}
             </div>
-          )}
+          ) : activeView === 'company-dashboard' ? (
+            <CompanyDashboard
+              startDate={companyDashboardFilters.startDate}
+              endDate={companyDashboardFilters.endDate}
+            />
+          ) : null}
           </Suspense>
 
         </section>
