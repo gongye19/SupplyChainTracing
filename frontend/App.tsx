@@ -64,7 +64,6 @@ const App: React.FC = () => {
   };
   const defaultHsMapFilters: Filters = {
     ...defaultFilters,
-    selectedCountries: ['CHN'],
     selectedHSCodes: ['854231'],
     selectedHSCode4Digit: [],
     selectedHSCodeCategories: [],
@@ -416,31 +415,35 @@ const App: React.FC = () => {
     if (activeView !== 'map-hscode') return;
 
     const selectedHsCodes = [...(mapHsFilters.selectedHSCodes || [])].sort();
-    const selectedCountries =
-      mapHsFilters.selectedCountries && mapHsFilters.selectedCountries.length > 0
-        ? [...mapHsFilters.selectedCountries].sort()
-        : ['CHN'];
+    const tradeDirection = mapHsFilters.tradeDirection || 'import';
+    const startYearMonth = mapHsFilters.startDate;
+    const endYearMonth = mapHsFilters.endDate;
 
-    const baseFilters = {
+    // 地图用：按选中 HSCode + 方向过滤，不限国家，展示全球所有国家分布
+    const mapFilters = {
       hsCode: selectedHsCodes,
-      country: selectedCountries,
-      tradeDirection: mapHsFilters.tradeDirection || 'import',
-      startYearMonth: mapHsFilters.startDate,
-      endYearMonth: mapHsFilters.endDate,
+      tradeDirection,
+      startYearMonth,
+      endYearMonth,
+    } as const;
+
+    // 排名图用：不限 HSCode，只按方向过滤，得到全球 HS 品类排名
+    const rankFilters = {
+      tradeDirection,
+      startYearMonth,
+      endYearMonth,
     } as const;
 
     const requestKey = [
-      baseFilters.startYearMonth || '',
-      baseFilters.endYearMonth || '',
+      startYearMonth || '',
+      endYearMonth || '',
       selectedHsCodes.join(','),
-      selectedCountries.join(','),
-      baseFilters.tradeDirection || '',
+      tradeDirection,
     ].join('|');
     const overallKey = [
-      baseFilters.startYearMonth || '',
-      baseFilters.endYearMonth || '',
-      selectedCountries.join(','),
-      baseFilters.tradeDirection || '',
+      startYearMonth || '',
+      endYearMonth || '',
+      tradeDirection,
     ].join('|');
 
     const loadHsCodeMapData = async () => {
@@ -463,26 +466,22 @@ const App: React.FC = () => {
 
         setHsCodeMapLoading(true);
         const [countryTotals, countryQuarterly, hsTotals, hsQuarterly] = await Promise.all([
+          // 地图数据：全球所有国家，按选中 HSCode + 方向
           selectedHsCodes.length > 0 ? countryTradeStatsAPI.getCountryAggregate({
-            ...baseFilters,
+            ...mapFilters,
             limit: 300,
           }) : Promise.resolve([]),
           selectedHsCodes.length > 0 ? countryTradeStatsAPI.getCountryQuarterly({
-            ...baseFilters,
+            ...mapFilters,
             limit: 5000,
           }) : Promise.resolve([]),
+          // 排名图：全球 HS 品类，只按方向过滤
           countryTradeStatsAPI.getHSAggregate({
-            country: baseFilters.country,
-            tradeDirection: baseFilters.tradeDirection,
-            startYearMonth: baseFilters.startYearMonth,
-            endYearMonth: baseFilters.endYearMonth,
+            ...rankFilters,
             limit: 200,
           }),
           countryTradeStatsAPI.getHSQuarterly({
-            country: baseFilters.country,
-            tradeDirection: baseFilters.tradeDirection,
-            startYearMonth: baseFilters.startYearMonth,
-            endYearMonth: baseFilters.endYearMonth,
+            ...rankFilters,
             limit: 5000,
           }),
         ]);
@@ -507,7 +506,7 @@ const App: React.FC = () => {
     return () => {
       if (hsCodeMapTimerRef.current) window.clearTimeout(hsCodeMapTimerRef.current);
     };
-  }, [activeView, mapHsFilters.endDate, mapHsFilters.selectedCountries, mapHsFilters.selectedHSCodes, mapHsFilters.startDate, mapHsFilters.tradeDirection, getCached, setCached]);
+  }, [activeView, mapHsFilters.endDate, mapHsFilters.selectedHSCodes, mapHsFilters.startDate, mapHsFilters.tradeDirection, getCached, setCached]);
 
   const countryNameToCodeMap = useMemo(() => {
     const map = new Map<string, string>();
