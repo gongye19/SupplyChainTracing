@@ -64,6 +64,7 @@ const App: React.FC = () => {
   };
   const defaultHsMapFilters: Filters = {
     ...defaultFilters,
+    selectedCountries: ['CHN'],
     selectedHSCodes: ['854231'],
     selectedHSCode4Digit: [],
     selectedHSCodeCategories: [],
@@ -415,9 +416,11 @@ const App: React.FC = () => {
     if (activeView !== 'map-hscode') return;
 
     const selectedHsCodes = [...(mapHsFilters.selectedHSCodes || [])].sort();
+    const selectedCountries = [...(mapHsFilters.selectedCountries || [])].sort();
 
     const baseFilters = {
       hsCode: selectedHsCodes,
+      country: selectedCountries,
       tradeDirection: mapHsFilters.tradeDirection || 'import',
       startYearMonth: mapHsFilters.startDate,
       endYearMonth: mapHsFilters.endDate,
@@ -427,11 +430,13 @@ const App: React.FC = () => {
       baseFilters.startYearMonth || '',
       baseFilters.endYearMonth || '',
       selectedHsCodes.join(','),
+      selectedCountries.join(','),
       baseFilters.tradeDirection || '',
     ].join('|');
     const overallKey = [
       baseFilters.startYearMonth || '',
       baseFilters.endYearMonth || '',
+      selectedCountries.join(','),
       baseFilters.tradeDirection || '',
     ].join('|');
 
@@ -464,12 +469,14 @@ const App: React.FC = () => {
             limit: 5000,
           }) : Promise.resolve([]),
           countryTradeStatsAPI.getHSAggregate({
+            country: baseFilters.country,
             tradeDirection: baseFilters.tradeDirection,
             startYearMonth: baseFilters.startYearMonth,
             endYearMonth: baseFilters.endYearMonth,
             limit: 200,
           }),
           countryTradeStatsAPI.getHSQuarterly({
+            country: baseFilters.country,
             tradeDirection: baseFilters.tradeDirection,
             startYearMonth: baseFilters.startYearMonth,
             endYearMonth: baseFilters.endYearMonth,
@@ -497,7 +504,7 @@ const App: React.FC = () => {
     return () => {
       if (hsCodeMapTimerRef.current) window.clearTimeout(hsCodeMapTimerRef.current);
     };
-  }, [activeView, mapHsFilters.endDate, mapHsFilters.selectedHSCodes, mapHsFilters.startDate, mapHsFilters.tradeDirection, getCached, setCached]);
+  }, [activeView, mapHsFilters.endDate, mapHsFilters.selectedCountries, mapHsFilters.selectedHSCodes, mapHsFilters.startDate, mapHsFilters.tradeDirection, getCached, setCached]);
 
   const countryNameToCodeMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -909,16 +916,24 @@ const App: React.FC = () => {
 
   const hsCodeMapFilterSummary = useMemo(() => {
     const selectedHsCodes = mapHsFilters.selectedHSCodes || [];
+    const selectedCountries = mapHsFilters.selectedCountries || [];
     const hsLabel =
       selectedHsCodes.length === 0
         ? 'All'
         : selectedHsCodes.length <= 4
           ? selectedHsCodes.join(', ')
           : `${selectedHsCodes.slice(0, 4).join(', ')} +${selectedHsCodes.length - 4}`;
+    const countryLabel =
+      selectedCountries.length === 0
+        ? 'All'
+        : selectedCountries.length <= 3
+          ? selectedCountries.join(', ')
+          : `${selectedCountries.slice(0, 3).join(', ')} +${selectedCountries.length - 3}`;
     return {
       time: `${mapHsFilters.startDate} ~ ${mapHsFilters.endDate}`,
       direction: mapHsFilters.tradeDirection === 'import' ? 'Import' : 'Export',
       hsCodes: hsLabel,
+      countries: countryLabel,
     };
   }, [mapHsFilters]);
 
@@ -1536,6 +1551,7 @@ const App: React.FC = () => {
                               </div>
                               <div><span className="text-[#86868B]">Time:</span> {hsCodeMapFilterSummary.time}</div>
                               <div><span className="text-[#86868B]">Direction:</span> {hsCodeMapFilterSummary.direction}</div>
+                              <div className="max-w-[340px] truncate"><span className="text-[#86868B]">Country:</span> {hsCodeMapFilterSummary.countries}</div>
                               <div className="max-w-[340px] truncate"><span className="text-[#86868B]">HS Code:</span> {hsCodeMapFilterSummary.hsCodes}</div>
                             </div>
                           </div>
@@ -1601,6 +1617,7 @@ const App: React.FC = () => {
                             metaLines={[
                               `Time: ${hsCodeOverallCountQuarterPlaying && hsCodeOverallQuarters.length > 0 ? hsCodeOverallQuarters[hsCodeOverallCountQuarterIndex]?.label || '' : hsCodeMapFilterSummary.time}`,
                               `Direction: ${hsCodeMapFilterSummary.direction}`,
+                              `Country: ${hsCodeMapFilterSummary.countries}`,
                               'HS Code: All',
                             ]}
                           />
@@ -1644,6 +1661,7 @@ const App: React.FC = () => {
                             metaLines={[
                               `Time: ${hsCodeOverallValueQuarterPlaying && hsCodeOverallQuarters.length > 0 ? hsCodeOverallQuarters[hsCodeOverallValueQuarterIndex]?.label || '' : hsCodeMapFilterSummary.time}`,
                               `Direction: ${hsCodeMapFilterSummary.direction}`,
+                              `Country: ${hsCodeMapFilterSummary.countries}`,
                               'HS Code: All',
                             ]}
                           />
