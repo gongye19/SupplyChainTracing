@@ -1787,6 +1787,11 @@ const App: React.FC = () => {
                 )}
                 </>
             </div>
+          ) : activeView === 'company-dashboard' ? (
+            <CompanyDashboard
+              startDate={companyDashboardFilters.startDate}
+              endDate={companyDashboardFilters.endDate}
+            />
           ) : (
             <div className="pr-4">
               <div className="mb-10">
@@ -1801,12 +1806,7 @@ const App: React.FC = () => {
                 <StatsPanel transactions={[]} />
               )}
             </div>
-          ) : activeView === 'company-dashboard' ? (
-            <CompanyDashboard
-              startDate={companyDashboardFilters.startDate}
-              endDate={companyDashboardFilters.endDate}
-            />
-          ) : null}
+          )}
           </Suspense>
 
         </section>
