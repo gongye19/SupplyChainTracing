@@ -1,14 +1,19 @@
 #!/usr/bin/env python3
 """
-Company-level data upload script.
+Upload HKUST company-level trade data as compact dashboard aggregates.
 
 Source:
-  data/hkust_文件汇总/*.xlsx -> company_trade_flows (company counterparty monthly aggregates)
-  company_trade_flows -> country_origin_trade_stats
+  data/hkust_文件汇总/*.xlsx
+
+Targets:
+  company_search_stats
+  company_monthly_trade_stats
+  company_hs_trade_stats
+  company_counterparty_trade_stats
+  country_origin_trade_stats
 
 Usage:
   python scripts/upload_company_trade_flows.py --clear
-  python scripts/upload_company_trade_flows.py
 """
 
 from __future__ import annotations
@@ -19,9 +24,11 @@ import os
 import re
 import sys
 import tempfile
+from collections import defaultdict
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
+from typing import Any
 
 import openpyxl
 import pycountry
@@ -35,6 +42,15 @@ DATABASE_URL = os.getenv(
         "postgresql://postgres:HcVbYOkDrgXNZPaUpttdATshXWFJWWQe@tramway.proxy.rlwy.net:11626/railway",
     ),
 )
+
+DB_CONNECT_ARGS = {
+    "connect_timeout": 20,
+    "keepalives": 1,
+    "keepalives_idle": 30,
+    "keepalives_interval": 10,
+    "keepalives_count": 3,
+    "options": "-c statement_timeout=180000",
+}
 
 EXPECTED_HEADERS = [
     "海关编码",
@@ -74,36 +90,57 @@ COUNTRY_NAME_TO_ISO3 = {
     "ST.PIERRE AND MIQUELON (SP)": "SPM",
 }
 
-COMPANY_FLOW_DDL = """
-CREATE TABLE IF NOT EXISTS company_trade_flows (
-    hs_code VARCHAR(6) NOT NULL,
+DDL = """
+DROP TABLE IF EXISTS company_trade_flows CASCADE;
+DROP TABLE IF EXISTS company_search_stats CASCADE;
+DROP TABLE IF EXISTS company_monthly_trade_stats CASCADE;
+DROP TABLE IF EXISTS company_hs_trade_stats CASCADE;
+DROP TABLE IF EXISTS company_counterparty_trade_stats CASCADE;
+DROP TABLE IF EXISTS country_origin_trade_stats CASCADE;
+DROP TABLE IF EXISTS country_monthly_trade_stats CASCADE;
+
+CREATE TABLE company_search_stats (
+    name TEXT NOT NULL,
+    country_code VARCHAR(3),
+    role VARCHAR(10) NOT NULL,
+    total_trade_value NUMERIC(24,2),
+    trade_count INTEGER,
+    import_trade_value NUMERIC(24,2),
+    export_trade_value NUMERIC(24,2)
+);
+
+CREATE TABLE company_monthly_trade_stats (
+    company_name TEXT NOT NULL,
+    country_code VARCHAR(3),
+    role VARCHAR(10) NOT NULL,
     year INTEGER NOT NULL,
     month INTEGER NOT NULL,
-    importer_name TEXT,
-    importer_country_code VARCHAR(3) NOT NULL,
-    exporter_name TEXT,
-    exporter_country_code VARCHAR(3),
-    origin_country_code VARCHAR(3),
-    export_side_country_code VARCHAR(3) NOT NULL,
-    amount_usd NUMERIC(24,2),
-    metric_tons NUMERIC(24,6),
-    trade_count INTEGER NOT NULL DEFAULT 0,
+    sum_of_usd NUMERIC(24,2),
+    trade_count INTEGER
+);
+
+CREATE TABLE company_hs_trade_stats (
+    company_name TEXT NOT NULL,
+    country_code VARCHAR(3),
+    role VARCHAR(10) NOT NULL,
+    hs_code VARCHAR(6) NOT NULL,
     product_desc_zh TEXT,
     product_desc_en TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    sum_of_usd NUMERIC(24,2),
+    trade_count INTEGER
 );
-"""
 
-COMPANY_INDEX_DDL = """
-CREATE INDEX IF NOT EXISTS idx_ctf_hs_ym ON company_trade_flows(hs_code, year, month);
-CREATE INDEX IF NOT EXISTS idx_ctf_importer ON company_trade_flows(importer_name);
-CREATE INDEX IF NOT EXISTS idx_ctf_exporter ON company_trade_flows(exporter_name);
-CREATE INDEX IF NOT EXISTS idx_ctf_importer_ym ON company_trade_flows(importer_name, year, month);
-CREATE INDEX IF NOT EXISTS idx_ctf_exporter_ym ON company_trade_flows(exporter_name, year, month);
-"""
+CREATE TABLE company_counterparty_trade_stats (
+    company_name TEXT NOT NULL,
+    country_code VARCHAR(3),
+    role VARCHAR(10) NOT NULL,
+    counterparty_name TEXT NOT NULL,
+    counterparty_country_code VARCHAR(3),
+    sum_of_usd NUMERIC(24,2),
+    trade_count INTEGER
+);
 
-COUNTRY_STATS_DDL = """
-CREATE TABLE IF NOT EXISTS country_origin_trade_stats (
+CREATE TABLE country_origin_trade_stats (
     hs_code                  VARCHAR(6)  NOT NULL,
     year                     INTEGER     NOT NULL,
     month                    INTEGER     NOT NULL,
@@ -117,41 +154,25 @@ CREATE TABLE IF NOT EXISTS country_origin_trade_stats (
     updated_at               TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uq_pair UNIQUE (hs_code, year, month, origin_country_code, destination_country_code)
 );
-CREATE INDEX IF NOT EXISTS idx_cots_hs ON country_origin_trade_stats(hs_code);
-CREATE INDEX IF NOT EXISTS idx_cots_ym ON country_origin_trade_stats(year, month);
-CREATE INDEX IF NOT EXISTS idx_cots_origin ON country_origin_trade_stats(origin_country_code);
-CREATE INDEX IF NOT EXISTS idx_cots_dest ON country_origin_trade_stats(destination_country_code);
-CREATE INDEX IF NOT EXISTS idx_cots_hs_ym ON country_origin_trade_stats(hs_code, year, month);
-CREATE INDEX IF NOT EXISTS idx_cots_dest_ym ON country_origin_trade_stats(destination_country_code, year, month);
-CREATE INDEX IF NOT EXISTS idx_cots_origin_ym ON country_origin_trade_stats(origin_country_code, year, month);
 """
 
-COPY_COLUMNS = [
-    "hs_code",
-    "year",
-    "month",
-    "importer_name",
-    "importer_country_code",
-    "exporter_name",
-    "exporter_country_code",
-    "origin_country_code",
-    "export_side_country_code",
-    "amount_usd",
-    "metric_tons",
-    "trade_count",
-    "product_desc_zh",
-    "product_desc_en",
-]
+INDEX_DDL = """
+CREATE INDEX idx_css_name ON company_search_stats(name);
+CREATE INDEX idx_cmts_company_ym ON company_monthly_trade_stats(company_name, year, month);
+CREATE INDEX idx_chts_company_hs ON company_hs_trade_stats(company_name, hs_code);
+CREATE INDEX idx_ccts_company_role ON company_counterparty_trade_stats(company_name, role);
+CREATE INDEX idx_cots_hs ON country_origin_trade_stats(hs_code);
+CREATE INDEX idx_cots_ym ON country_origin_trade_stats(year, month);
+CREATE INDEX idx_cots_origin ON country_origin_trade_stats(origin_country_code);
+CREATE INDEX idx_cots_dest ON country_origin_trade_stats(destination_country_code);
+CREATE INDEX idx_cots_hs_ym ON country_origin_trade_stats(hs_code, year, month);
+CREATE INDEX idx_cots_dest_ym ON country_origin_trade_stats(destination_country_code, year, month);
+CREATE INDEX idx_cots_origin_ym ON country_origin_trade_stats(origin_country_code, year, month);
+"""
 
 COPY_BATCH_ROWS = 20_000
-DB_CONNECT_ARGS = {
-    "connect_timeout": 20,
-    "keepalives": 1,
-    "keepalives_idle": 30,
-    "keepalives_interval": 10,
-    "keepalives_count": 3,
-    "options": "-c statement_timeout=180000",
-}
+TOP_COMPANIES = int(os.getenv("COMPANY_IMPORT_TOP_COMPANIES", "2000"))
+TOP_COUNTERPARTIES_PER_COMPANY_ROLE = int(os.getenv("COMPANY_IMPORT_TOP_COUNTERPARTIES", "25"))
 
 
 def to_iso3(code: str) -> str | None:
@@ -194,18 +215,13 @@ def clean_company(raw: object) -> str | None:
     return value or None
 
 
-def parse_decimal(raw: object) -> str | None:
+def parse_decimal(raw: object) -> Decimal:
     if raw is None or str(raw).strip() == "":
-        return None
+        return Decimal("0")
     try:
-        return str(Decimal(str(raw).replace(",", "").strip()))
+        return Decimal(str(raw).replace(",", "").strip())
     except InvalidOperation:
-        return None
-
-
-def parse_decimal_value(raw: object) -> Decimal:
-    value = parse_decimal(raw)
-    return Decimal(value) if value is not None else Decimal("0")
+        return Decimal("0")
 
 
 def parse_int(raw: object, default: int = 0) -> int:
@@ -232,19 +248,24 @@ def parse_month(raw: object) -> tuple[int, int] | None:
     return year, month
 
 
-def create_tables(engine, clear_first: bool) -> None:
-    with engine.begin() as conn:
-        if clear_first:
-            conn.execute(text("DROP TABLE IF EXISTS company_trade_flows CASCADE"))
-            conn.execute(text("DROP TABLE IF EXISTS country_origin_trade_stats CASCADE"))
-            conn.execute(text("DROP TABLE IF EXISTS country_monthly_trade_stats CASCADE"))
-        conn.execute(text(COMPANY_FLOW_DDL))
-        conn.execute(text(COUNTRY_STATS_DDL))
+def normalize_hs(raw: object) -> str:
+    hs_code = str(raw).strip()
+    if re.fullmatch(r"\d+(\.0+)?", hs_code):
+        return str(int(float(hs_code)))
+    return hs_code
 
 
-def create_company_indexes(engine) -> None:
-    with engine.begin() as conn:
-        conn.execute(text(COMPANY_INDEX_DDL))
+def add_amount(bucket: dict[str, Any], amount: Decimal, trade_count: int, desc_zh: str | None = None, desc_en: str | None = None) -> None:
+    bucket["sum_of_usd"] += amount
+    bucket["trade_count"] += trade_count
+    if desc_zh and not bucket.get("product_desc_zh"):
+        bucket["product_desc_zh"] = desc_zh
+    if desc_en and not bucket.get("product_desc_en"):
+        bucket["product_desc_en"] = desc_en
+
+
+def empty_amount_bucket() -> dict[str, Any]:
+    return {"sum_of_usd": Decimal("0"), "trade_count": 0, "product_desc_zh": None, "product_desc_en": None}
 
 
 def iter_trade_files(data_dir: Path) -> list[Path]:
@@ -255,18 +276,21 @@ def iter_trade_files(data_dir: Path) -> list[Path]:
     ]
 
 
-def build_csv(data_dir: Path, csv_path: Path) -> dict[str, int]:
+def build_aggregates(data_dir: Path) -> tuple[dict[str, int], dict[str, dict]]:
     stats = {
         "rows_seen": 0,
         "rows_accepted": 0,
-        "rows_written": 0,
         "rows_skipped": 0,
-        "collapsed_rows": 0,
         "bad_header_sheets": 0,
         "bad_month_rows": 0,
         "bad_country_rows": 0,
     }
-    aggregates: dict[tuple, dict[str, object]] = {}
+
+    monthly: dict[tuple, dict[str, Any]] = defaultdict(empty_amount_bucket)
+    hs_stats: dict[tuple, dict[str, Any]] = defaultdict(empty_amount_bucket)
+    counterparty: dict[tuple, dict[str, Any]] = defaultdict(empty_amount_bucket)
+    country_stats: dict[tuple, dict[str, Any]] = defaultdict(empty_amount_bucket)
+
     files = iter_trade_files(data_dir)
     print(f"找到 {len(files)} 个贸易文件")
 
@@ -309,76 +333,177 @@ def build_csv(data_dir: Path, csv_path: Path) -> dict[str, int]:
                     continue
 
                 year, month = month_pair
-                hs_code = str(raw[0]).strip()
-                if re.fullmatch(r"\d+(\.0+)?", hs_code):
-                    hs_code = str(int(float(hs_code)))
-
+                hs_code = normalize_hs(raw[0])
+                desc_zh = None if raw[1] is None else str(raw[1]).strip() or None
+                desc_en = None if raw[2] is None else str(raw[2]).strip() or None
                 importer_name = clean_company(raw[4])
                 exporter_name = clean_company(raw[6])
-                key = (
-                    hs_code,
-                    year,
-                    month,
-                    importer_name,
-                    importer_country,
-                    exporter_name,
-                    exporter_country,
-                    origin_country,
-                    export_side_country,
-                )
-                current = aggregates.get(key)
-                if current is None:
-                    current = {
-                        "amount_usd": Decimal("0"),
-                        "metric_tons": Decimal("0"),
-                        "trade_count": 0,
-                        "product_desc_zh": None if raw[1] is None else str(raw[1]).strip() or None,
-                        "product_desc_en": None if raw[2] is None else str(raw[2]).strip() or None,
-                    }
-                    aggregates[key] = current
+                exporter_company_country = exporter_country or export_side_country
+                amount = parse_decimal(raw[11])
+                trade_count = parse_int(raw[13])
 
-                current["amount_usd"] = current["amount_usd"] + parse_decimal_value(raw[11])
-                current["metric_tons"] = current["metric_tons"] + parse_decimal_value(raw[12])
-                current["trade_count"] = int(current["trade_count"]) + parse_int(raw[13])
-                if not current["product_desc_zh"] and raw[1] is not None:
-                    current["product_desc_zh"] = str(raw[1]).strip() or None
-                if not current["product_desc_en"] and raw[2] is not None:
-                    current["product_desc_en"] = str(raw[2]).strip() or None
+                add_amount(
+                    country_stats[(hs_code, year, month, export_side_country, importer_country)],
+                    amount,
+                    trade_count,
+                    desc_zh,
+                    desc_en,
+                )
+
+                if importer_name:
+                    add_amount(monthly[(importer_name, importer_country, "importer", year, month)], amount, trade_count)
+                    add_amount(hs_stats[(importer_name, importer_country, "importer", hs_code)], amount, trade_count, desc_zh, desc_en)
+                    if exporter_name:
+                        add_amount(
+                            counterparty[(importer_name, importer_country, "importer", exporter_name, exporter_company_country)],
+                            amount,
+                            trade_count,
+                        )
+
+                if exporter_name:
+                    add_amount(monthly[(exporter_name, exporter_company_country, "exporter", year, month)], amount, trade_count)
+                    add_amount(hs_stats[(exporter_name, exporter_company_country, "exporter", hs_code)], amount, trade_count, desc_zh, desc_en)
+                    if importer_name:
+                        add_amount(
+                            counterparty[(exporter_name, exporter_company_country, "exporter", importer_name, importer_country)],
+                            amount,
+                            trade_count,
+                        )
 
                 stats["rows_accepted"] += 1
                 sheet_accepted += 1
+
             print(f"  {ws.title}: 接受 {sheet_accepted:,}，跳过 {sheet_skipped:,}")
         wb.close()
 
-    with csv_path.open("w", newline="", encoding="utf-8") as fh:
+    return stats, {
+        "monthly": monthly,
+        "hs": hs_stats,
+        "counterparty": counterparty,
+        "country": country_stats,
+    }
+
+
+def write_csvs(aggregates: dict[str, dict], output_dir: Path) -> dict[str, Path]:
+    paths = {
+        "company_monthly_trade_stats": output_dir / "company_monthly_trade_stats.csv",
+        "company_hs_trade_stats": output_dir / "company_hs_trade_stats.csv",
+        "company_counterparty_trade_stats": output_dir / "company_counterparty_trade_stats.csv",
+        "country_origin_trade_stats": output_dir / "country_origin_trade_stats.csv",
+        "company_search_stats": output_dir / "company_search_stats.csv",
+    }
+
+    name_totals: dict[str, Decimal] = defaultdict(lambda: Decimal("0"))
+    for (company, _country, _role, _year, _month), bucket in aggregates["monthly"].items():
+        name_totals[company] += bucket["sum_of_usd"]
+
+    top_company_names = {
+        company
+        for company, _value in sorted(name_totals.items(), key=lambda item: item[1], reverse=True)[:TOP_COMPANIES]
+    }
+    print(f"公司看板仅导入交易额 Top {len(top_company_names):,} 公司")
+
+    role_totals: dict[tuple, dict[str, Decimal | int]] = defaultdict(
+        lambda: {"import": Decimal("0"), "export": Decimal("0"), "trade_count": 0}
+    )
+
+    with paths["company_monthly_trade_stats"].open("w", newline="", encoding="utf-8") as fh:
         writer = csv.writer(fh)
-        for key, aggregate in aggregates.items():
-            record = [
-                *key,
-                aggregate["amount_usd"],
-                aggregate["metric_tons"],
-                aggregate["trade_count"],
-                aggregate["product_desc_zh"],
-                aggregate["product_desc_en"],
-            ]
-            writer.writerow(record)
+        for (company, country, role, year, month), bucket in aggregates["monthly"].items():
+            if company not in top_company_names:
+                continue
+            writer.writerow([company, country, role, year, month, bucket["sum_of_usd"], bucket["trade_count"]])
+            totals = role_totals[(company, country)]
+            if role == "importer":
+                totals["import"] = totals["import"] + bucket["sum_of_usd"]
+            else:
+                totals["export"] = totals["export"] + bucket["sum_of_usd"]
+            totals["trade_count"] = int(totals["trade_count"]) + bucket["trade_count"]
 
-    stats["rows_written"] = len(aggregates)
-    stats["collapsed_rows"] = stats["rows_accepted"] - stats["rows_written"]
-    return stats
+    with paths["company_search_stats"].open("w", newline="", encoding="utf-8") as fh:
+        writer = csv.writer(fh)
+        for (company, country), totals in role_totals.items():
+            import_value = totals["import"]
+            export_value = totals["export"]
+            role = "both" if import_value and export_value else "importer" if import_value else "exporter"
+            writer.writerow([
+                company,
+                country,
+                role,
+                import_value + export_value,
+                totals["trade_count"],
+                import_value,
+                export_value,
+            ])
+
+    with paths["company_hs_trade_stats"].open("w", newline="", encoding="utf-8") as fh:
+        writer = csv.writer(fh)
+        for (company, country, role, hs_code), bucket in aggregates["hs"].items():
+            if company not in top_company_names:
+                continue
+            writer.writerow([
+                company,
+                country,
+                role,
+                hs_code,
+                bucket["product_desc_zh"],
+                bucket["product_desc_en"],
+                bucket["sum_of_usd"],
+                bucket["trade_count"],
+            ])
+
+    with paths["company_counterparty_trade_stats"].open("w", newline="", encoding="utf-8") as fh:
+        writer = csv.writer(fh)
+        grouped_counterparties: dict[tuple, list[tuple[tuple, dict[str, Any]]]] = defaultdict(list)
+        for key, bucket in aggregates["counterparty"].items():
+            company, country, role, _counterparty_name, _counterparty_country = key
+            if company not in top_company_names:
+                continue
+            grouped_counterparties[(company, country, role)].append((key, bucket))
+
+        for rows in grouped_counterparties.values():
+            rows.sort(key=lambda item: (item[1]["sum_of_usd"], item[1]["trade_count"]), reverse=True)
+            for (company, country, role, counterparty_name, counterparty_country), bucket in rows[:TOP_COUNTERPARTIES_PER_COMPANY_ROLE]:
+                writer.writerow([company, country, role, counterparty_name, counterparty_country, bucket["sum_of_usd"], bucket["trade_count"]])
+
+    with paths["country_origin_trade_stats"].open("w", newline="", encoding="utf-8") as fh:
+        writer = csv.writer(fh)
+        for (hs_code, year, month, origin_country, destination_country), bucket in aggregates["country"].items():
+            writer.writerow([
+                hs_code,
+                year,
+                month,
+                origin_country,
+                destination_country,
+                bucket["sum_of_usd"],
+                bucket["trade_count"],
+                bucket["product_desc_zh"],
+                bucket["product_desc_en"],
+            ])
+
+    return paths
 
 
-def copy_company_flows(engine, csv_path: Path) -> None:
-    cols = ", ".join(COPY_COLUMNS)
-    copy_sql = f"COPY company_trade_flows ({cols}) FROM STDIN WITH (FORMAT CSV)"
+def recreate_tables(engine) -> None:
+    with engine.begin() as conn:
+        conn.execute(text(DDL))
+
+
+def create_indexes(engine) -> None:
+    with engine.begin() as conn:
+        conn.execute(text(INDEX_DDL))
+
+
+def copy_csv(engine, table: str, columns: list[str], csv_path: Path) -> int:
     total = 0
     batch_no = 0
+    cols = ", ".join(columns)
+    copy_sql = f"COPY {table} ({cols}) FROM STDIN WITH (FORMAT CSV)"
 
     def flush(rows: list[list[str]]) -> None:
         nonlocal total, batch_no
         if not rows:
             return
-
         buffer = io.StringIO()
         writer = csv.writer(buffer)
         writer.writerows(rows)
@@ -394,7 +519,7 @@ def copy_company_flows(engine, csv_path: Path) -> None:
 
         batch_no += 1
         total += len(rows)
-        print(f"  COPY batch {batch_no}: {len(rows):,} rows, total {total:,}", flush=True)
+        print(f"  {table} batch {batch_no}: {len(rows):,} rows, total {total:,}", flush=True)
 
     with csv_path.open("r", newline="", encoding="utf-8") as fh:
         reader = csv.reader(fh)
@@ -406,44 +531,17 @@ def copy_company_flows(engine, csv_path: Path) -> None:
                 batch = []
         flush(batch)
 
-
-def refresh_country_stats(engine) -> None:
-    with engine.begin() as conn:
-        conn.execute(text("TRUNCATE TABLE country_origin_trade_stats"))
-        conn.execute(
-            text(
-                """
-                INSERT INTO country_origin_trade_stats (
-                    hs_code, year, month,
-                    origin_country_code, destination_country_code,
-                    sum_of_usd, trade_count, product_desc_zh, product_desc_en
-                )
-                SELECT
-                    hs_code,
-                    year,
-                    month,
-                    export_side_country_code AS origin_country_code,
-                    importer_country_code AS destination_country_code,
-                    COALESCE(SUM(amount_usd), 0)::numeric(20,2) AS sum_of_usd,
-                    COALESCE(SUM(trade_count), 0)::integer AS trade_count,
-                    MAX(product_desc_zh) AS product_desc_zh,
-                    MAX(product_desc_en) AS product_desc_en
-                FROM company_trade_flows
-                GROUP BY hs_code, year, month, export_side_country_code, importer_country_code
-                """
-            )
-        )
+    return total
 
 
 def main() -> None:
-    clear_first = "--clear" in sys.argv
     project_root = Path(__file__).resolve().parents[1]
     data_dir = project_root / "data" / "hkust_文件汇总"
 
     print("=" * 72)
-    print("上传 hkust_文件汇总 公司级数据到数据库")
+    print("上传 hkust_文件汇总 公司级聚合数据到数据库")
     print("=" * 72)
-    print("模式:", "全量重建 (--clear)" if clear_first else "追加导入")
+    print("模式: 全量重建")
     print("数据目录:", data_dir)
 
     if not data_dir.exists():
@@ -460,38 +558,56 @@ def main() -> None:
         sys.exit(1)
 
     start = datetime.now()
-    create_tables(engine, clear_first=clear_first)
+    stats, aggregates = build_aggregates(data_dir)
+    print("聚合完成:", stats)
+    print(
+        "聚合行数:",
+        {
+            "company_search_stats": "derived",
+            "company_monthly_trade_stats": len(aggregates["monthly"]),
+            "company_hs_trade_stats": len(aggregates["hs"]),
+            "company_counterparty_trade_stats": len(aggregates["counterparty"]),
+            "country_origin_trade_stats": len(aggregates["country"]),
+        },
+    )
 
-    with tempfile.TemporaryDirectory(prefix="company_flows_") as tmp:
-        csv_path = Path(tmp) / "company_trade_flows.csv"
-        stats = build_csv(data_dir, csv_path)
-        print("CSV 生成完成:", stats)
-        print("开始 COPY 导入 company_trade_flows ...")
-        copy_company_flows(engine, csv_path)
+    with tempfile.TemporaryDirectory(prefix="company_aggregates_") as tmp:
+        paths = write_csvs(aggregates, Path(tmp))
+        csv_counts = {table: sum(1 for _ in path.open("r", encoding="utf-8")) for table, path in paths.items()}
+        print("CSV 行数:", csv_counts)
 
-    print("刷新 country_origin_trade_stats 聚合表 ...")
-    refresh_country_stats(engine)
-    print("创建 company_trade_flows 查询索引 ...")
-    create_company_indexes(engine)
+        print("重建数据库表 ...")
+        recreate_tables(engine)
+
+        copy_csv(engine, "company_search_stats", ["name", "country_code", "role", "total_trade_value", "trade_count", "import_trade_value", "export_trade_value"], paths["company_search_stats"])
+        copy_csv(engine, "company_monthly_trade_stats", ["company_name", "country_code", "role", "year", "month", "sum_of_usd", "trade_count"], paths["company_monthly_trade_stats"])
+        copy_csv(engine, "company_hs_trade_stats", ["company_name", "country_code", "role", "hs_code", "product_desc_zh", "product_desc_en", "sum_of_usd", "trade_count"], paths["company_hs_trade_stats"])
+        copy_csv(engine, "company_counterparty_trade_stats", ["company_name", "country_code", "role", "counterparty_name", "counterparty_country_code", "sum_of_usd", "trade_count"], paths["company_counterparty_trade_stats"])
+        copy_csv(engine, "country_origin_trade_stats", ["hs_code", "year", "month", "origin_country_code", "destination_country_code", "sum_of_usd", "trade_count", "product_desc_zh", "product_desc_en"], paths["country_origin_trade_stats"])
+
+    print("创建查询索引 ...")
+    create_indexes(engine)
 
     elapsed = (datetime.now() - start).total_seconds()
     with engine.connect() as conn:
-        company_count = conn.execute(text("SELECT COUNT(*) FROM company_trade_flows")).scalar()
-        country_count = conn.execute(text("SELECT COUNT(*) FROM country_origin_trade_stats")).scalar()
+        counts = {
+            table: conn.execute(text(f"SELECT COUNT(*) FROM {table}")).scalar()
+            for table in [
+                "company_search_stats",
+                "company_monthly_trade_stats",
+                "company_hs_trade_stats",
+                "company_counterparty_trade_stats",
+                "country_origin_trade_stats",
+            ]
+        }
         months = conn.execute(
-            text(
-                """
-                SELECT MIN(year * 100 + month), MAX(year * 100 + month)
-                FROM company_trade_flows
-                """
-            )
+            text("SELECT MIN(year * 100 + month), MAX(year * 100 + month) FROM company_monthly_trade_stats")
         ).fetchone()
 
     print("\n" + "=" * 72)
     print("上传完成")
     print("=" * 72)
-    print(f"公司级记录数: {company_count:,}")
-    print(f"国家聚合记录数: {country_count:,}")
+    print("数据库记录数:", counts)
     print(f"月份范围: {months[0]} ~ {months[1]}")
     print(f"耗时: {elapsed:.1f}s")
 

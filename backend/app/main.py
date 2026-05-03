@@ -201,7 +201,13 @@ def debug_db(db: Session = Depends(get_db)):
             SELECT table_name 
             FROM information_schema.tables 
             WHERE table_schema = 'public' 
-            AND table_name IN ('company_trade_flows', 'country_origin_trade_stats', 'country_monthly_trade_stats')
+            AND table_name IN (
+                'company_search_stats',
+                'company_monthly_trade_stats',
+                'company_hs_trade_stats',
+                'company_counterparty_trade_stats',
+                'country_origin_trade_stats'
+            )
             ORDER BY table_name
         """))
         tables = [row[0] for row in result.fetchall()]
