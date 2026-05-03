@@ -143,7 +143,15 @@ COPY_COLUMNS = [
     "product_desc_en",
 ]
 
-COPY_BATCH_ROWS = 100_000
+COPY_BATCH_ROWS = 20_000
+DB_CONNECT_ARGS = {
+    "connect_timeout": 20,
+    "keepalives": 1,
+    "keepalives_idle": 30,
+    "keepalives_interval": 10,
+    "keepalives_count": 3,
+    "options": "-c statement_timeout=180000",
+}
 
 
 def to_iso3(code: str) -> str | None:
@@ -442,7 +450,7 @@ def main() -> None:
         print(f"❌ 数据目录不存在: {data_dir}")
         sys.exit(1)
 
-    engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+    engine = create_engine(DATABASE_URL, pool_pre_ping=True, connect_args=DB_CONNECT_ARGS)
     try:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
