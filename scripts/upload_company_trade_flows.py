@@ -32,7 +32,7 @@ DATABASE_URL = os.getenv(
     "DATABASE_URL",
     os.getenv(
         "DATABASE_PUBLIC_URL",
-        "postgresql://postgres:MWXAjkGpQgosJuCgIPcRdudhiyAiXCRl@crossover.proxy.rlwy.net:42314/railway",
+        "postgresql://postgres:HcVbYOkDrgXNZPaUpttdATshXWFJWWQe@tramway.proxy.rlwy.net:11626/railway",
     ),
 )
 
