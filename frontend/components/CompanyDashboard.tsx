@@ -33,6 +33,17 @@ const roleLabel = (role: CompanyDashboardData['role']) => {
   return 'Company';
 };
 
+const SUGGESTED_COMPANIES = [
+  'INTEL PRODUCTS VIETNAM CO LTD',
+  'SAMSUNG ELECTRONICS CO LTD',
+  'SAMSUNG ELECTRONICS VIETNAM CO LTD',
+  'HANYANG DIGITECH VINA CO LTD',
+  'MB AUTOMATION MALAYSIA SDN BHD',
+  'INTEL TECHNOLOGY SDN BHD',
+  'FOXCONN HON HAI TECHNOLOGY INDIA MEGA DEVELOPMENT IND',
+  'MICRON MEMORY MALAYSIA SDN BHD',
+];
+
 const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate }) => {
   const [searchInput, setSearchInput] = useState('');
   const [results, setResults] = useState<CompanySearchResult[]>([]);
@@ -162,13 +173,28 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
       )}
 
       {!company && !error && (
-        <div className="flex flex-col items-center justify-center flex-1 py-24 gap-4 text-center">
+        <div className="flex flex-col items-center justify-center flex-1 py-24 gap-5 text-center">
           <div className="w-20 h-20 rounded-[24px] bg-white border border-black/5 shadow-sm flex items-center justify-center">
             <Building2 className="w-10 h-10 text-[#C7C7CC]" />
           </div>
           <div>
             <p className="text-[18px] font-bold text-[#1D1D1F] mb-1">Company Dashboard</p>
             <p className="text-[14px] text-[#86868B] max-w-sm">Search a company to view categories, suppliers, customers, and monthly trend.</p>
+          </div>
+          <div className="w-full max-w-4xl">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-[#86868B] mb-3">Popular Searches</p>
+            <div className="flex flex-wrap justify-center gap-2">
+              {SUGGESTED_COMPANIES.map((name) => (
+                <button
+                  key={name}
+                  onClick={() => loadCompany(name)}
+                  className="max-w-[360px] truncate px-3.5 py-2 rounded-[10px] text-[12px] font-semibold bg-white border border-black/[0.08] text-[#1D1D1F] hover:border-[#007AFF]/30 hover:text-[#007AFF] hover:bg-[#F0F7FF] transition-colors shadow-sm"
+                  title={name}
+                >
+                  {name}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -196,27 +222,31 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
           </div>
 
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
-            <div className="xl:col-span-2 bg-white rounded-[20px] border border-black/5 shadow-sm p-6">
+            <div className="xl:col-span-2 bg-white rounded-[20px] border border-black/5 shadow-sm p-6 min-w-0">
               <div className="flex items-center gap-2 mb-4">
                 <TrendingUp className="w-4 h-4 text-[#007AFF]" />
                 <span className="text-[15px] font-bold text-[#1D1D1F]">Monthly Trend</span>
               </div>
-              <div className="h-[260px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={trendData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="companyTrend" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#007AFF" stopOpacity={0.25} />
-                        <stop offset="95%" stopColor="#007AFF" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#E5E5EA" />
-                    <XAxis dataKey="yearMonth" tick={{ fontSize: 10, fill: '#86868B' }} minTickGap={28} />
-                    <YAxis tickFormatter={formatMoney} tick={{ fontSize: 10, fill: '#86868B' }} width={62} />
-                    <Tooltip formatter={(value: number) => [formatMoney(value), 'Trade Value']} />
-                    <Area type="monotone" dataKey="sumOfUsd" stroke="#007AFF" fill="url(#companyTrend)" strokeWidth={2} />
-                  </AreaChart>
-                </ResponsiveContainer>
+              <div className="h-[260px] min-h-[260px] min-w-0">
+                {trendData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
+                    <AreaChart data={trendData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="companyTrend" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#007AFF" stopOpacity={0.25} />
+                          <stop offset="95%" stopColor="#007AFF" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#E5E5EA" />
+                      <XAxis dataKey="yearMonth" tick={{ fontSize: 10, fill: '#86868B' }} minTickGap={28} />
+                      <YAxis tickFormatter={formatMoney} tick={{ fontSize: 10, fill: '#86868B' }} width={62} />
+                      <Tooltip formatter={(value: number) => [formatMoney(value), 'Trade Value']} />
+                      <Area type="monotone" dataKey="sumOfUsd" stroke="#007AFF" fill="url(#companyTrend)" strokeWidth={2} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-[13px] text-[#86868B]">No trend data</div>
+                )}
               </div>
             </div>
 
