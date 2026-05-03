@@ -211,6 +211,51 @@ export interface HSQuarterAggregate {
   tradeCount: number;
 }
 
+export interface CompanySearchResult {
+  name: string;
+  countryCode?: string;
+  role: 'importer' | 'exporter' | 'both' | 'unknown';
+  totalTradeValue: number;
+  tradeCount: number;
+}
+
+export interface CompanyCategoryStat {
+  hsCode: string;
+  label: string;
+  sumOfUsd: number;
+  tradeCount: number;
+  sharePct: number;
+}
+
+export interface CompanyRankItem {
+  rank: number;
+  company: string;
+  countryCode?: string;
+  sumOfUsd: number;
+  tradeCount: number;
+  sharePct: number;
+}
+
+export interface CompanyTrendPoint {
+  yearMonth: string;
+  sumOfUsd: number;
+  tradeCount: number;
+}
+
+export interface CompanyDashboardData {
+  name: string;
+  countryCode?: string;
+  role: 'importer' | 'exporter' | 'both' | 'unknown';
+  totalTradeValue: number;
+  totalTradeCount: number;
+  importTradeValue: number;
+  exportTradeValue: number;
+  categories: CompanyCategoryStat[];
+  topSuppliers: CompanyRankItem[];
+  topCustomers: CompanyRankItem[];
+  trends: CompanyTrendPoint[];
+}
+
 // 国家贸易统计筛选条件
 export interface CountryTradeFilters {
   hsCode?: string[];

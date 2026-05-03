@@ -12,6 +12,8 @@ import {
   HSAggregate,
   HSQuarterAggregate,
   CountryTradeFilters,
+  CompanyDashboardData,
+  CompanySearchResult,
   Location,
 } from '../types';
 import { logger } from '../utils/logger';
@@ -696,3 +698,74 @@ export const countryTradeStatsAPI = {
   },
 };
 
+export const companiesAPI = {
+  search: async (query: string, limit = 12): Promise<CompanySearchResult[]> => {
+    const params = new URLSearchParams();
+    params.append('q', query);
+    params.append('limit', String(limit));
+    const data = await fetchAPI<any[]>(`/api/companies/search?${params.toString()}`);
+    return data.map((item) => ({
+      name: item.name,
+      countryCode: item.country_code || undefined,
+      role: item.role || 'unknown',
+      totalTradeValue: parseFloat(item.total_trade_value) || 0,
+      tradeCount: parseInt(item.trade_count) || 0,
+    }));
+  },
+
+  getDashboard: async (filters: {
+    name: string;
+    startYearMonth?: string;
+    endYearMonth?: string;
+    hsCode?: string[];
+    hsCodePrefix?: string[];
+    limit?: number;
+  }): Promise<CompanyDashboardData> => {
+    const params = new URLSearchParams();
+    params.append('name', filters.name);
+    if (filters.startYearMonth) params.append('start_year_month', filters.startYearMonth);
+    if (filters.endYearMonth) params.append('end_year_month', filters.endYearMonth);
+    if (filters.hsCode?.length) filters.hsCode.forEach((code) => params.append('hs_code', code));
+    if (filters.hsCodePrefix?.length) filters.hsCodePrefix.forEach((prefix) => params.append('hs_code_prefix', prefix));
+    params.append('limit', String(filters.limit ?? 10));
+
+    const item = await fetchAPI<any>(`/api/companies/dashboard?${params.toString()}`);
+    return {
+      name: item.name,
+      countryCode: item.country_code || undefined,
+      role: item.role || 'unknown',
+      totalTradeValue: parseFloat(item.total_trade_value) || 0,
+      totalTradeCount: parseInt(item.total_trade_count) || 0,
+      importTradeValue: parseFloat(item.import_trade_value) || 0,
+      exportTradeValue: parseFloat(item.export_trade_value) || 0,
+      categories: (item.categories || []).map((cat: any) => ({
+        hsCode: cat.hs_code,
+        label: cat.label,
+        sumOfUsd: parseFloat(cat.sum_of_usd) || 0,
+        tradeCount: parseInt(cat.trade_count) || 0,
+        sharePct: parseFloat(cat.share_pct) || 0,
+      })),
+      topSuppliers: (item.top_suppliers || []).map((rank: any) => ({
+        rank: parseInt(rank.rank) || 0,
+        company: rank.company,
+        countryCode: rank.country_code || undefined,
+        sumOfUsd: parseFloat(rank.sum_of_usd) || 0,
+        tradeCount: parseInt(rank.trade_count) || 0,
+        sharePct: parseFloat(rank.share_pct) || 0,
+      })),
+      topCustomers: (item.top_customers || []).map((rank: any) => ({
+        rank: parseInt(rank.rank) || 0,
+        company: rank.company,
+        countryCode: rank.country_code || undefined,
+        sumOfUsd: parseFloat(rank.sum_of_usd) || 0,
+        tradeCount: parseInt(rank.trade_count) || 0,
+        sharePct: parseFloat(rank.share_pct) || 0,
+      })),
+      trends: (item.trends || []).map((point: any) => ({
+        yearMonth: point.year_month,
+        sumOfUsd: parseFloat(point.sum_of_usd) || 0,
+        tradeCount: parseInt(point.trade_count) || 0,
+      })),
+    };
+  },
+};

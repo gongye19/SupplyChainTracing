@@ -269,3 +269,50 @@ class HSQuarterAggregate(BaseModel):
     hs_code: str
     sum_of_usd: float
     trade_count: int
+
+
+# ── 公司级看板 ────────────────────────────────────────────────
+
+class CompanySearchResult(BaseModel):
+    name: str
+    country_code: Optional[str] = None
+    role: str
+    total_trade_value: float
+    trade_count: int
+
+
+class CompanyCategoryStat(BaseModel):
+    hs_code: str
+    label: str
+    sum_of_usd: float
+    trade_count: int
+    share_pct: float
+
+
+class CompanyRankItem(BaseModel):
+    rank: int
+    company: str
+    country_code: Optional[str] = None
+    sum_of_usd: float
+    trade_count: int
+    share_pct: float
+
+
+class CompanyTrendPoint(BaseModel):
+    year_month: str
+    sum_of_usd: float
+    trade_count: int
+
+
+class CompanyDashboardResponse(BaseModel):
+    name: str
+    country_code: Optional[str] = None
+    role: str
+    total_trade_value: float
+    total_trade_count: int
+    import_trade_value: float
+    export_trade_value: float
+    categories: List[CompanyCategoryStat]
+    top_suppliers: List[CompanyRankItem]
+    top_customers: List[CompanyRankItem]
+    trends: List[CompanyTrendPoint]

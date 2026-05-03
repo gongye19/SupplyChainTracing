@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 import os
 import re
 
-from .routes import chat, hs_code_categories, country_locations as port_locations_route, country_locations_compat, shipments, country_trade_stats
+from .routes import chat, hs_code_categories, country_locations as port_locations_route, country_locations_compat, shipments, country_trade_stats, companies
 from .database import get_db
 from .utils.logger import get_logger
 
@@ -157,6 +157,7 @@ app.include_router(port_locations_route.router, prefix="/api/port-locations", ta
 # 向后兼容：保留 country-locations 路由（从 port_locations 表提取国家信息）
 app.include_router(country_locations_compat.router, prefix="/api/country-locations", tags=["country-locations"])
 app.include_router(country_trade_stats.router, prefix="/api/country-trade-stats", tags=["country-trade-stats"])
+app.include_router(companies.router, prefix="/api/companies", tags=["companies"])
 
 @app.get("/")
 def root():
@@ -200,7 +201,7 @@ def debug_db(db: Session = Depends(get_db)):
             SELECT table_name 
             FROM information_schema.tables 
             WHERE table_schema = 'public' 
-            AND table_name IN ('country_origin_trade_stats', 'country_monthly_trade_stats')
+            AND table_name IN ('company_trade_flows', 'country_origin_trade_stats', 'country_monthly_trade_stats')
             ORDER BY table_name
         """))
         tables = [row[0] for row in result.fetchall()]
@@ -214,4 +215,3 @@ def debug_db(db: Session = Depends(get_db)):
             "status": "error",
             "error": str(e)
         }
-
