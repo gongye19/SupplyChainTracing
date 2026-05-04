@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Building2, Package, Search, TrendingUp, Users, X } from 'lucide-react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { companiesAPI } from '../services/api';
-import { CompanyDashboardData, CompanyRankItem, CompanySearchResult } from '../types';
+import { CompanyDashboardData, CompanyFilterOptions, CompanyRankItem, CompanySearchResult } from '../types';
 
 interface CompanyDashboardProps {
   startDate: string;
@@ -39,8 +39,28 @@ const SUGGESTED_COMPANIES = [
   'SAMSUNG ELECTRONICS VIETNAM CO LTD',
 ];
 
+const CONTINENT_OPTIONS = [
+  { id: 'asia', label: 'Asia', countries: ['ARE', 'ARM', 'AZE', 'BGD', 'BHR', 'BRN', 'CHN', 'GEO', 'HKG', 'IDN', 'IND', 'ISR', 'JOR', 'JPN', 'KAZ', 'KHM', 'KOR', 'KWT', 'LAO', 'LKA', 'MAC', 'MMR', 'MNG', 'MYS', 'OMN', 'PAK', 'PHL', 'QAT', 'SAU', 'SGP', 'THA', 'TUR', 'TWN', 'VNM'] },
+  { id: 'europe', label: 'Europe', countries: ['AUT', 'BEL', 'BGR', 'CHE', 'CZE', 'DEU', 'DNK', 'ESP', 'EST', 'FIN', 'FRA', 'GBR', 'GRC', 'HRV', 'HUN', 'IRL', 'ITA', 'LTU', 'LUX', 'LVA', 'NLD', 'NOR', 'POL', 'PRT', 'ROU', 'RUS', 'SVK', 'SVN', 'SWE', 'UKR'] },
+  { id: 'north_america', label: 'North America', countries: ['CAN', 'CRI', 'DOM', 'GTM', 'HND', 'MEX', 'NIC', 'PAN', 'SLV', 'USA'] },
+  { id: 'south_america', label: 'South America', countries: ['ARG', 'BOL', 'BRA', 'CHL', 'COL', 'ECU', 'PER', 'PRY', 'URY', 'VEN'] },
+  { id: 'africa', label: 'Africa', countries: ['AGO', 'EGY', 'ETH', 'GHA', 'KEN', 'MAR', 'MUS', 'NGA', 'TUN', 'TZA', 'UGA', 'ZAF'] },
+  { id: 'oceania', label: 'Oceania', countries: ['AUS', 'FJI', 'NZL'] },
+];
+
+const HS_CATEGORY_LABELS: Record<string, string> = {
+  '38': 'HS 38 Materials',
+  '84': 'HS 84 Equipment',
+  '85': 'HS 85 IC & Components',
+  '90': 'HS 90 Instruments',
+};
+
 const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate }) => {
   const [searchInput, setSearchInput] = useState('');
+  const [selectedContinent, setSelectedContinent] = useState('');
+  const [selectedCountry, setSelectedCountry] = useState('');
+  const [selectedHsPrefix, setSelectedHsPrefix] = useState('');
+  const [filterOptions, setFilterOptions] = useState<CompanyFilterOptions>({ countries: [], hsCategories: [] });
   const [results, setResults] = useState<CompanySearchResult[]>([]);
   const [company, setCompany] = useState<CompanyDashboardData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -48,8 +68,47 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let active = true;
+    companiesAPI.getFilters()
+      .then((data) => {
+        if (active) setFilterOptions(data);
+      })
+      .catch(() => {
+        if (active) setFilterOptions({ countries: [], hsCategories: [] });
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const availableCountryCodes = useMemo(
+    () => new Set(filterOptions.countries.map((item) => item.countryCode)),
+    [filterOptions.countries]
+  );
+
+  const continentCountryCodes = useMemo(() => {
+    const selected = CONTINENT_OPTIONS.find((item) => item.id === selectedContinent);
+    if (!selected) return [];
+    return selected.countries.filter((code) => availableCountryCodes.has(code));
+  }, [availableCountryCodes, selectedContinent]);
+
+  const countryOptions = useMemo(() => {
+    if (!selectedContinent) return filterOptions.countries;
+    const allowed = new Set(continentCountryCodes);
+    return filterOptions.countries.filter((item) => allowed.has(item.countryCode));
+  }, [continentCountryCodes, filterOptions.countries, selectedContinent]);
+
+  const activeCountries = useMemo(() => {
+    if (selectedCountry) return [selectedCountry];
+    if (selectedContinent) return continentCountryCodes;
+    return [];
+  }, [continentCountryCodes, selectedContinent, selectedCountry]);
+
+  const hasDiscoveryFilter = activeCountries.length > 0 || Boolean(selectedHsPrefix);
+
+  useEffect(() => {
     const keyword = searchInput.trim();
-    if (keyword.length < 2 || keyword === company?.name) {
+    if ((!hasDiscoveryFilter && keyword.length < 2) || keyword === company?.name) {
       setResults([]);
       setSearching(false);
       return;
@@ -59,7 +118,12 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
     setSearching(true);
     const timer = window.setTimeout(async () => {
       try {
-        const data = await companiesAPI.search(keyword, 8);
+        const data = await companiesAPI.search({
+          query: keyword,
+          countries: activeCountries,
+          hsCodePrefix: selectedHsPrefix ? [selectedHsPrefix] : undefined,
+          limit: 8,
+        });
         if (active) {
           setResults(data);
           setError(null);
@@ -75,7 +139,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
       active = false;
       window.clearTimeout(timer);
     };
-  }, [searchInput, company?.name]);
+  }, [activeCountries, company?.name, hasDiscoveryFilter, searchInput, selectedHsPrefix]);
 
   const loadCompany = async (name: string) => {
     const trimmed = name.trim();
@@ -88,6 +152,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
         name: trimmed,
         startYearMonth: startDate,
         endYearMonth: endDate,
+        hsCodePrefix: selectedHsPrefix ? [selectedHsPrefix] : undefined,
         limit: 10,
       });
       setCompany(data);
@@ -108,7 +173,12 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
     setSearching(false);
     setError(null);
     try {
-      const data = await companiesAPI.search(trimmed, 12);
+      const data = await companiesAPI.search({
+        query: trimmed,
+        countries: activeCountries,
+        hsCodePrefix: selectedHsPrefix ? [selectedHsPrefix] : undefined,
+        limit: 12,
+      });
       setResults(data);
       if (data.length === 1) {
         await loadCompany(data[0].name);
@@ -169,6 +239,44 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
             className="mr-2 min-w-[84px] px-5 py-2.5 bg-[#007AFF] text-white text-[13px] font-semibold rounded-[12px] hover:bg-[#0066CC] transition-colors disabled:opacity-60 shrink-0"
           >
             {loading || searching ? 'Loading' : 'Search'}
+          </button>
+        </div>
+
+        <div className="mt-3 grid grid-cols-1 md:grid-cols-[1fr_1fr_1.1fr_auto] gap-2">
+          <FilterSelect
+            label="Continent"
+            value={selectedContinent}
+            onChange={(value) => {
+              setSelectedContinent(value);
+              setSelectedCountry('');
+            }}
+            options={CONTINENT_OPTIONS.map((item) => ({ value: item.id, label: item.label }))}
+          />
+          <FilterSelect
+            label="Country"
+            value={selectedCountry}
+            onChange={setSelectedCountry}
+            options={countryOptions.map((item) => ({ value: item.countryCode, label: item.countryCode }))}
+          />
+          <FilterSelect
+            label="Category"
+            value={selectedHsPrefix}
+            onChange={setSelectedHsPrefix}
+            options={filterOptions.hsCategories.map((item) => ({
+              value: item.hsPrefix,
+              label: HS_CATEGORY_LABELS[item.hsPrefix] || `HS ${item.hsPrefix}`,
+            }))}
+          />
+          <button
+            onClick={() => {
+              setSelectedContinent('');
+              setSelectedCountry('');
+              setSelectedHsPrefix('');
+              setResults([]);
+            }}
+            className="h-[42px] px-3 rounded-[10px] bg-white border border-black/[0.08] text-[12px] font-semibold text-[#86868B] hover:text-[#1D1D1F] hover:bg-[#F5F5F7] transition-colors"
+          >
+            Clear
           </button>
         </div>
 
@@ -319,6 +427,29 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
     </div>
   );
 };
+
+const FilterSelect: React.FC<{
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: Array<{ value: string; label: string }>;
+}> = ({ label, value, onChange, options }) => (
+  <label className="h-[42px] flex items-center gap-2 px-3 rounded-[10px] bg-white border border-black/[0.08] min-w-0">
+    <span className="text-[10px] font-bold uppercase tracking-wider text-[#86868B] shrink-0">{label}</span>
+    <select
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      className="min-w-0 flex-1 bg-transparent outline-none text-[12px] font-semibold text-[#1D1D1F]"
+    >
+      <option value="">All</option>
+      {options.map((option) => (
+        <option key={option.value} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+    </select>
+  </label>
+);
 
 const Metric: React.FC<{ label: string; value: string }> = ({ label, value }) => (
   <div className="text-right">

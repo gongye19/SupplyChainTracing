@@ -219,6 +219,22 @@ export interface CompanySearchResult {
   tradeCount: number;
 }
 
+export interface CompanyCountryFilter {
+  countryCode: string;
+  totalTradeValue: number;
+}
+
+export interface CompanyHSCategoryFilter {
+  hsPrefix: string;
+  totalTradeValue: number;
+  tradeCount: number;
+}
+
+export interface CompanyFilterOptions {
+  countries: CompanyCountryFilter[];
+  hsCategories: CompanyHSCategoryFilter[];
+}
+
 export interface CompanyCategoryStat {
   hsCode: string;
   label: string;

@@ -849,7 +849,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
           </div>
         </div>
       </div>
-      <div className="absolute top-4 right-4 z-10 pointer-events-auto">
+      <div className="absolute bottom-4 left-4 z-10 pointer-events-auto">
         <div className="bg-white/95 backdrop-blur-xl p-3 rounded-[14px] border border-black/[0.05] shadow-md text-[10px] text-[#1D1D1F] leading-relaxed">
           <div className="font-bold uppercase tracking-wide text-[#86868B] mb-1">Legend</div>
           <div>Line width: trade amount</div>

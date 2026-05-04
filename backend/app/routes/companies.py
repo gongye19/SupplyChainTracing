@@ -48,21 +48,68 @@ def _safe(db: Session, query: str, params: dict, fallback):
 
 @router.get("/search", response_model=List[CompanySearchResult])
 def search_companies(
-    q: str = Query(..., min_length=1),
+    q: Optional[str] = Query(None),
+    country: Optional[List[str]] = Query(None),
+    hs_code: Optional[List[str]] = Query(None),
+    hs_code_prefix: Optional[List[str]] = Query(None),
     limit: int = Query(20, ge=1, le=50),
     db: Session = Depends(get_db),
 ):
-    query = """
-        SELECT name, country_code, role, total_trade_value, trade_count
-        FROM company_search_stats
-        WHERE name ILIKE :keyword
+    params: dict = {"limit": limit}
+    where = " WHERE 1=1"
+    keyword = (q or "").strip()
+    if keyword:
+        where += " AND s.name ILIKE :keyword"
+        params["keyword"] = f"%{keyword}%"
+
+    if country:
+        ph = ", ".join(f":country_{i}" for i in range(len(country)))
+        where += f" AND s.country_code IN ({ph})"
+        for i, code in enumerate(country):
+            params[f"country_{i}"] = code
+
+    hs_exists_where = " WHERE h.company_name = s.name"
+    hs_exists_where, params = _hs_filter(hs_exists_where, params, hs_code, hs_code_prefix)
+    if hs_code or hs_code_prefix:
+        where += f" AND EXISTS (SELECT 1 FROM company_hs_trade_stats h{hs_exists_where})"
+
+    query = f"""
+        SELECT s.name, s.country_code, s.role, s.total_trade_value, s.trade_count
+        FROM company_search_stats s
+        {where}
         ORDER BY total_trade_value DESC, trade_count DESC
         LIMIT :limit
     """
-    result = _safe(db, query, {"keyword": f"%{q.strip()}%", "limit": limit}, fallback=[])
+    result = _safe(db, query, params, fallback=[])
     if result == []:
         return []
     return rows_to_dicts(result, result.fetchall())
+
+
+@router.get("/filters")
+def get_company_filters(db: Session = Depends(get_db)):
+    countries_query = """
+        SELECT country_code, COALESCE(SUM(total_trade_value), 0) AS total_trade_value
+        FROM company_search_stats
+        WHERE country_code IS NOT NULL
+        GROUP BY country_code
+        ORDER BY total_trade_value DESC
+    """
+    hs_query = """
+        SELECT
+            LEFT(hs_code, 2) AS hs_prefix,
+            COALESCE(SUM(sum_of_usd), 0) AS total_trade_value,
+            COALESCE(SUM(trade_count), 0) AS trade_count
+        FROM company_hs_trade_stats
+        GROUP BY LEFT(hs_code, 2)
+        ORDER BY total_trade_value DESC
+    """
+    countries_result = _safe(db, countries_query, {}, fallback=[])
+    hs_result = _safe(db, hs_query, {}, fallback=[])
+    return {
+        "countries": rows_to_dicts(countries_result, countries_result.fetchall()) if countries_result != [] else [],
+        "hs_categories": rows_to_dicts(hs_result, hs_result.fetchall()) if hs_result != [] else [],
+    }
 
 
 @router.get("/dashboard", response_model=CompanyDashboardResponse)

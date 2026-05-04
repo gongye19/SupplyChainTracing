@@ -13,6 +13,7 @@ import {
   HSQuarterAggregate,
   CountryTradeFilters,
   CompanyDashboardData,
+  CompanyFilterOptions,
   CompanySearchResult,
   Location,
 } from '../types';
@@ -699,10 +700,17 @@ export const countryTradeStatsAPI = {
 };
 
 export const companiesAPI = {
-  search: async (query: string, limit = 12): Promise<CompanySearchResult[]> => {
+  search: async (filters: {
+    query?: string;
+    countries?: string[];
+    hsCodePrefix?: string[];
+    limit?: number;
+  }): Promise<CompanySearchResult[]> => {
     const params = new URLSearchParams();
-    params.append('q', query);
-    params.append('limit', String(limit));
+    if (filters.query?.trim()) params.append('q', filters.query.trim());
+    filters.countries?.forEach((country) => params.append('country', country));
+    filters.hsCodePrefix?.forEach((prefix) => params.append('hs_code_prefix', prefix));
+    params.append('limit', String(filters.limit ?? 12));
     const data = await fetchAPI<any[]>(`/api/companies/search?${params.toString()}`);
     return data.map((item) => ({
       name: item.name,
@@ -711,6 +719,21 @@ export const companiesAPI = {
       totalTradeValue: parseFloat(item.total_trade_value) || 0,
       tradeCount: parseInt(item.trade_count) || 0,
     }));
+  },
+
+  getFilters: async (): Promise<CompanyFilterOptions> => {
+    const data = await fetchAPI<any>('/api/companies/filters');
+    return {
+      countries: (data.countries || []).map((item: any) => ({
+        countryCode: item.country_code,
+        totalTradeValue: parseFloat(item.total_trade_value) || 0,
+      })),
+      hsCategories: (data.hs_categories || []).map((item: any) => ({
+        hsPrefix: item.hs_prefix,
+        totalTradeValue: parseFloat(item.total_trade_value) || 0,
+        tradeCount: parseInt(item.trade_count) || 0,
+      })),
+    };
   },
 
   getDashboard: async (filters: {
