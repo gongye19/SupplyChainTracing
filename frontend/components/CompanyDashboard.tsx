@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Building2, Package, Search, TrendingUp, Users, X } from 'lucide-react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { companiesAPI } from '../services/api';
@@ -37,11 +37,6 @@ const SUGGESTED_COMPANIES = [
   'INTEL PRODUCTS VIETNAM CO LTD',
   'SAMSUNG ELECTRONICS CO LTD',
   'SAMSUNG ELECTRONICS VIETNAM CO LTD',
-  'HANYANG DIGITECH VINA CO LTD',
-  'MB AUTOMATION MALAYSIA SDN BHD',
-  'INTEL TECHNOLOGY SDN BHD',
-  'FOXCONN HON HAI TECHNOLOGY INDIA MEGA DEVELOPMENT IND',
-  'MICRON MEMORY MALAYSIA SDN BHD',
 ];
 
 const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate }) => {
@@ -49,12 +44,44 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
   const [results, setResults] = useState<CompanySearchResult[]>([]);
   const [company, setCompany] = useState<CompanyDashboardData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const keyword = searchInput.trim();
+    if (keyword.length < 2 || keyword === company?.name) {
+      setResults([]);
+      setSearching(false);
+      return;
+    }
+
+    let active = true;
+    setSearching(true);
+    const timer = window.setTimeout(async () => {
+      try {
+        const data = await companiesAPI.search(keyword, 8);
+        if (active) {
+          setResults(data);
+          setError(null);
+        }
+      } catch {
+        if (active) setResults([]);
+      } finally {
+        if (active) setSearching(false);
+      }
+    }, 280);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [searchInput, company?.name]);
 
   const loadCompany = async (name: string) => {
     const trimmed = name.trim();
     if (!trimmed) return;
     setLoading(true);
+    setSearching(false);
     setError(null);
     try {
       const data = await companiesAPI.getDashboard({
@@ -78,6 +105,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
     const trimmed = searchInput.trim();
     if (!trimmed) return;
     setLoading(true);
+    setSearching(false);
     setError(null);
     try {
       const data = await companiesAPI.search(trimmed, 12);
@@ -108,7 +136,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
         <span className="font-semibold text-[#1D1D1F]">{startDate} - {endDate}</span>
       </div>
 
-      <div className="w-full max-w-3xl">
+      <div className="w-full max-w-4xl mx-auto">
         <div className="relative flex items-center bg-white rounded-[18px] border border-black/[0.08] shadow-[0_4px_24px_rgba(0,0,0,0.06)] overflow-hidden focus-within:shadow-[0_4px_32px_rgba(0,122,255,0.15)] focus-within:border-[#007AFF]/30">
           <Search className="w-5 h-5 text-[#86868B] ml-5 shrink-0" />
           <input
@@ -129,7 +157,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
                 setCompany(null);
                 setError(null);
               }}
-              className="mr-2 p-1.5 rounded-full hover:bg-black/5 transition-colors"
+              className="mr-2 p-1.5 rounded-full hover:bg-black/5 transition-colors shrink-0"
               title="Clear"
             >
               <X className="w-4 h-4 text-[#86868B]" />
@@ -138,19 +166,19 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
           <button
             onClick={runSearch}
             disabled={loading}
-            className="mr-2 px-5 py-2.5 bg-[#007AFF] text-white text-[13px] font-semibold rounded-[12px] hover:bg-[#0066CC] transition-colors disabled:opacity-60 shrink-0"
+            className="mr-2 min-w-[84px] px-5 py-2.5 bg-[#007AFF] text-white text-[13px] font-semibold rounded-[12px] hover:bg-[#0066CC] transition-colors disabled:opacity-60 shrink-0"
           >
-            {loading ? 'Loading' : 'Search'}
+            {loading || searching ? 'Loading' : 'Search'}
           </button>
         </div>
 
         {results.length > 0 && (
-          <div className="mt-3 bg-white border border-black/5 rounded-[14px] shadow-sm overflow-hidden">
+          <div className="mt-3 bg-white border border-black/5 rounded-[14px] shadow-sm overflow-hidden max-h-[360px] overflow-y-auto">
             {results.map((result) => (
               <button
                 key={`${result.name}-${result.countryCode || 'NA'}-${result.role}`}
                 onClick={() => loadCompany(result.name)}
-                className="w-full px-4 py-3 flex items-center justify-between hover:bg-[#F5F5F7] border-b border-black/5 last:border-b-0 text-left"
+                className="w-full px-4 py-3 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 hover:bg-[#F5F5F7] border-b border-black/5 last:border-b-0 text-left"
               >
                 <div className="min-w-0">
                   <div className="text-[13px] font-bold text-[#1D1D1F] truncate">{result.name}</div>
@@ -173,22 +201,19 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
       )}
 
       {!company && !error && (
-        <div className="flex flex-col items-center justify-center flex-1 py-24 gap-5 text-center">
-          <div className="w-20 h-20 rounded-[24px] bg-white border border-black/5 shadow-sm flex items-center justify-center">
-            <Building2 className="w-10 h-10 text-[#C7C7CC]" />
-          </div>
+        <div className="flex flex-col items-center justify-start flex-1 pt-16 pb-24 gap-5 text-center">
           <div>
             <p className="text-[18px] font-bold text-[#1D1D1F] mb-1">Company Dashboard</p>
             <p className="text-[14px] text-[#86868B] max-w-sm">Search a company to view categories, suppliers, customers, and monthly trend.</p>
           </div>
-          <div className="w-full max-w-4xl">
+          <div className="w-full max-w-3xl">
             <p className="text-[11px] font-bold uppercase tracking-wider text-[#86868B] mb-3">Popular Searches</p>
-            <div className="flex flex-wrap justify-center gap-2">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
               {SUGGESTED_COMPANIES.map((name) => (
                 <button
                   key={name}
                   onClick={() => loadCompany(name)}
-                  className="max-w-[360px] truncate px-3.5 py-2 rounded-[10px] text-[12px] font-semibold bg-white border border-black/[0.08] text-[#1D1D1F] hover:border-[#007AFF]/30 hover:text-[#007AFF] hover:bg-[#F0F7FF] transition-colors shadow-sm"
+                  className="min-w-0 truncate px-3.5 py-2.5 rounded-[10px] text-[12px] font-semibold bg-white border border-black/[0.08] text-[#1D1D1F] hover:border-[#007AFF]/30 hover:text-[#007AFF] hover:bg-[#F0F7FF] transition-colors shadow-sm"
                   title={name}
                 >
                   {name}
