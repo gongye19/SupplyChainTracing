@@ -46,6 +46,8 @@ const ROLE_OPTIONS = [
   { value: 'both', label: 'Both' },
 ] as const;
 
+type CompanyRoleFilter = typeof ROLE_OPTIONS[number]['value'];
+
 const RESULTS_PER_PAGE = 10;
 
 const CONTINENT_OPTIONS = [
@@ -69,7 +71,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
   const [selectedContinent, setSelectedContinent] = useState('');
   const [selectedCountry, setSelectedCountry] = useState('');
   const [selectedHsPrefix, setSelectedHsPrefix] = useState('');
-  const [selectedRole, setSelectedRole] = useState<'' | 'importer' | 'exporter' | 'both'>('');
+  const [selectedRole, setSelectedRole] = useState<CompanyRoleFilter>('');
   const [filterOptions, setFilterOptions] = useState<CompanyFilterOptions>({ countries: [], hsCategories: [] });
   const [results, setResults] = useState<CompanySearchResult[]>([]);
   const [resultPage, setResultPage] = useState(1);
@@ -115,47 +117,9 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
     return [];
   }, [continentCountryCodes, selectedContinent, selectedCountry]);
 
-  const hasDiscoveryFilter = activeCountries.length > 0 || Boolean(selectedHsPrefix) || Boolean(selectedRole);
-
   useEffect(() => {
     setResultPage(1);
   }, [searchInput, selectedContinent, selectedCountry, selectedHsPrefix, selectedRole]);
-
-  useEffect(() => {
-    const keyword = searchInput.trim();
-    if ((!hasDiscoveryFilter && keyword.length < 2) || keyword === company?.name) {
-      setResults([]);
-      setSearching(false);
-      return;
-    }
-
-    let active = true;
-    setSearching(true);
-    const timer = window.setTimeout(async () => {
-      try {
-        const data = await companiesAPI.search({
-          query: keyword,
-          countries: activeCountries,
-          hsCodePrefix: selectedHsPrefix ? [selectedHsPrefix] : undefined,
-          role: selectedRole,
-          limit: 100,
-        });
-        if (active) {
-          setResults(data);
-          setError(null);
-        }
-      } catch {
-        if (active) setResults([]);
-      } finally {
-        if (active) setSearching(false);
-      }
-    }, 280);
-
-    return () => {
-      active = false;
-      window.clearTimeout(timer);
-    };
-  }, [activeCountries, company?.name, hasDiscoveryFilter, searchInput, selectedHsPrefix, selectedRole]);
 
   const loadCompany = async (name: string) => {
     const trimmed = name.trim();
@@ -184,7 +148,6 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
 
   const runSearch = async () => {
     const trimmed = searchInput.trim();
-    if (!trimmed) return;
     setLoading(true);
     setSearching(false);
     setError(null);
@@ -249,6 +212,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
                   setResults([]);
                   setCompany(null);
                   setError(null);
+                  setSearching(false);
                 }}
                 className="mr-2 p-1.5 rounded-full hover:bg-black/5 transition-colors shrink-0"
                 title="Clear"
@@ -265,7 +229,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
             </button>
           </div>
 
-          <div className="mt-3 grid grid-cols-1 md:grid-cols-[1fr_1fr_1.1fr] gap-2">
+          <div className="mt-3 grid grid-cols-1 md:grid-cols-4 gap-2">
             <FilterSelect
               label="Continent"
               value={selectedContinent}
@@ -290,24 +254,18 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
                 label: HS_CATEGORY_LABELS[item.hsPrefix] || `HS ${item.hsPrefix}`,
               }))}
             />
+            <FilterSelect
+              label="Role"
+              value={selectedRole}
+              onChange={(value) => setSelectedRole(value as CompanyRoleFilter)}
+              options={ROLE_OPTIONS.filter((option) => option.value).map((option) => ({
+                value: option.value,
+                label: option.label,
+              }))}
+            />
           </div>
 
-          <div className="mt-3 flex items-center justify-between gap-3">
-            <div className="inline-flex bg-[#F5F5F7] rounded-[10px] p-1 border border-black/[0.04]">
-              {ROLE_OPTIONS.map((option) => (
-                <button
-                  key={option.value || 'all'}
-                  onClick={() => setSelectedRole(option.value)}
-                  className={`px-3 py-1.5 rounded-[8px] text-[12px] font-semibold transition-colors ${
-                    selectedRole === option.value
-                      ? 'bg-white text-[#007AFF] shadow-sm'
-                      : 'text-[#86868B] hover:text-[#1D1D1F]'
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
+          <div className="mt-3 flex items-center justify-end gap-2">
             <button
               onClick={() => {
                 setSelectedContinent('');
@@ -315,10 +273,18 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
                 setSelectedHsPrefix('');
                 setSelectedRole('');
                 setResults([]);
+                setSearching(false);
               }}
               className="h-[34px] px-3 rounded-[9px] bg-[#F5F5F7] text-[12px] font-semibold text-[#86868B] hover:text-[#1D1D1F] transition-colors"
             >
               Clear Filters
+            </button>
+            <button
+              onClick={runSearch}
+              disabled={loading}
+              className="h-[34px] px-4 rounded-[9px] bg-[#007AFF] text-white text-[12px] font-semibold hover:bg-[#0066CC] transition-colors disabled:opacity-60"
+            >
+              {loading ? 'Searching' : 'Apply Search'}
             </button>
           </div>
         </div>
