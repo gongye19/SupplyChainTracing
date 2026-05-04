@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Building2, Package, Search, TrendingUp, Users, X } from 'lucide-react';
+import { Building2, ChevronLeft, ChevronRight, Package, Search, TrendingUp, Users, X } from 'lucide-react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { companiesAPI } from '../services/api';
 import { CompanyDashboardData, CompanyFilterOptions, CompanyRankItem, CompanySearchResult } from '../types';
@@ -39,6 +39,15 @@ const SUGGESTED_COMPANIES = [
   'SAMSUNG ELECTRONICS VIETNAM CO LTD',
 ];
 
+const ROLE_OPTIONS = [
+  { value: '', label: 'All' },
+  { value: 'importer', label: 'Import' },
+  { value: 'exporter', label: 'Export' },
+  { value: 'both', label: 'Both' },
+] as const;
+
+const RESULTS_PER_PAGE = 10;
+
 const CONTINENT_OPTIONS = [
   { id: 'asia', label: 'Asia', countries: ['ARE', 'ARM', 'AZE', 'BGD', 'BHR', 'BRN', 'CHN', 'GEO', 'HKG', 'IDN', 'IND', 'ISR', 'JOR', 'JPN', 'KAZ', 'KHM', 'KOR', 'KWT', 'LAO', 'LKA', 'MAC', 'MMR', 'MNG', 'MYS', 'OMN', 'PAK', 'PHL', 'QAT', 'SAU', 'SGP', 'THA', 'TUR', 'TWN', 'VNM'] },
   { id: 'europe', label: 'Europe', countries: ['AUT', 'BEL', 'BGR', 'CHE', 'CZE', 'DEU', 'DNK', 'ESP', 'EST', 'FIN', 'FRA', 'GBR', 'GRC', 'HRV', 'HUN', 'IRL', 'ITA', 'LTU', 'LUX', 'LVA', 'NLD', 'NOR', 'POL', 'PRT', 'ROU', 'RUS', 'SVK', 'SVN', 'SWE', 'UKR'] },
@@ -60,8 +69,10 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
   const [selectedContinent, setSelectedContinent] = useState('');
   const [selectedCountry, setSelectedCountry] = useState('');
   const [selectedHsPrefix, setSelectedHsPrefix] = useState('');
+  const [selectedRole, setSelectedRole] = useState<'' | 'importer' | 'exporter' | 'both'>('');
   const [filterOptions, setFilterOptions] = useState<CompanyFilterOptions>({ countries: [], hsCategories: [] });
   const [results, setResults] = useState<CompanySearchResult[]>([]);
+  const [resultPage, setResultPage] = useState(1);
   const [company, setCompany] = useState<CompanyDashboardData | null>(null);
   const [loading, setLoading] = useState(false);
   const [searching, setSearching] = useState(false);
@@ -104,7 +115,11 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
     return [];
   }, [continentCountryCodes, selectedContinent, selectedCountry]);
 
-  const hasDiscoveryFilter = activeCountries.length > 0 || Boolean(selectedHsPrefix);
+  const hasDiscoveryFilter = activeCountries.length > 0 || Boolean(selectedHsPrefix) || Boolean(selectedRole);
+
+  useEffect(() => {
+    setResultPage(1);
+  }, [searchInput, selectedContinent, selectedCountry, selectedHsPrefix, selectedRole]);
 
   useEffect(() => {
     const keyword = searchInput.trim();
@@ -122,7 +137,8 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
           query: keyword,
           countries: activeCountries,
           hsCodePrefix: selectedHsPrefix ? [selectedHsPrefix] : undefined,
-          limit: 8,
+          role: selectedRole,
+          limit: 100,
         });
         if (active) {
           setResults(data);
@@ -139,7 +155,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
       active = false;
       window.clearTimeout(timer);
     };
-  }, [activeCountries, company?.name, hasDiscoveryFilter, searchInput, selectedHsPrefix]);
+  }, [activeCountries, company?.name, hasDiscoveryFilter, searchInput, selectedHsPrefix, selectedRole]);
 
   const loadCompany = async (name: string) => {
     const trimmed = name.trim();
@@ -177,12 +193,12 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
         query: trimmed,
         countries: activeCountries,
         hsCodePrefix: selectedHsPrefix ? [selectedHsPrefix] : undefined,
-        limit: 12,
+        role: selectedRole,
+        limit: 100,
       });
       setResults(data);
-      if (data.length === 1) {
-        await loadCompany(data[0].name);
-      } else if (data.length === 0) {
+      setResultPage(1);
+      if (data.length === 0) {
         setCompany(null);
         setError('No company found');
       }
@@ -198,6 +214,12 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
     [company]
   );
 
+  const totalResultPages = Math.max(1, Math.ceil(results.length / RESULTS_PER_PAGE));
+  const pagedResults = useMemo(
+    () => results.slice((resultPage - 1) * RESULTS_PER_PAGE, resultPage * RESULTS_PER_PAGE),
+    [resultPage, results]
+  );
+
   return (
     <div className="flex-1 flex flex-col overflow-y-auto bg-[#F5F5F7] p-6 gap-6">
       <div className="flex items-center gap-2 text-[12px] text-[#86868B] bg-white/80 backdrop-blur px-4 py-2.5 rounded-[12px] border border-black/5 w-fit shadow-sm">
@@ -207,82 +229,111 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
       </div>
 
       <div className="w-full max-w-4xl mx-auto">
-        <div className="relative flex items-center bg-white rounded-[18px] border border-black/[0.08] shadow-[0_4px_24px_rgba(0,0,0,0.06)] overflow-hidden focus-within:shadow-[0_4px_32px_rgba(0,122,255,0.15)] focus-within:border-[#007AFF]/30">
-          <Search className="w-5 h-5 text-[#86868B] ml-5 shrink-0" />
-          <input
-            type="text"
-            value={searchInput}
-            onChange={(event) => setSearchInput(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') runSearch();
-            }}
-            placeholder="Search company name"
-            className="flex-1 px-4 py-4 text-[15px] font-medium text-[#1D1D1F] placeholder:text-[#C7C7CC] bg-transparent outline-none"
-          />
-          {searchInput && (
+        <div className="bg-white rounded-[18px] border border-black/[0.08] shadow-[0_4px_24px_rgba(0,0,0,0.06)] p-3">
+          <div className="relative flex items-center bg-[#F5F5F7] rounded-[12px] border border-transparent focus-within:bg-white focus-within:border-[#007AFF]/30 transition-colors">
+            <Search className="w-5 h-5 text-[#86868B] ml-4 shrink-0" />
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(event) => setSearchInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') runSearch();
+              }}
+              placeholder="Search company name"
+              className="flex-1 min-w-0 px-3 py-3 text-[15px] font-medium text-[#1D1D1F] placeholder:text-[#C7C7CC] bg-transparent outline-none"
+            />
+            {searchInput && (
+              <button
+                onClick={() => {
+                  setSearchInput('');
+                  setResults([]);
+                  setCompany(null);
+                  setError(null);
+                }}
+                className="mr-2 p-1.5 rounded-full hover:bg-black/5 transition-colors shrink-0"
+                title="Clear"
+              >
+                <X className="w-4 h-4 text-[#86868B]" />
+              </button>
+            )}
+            <button
+              onClick={runSearch}
+              disabled={loading}
+              className="mr-1.5 min-w-[84px] px-4 py-2 bg-[#007AFF] text-white text-[13px] font-semibold rounded-[10px] hover:bg-[#0066CC] transition-colors disabled:opacity-60 shrink-0"
+            >
+              {loading || searching ? 'Loading' : 'Search'}
+            </button>
+          </div>
+
+          <div className="mt-3 grid grid-cols-1 md:grid-cols-[1fr_1fr_1.1fr] gap-2">
+            <FilterSelect
+              label="Continent"
+              value={selectedContinent}
+              onChange={(value) => {
+                setSelectedContinent(value);
+                setSelectedCountry('');
+              }}
+              options={CONTINENT_OPTIONS.map((item) => ({ value: item.id, label: item.label }))}
+            />
+            <FilterSelect
+              label="Country"
+              value={selectedCountry}
+              onChange={setSelectedCountry}
+              options={countryOptions.map((item) => ({ value: item.countryCode, label: item.countryCode }))}
+            />
+            <FilterSelect
+              label="Category"
+              value={selectedHsPrefix}
+              onChange={setSelectedHsPrefix}
+              options={filterOptions.hsCategories.map((item) => ({
+                value: item.hsPrefix,
+                label: HS_CATEGORY_LABELS[item.hsPrefix] || `HS ${item.hsPrefix}`,
+              }))}
+            />
+          </div>
+
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <div className="inline-flex bg-[#F5F5F7] rounded-[10px] p-1 border border-black/[0.04]">
+              {ROLE_OPTIONS.map((option) => (
+                <button
+                  key={option.value || 'all'}
+                  onClick={() => setSelectedRole(option.value)}
+                  className={`px-3 py-1.5 rounded-[8px] text-[12px] font-semibold transition-colors ${
+                    selectedRole === option.value
+                      ? 'bg-white text-[#007AFF] shadow-sm'
+                      : 'text-[#86868B] hover:text-[#1D1D1F]'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
             <button
               onClick={() => {
-                setSearchInput('');
+                setSelectedContinent('');
+                setSelectedCountry('');
+                setSelectedHsPrefix('');
+                setSelectedRole('');
                 setResults([]);
-                setCompany(null);
-                setError(null);
               }}
-              className="mr-2 p-1.5 rounded-full hover:bg-black/5 transition-colors shrink-0"
-              title="Clear"
+              className="h-[34px] px-3 rounded-[9px] bg-[#F5F5F7] text-[12px] font-semibold text-[#86868B] hover:text-[#1D1D1F] transition-colors"
             >
-              <X className="w-4 h-4 text-[#86868B]" />
+              Clear Filters
             </button>
-          )}
-          <button
-            onClick={runSearch}
-            disabled={loading}
-            className="mr-2 min-w-[84px] px-5 py-2.5 bg-[#007AFF] text-white text-[13px] font-semibold rounded-[12px] hover:bg-[#0066CC] transition-colors disabled:opacity-60 shrink-0"
-          >
-            {loading || searching ? 'Loading' : 'Search'}
-          </button>
-        </div>
-
-        <div className="mt-3 grid grid-cols-1 md:grid-cols-[1fr_1fr_1.1fr_auto] gap-2">
-          <FilterSelect
-            label="Continent"
-            value={selectedContinent}
-            onChange={(value) => {
-              setSelectedContinent(value);
-              setSelectedCountry('');
-            }}
-            options={CONTINENT_OPTIONS.map((item) => ({ value: item.id, label: item.label }))}
-          />
-          <FilterSelect
-            label="Country"
-            value={selectedCountry}
-            onChange={setSelectedCountry}
-            options={countryOptions.map((item) => ({ value: item.countryCode, label: item.countryCode }))}
-          />
-          <FilterSelect
-            label="Category"
-            value={selectedHsPrefix}
-            onChange={setSelectedHsPrefix}
-            options={filterOptions.hsCategories.map((item) => ({
-              value: item.hsPrefix,
-              label: HS_CATEGORY_LABELS[item.hsPrefix] || `HS ${item.hsPrefix}`,
-            }))}
-          />
-          <button
-            onClick={() => {
-              setSelectedContinent('');
-              setSelectedCountry('');
-              setSelectedHsPrefix('');
-              setResults([]);
-            }}
-            className="h-[42px] px-3 rounded-[10px] bg-white border border-black/[0.08] text-[12px] font-semibold text-[#86868B] hover:text-[#1D1D1F] hover:bg-[#F5F5F7] transition-colors"
-          >
-            Clear
-          </button>
+          </div>
         </div>
 
         {results.length > 0 && (
-          <div className="mt-3 bg-white border border-black/5 rounded-[14px] shadow-sm overflow-hidden max-h-[360px] overflow-y-auto">
-            {results.map((result) => (
+          <div className="mt-3 bg-white border border-black/5 rounded-[14px] shadow-sm overflow-hidden">
+            <div className="px-4 py-2.5 border-b border-black/5 flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[#86868B]">
+                {results.length.toLocaleString()} Companies
+              </span>
+              <span className="text-[11px] font-semibold text-[#86868B]">
+                Page {resultPage} / {totalResultPages}
+              </span>
+            </div>
+            {pagedResults.map((result) => (
               <button
                 key={`${result.name}-${result.countryCode || 'NA'}-${result.role}`}
                 onClick={() => loadCompany(result.name)}
@@ -298,6 +349,26 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
                 </div>
               </button>
             ))}
+            {totalResultPages > 1 && (
+              <div className="px-3 py-2.5 border-t border-black/5 flex items-center justify-end gap-2">
+                <button
+                  onClick={() => setResultPage((page) => Math.max(1, page - 1))}
+                  disabled={resultPage <= 1}
+                  className="w-8 h-8 rounded-[8px] bg-[#F5F5F7] flex items-center justify-center disabled:opacity-40 hover:bg-black/10 transition-colors"
+                  title="Previous page"
+                >
+                  <ChevronLeft className="w-4 h-4 text-[#1D1D1F]" />
+                </button>
+                <button
+                  onClick={() => setResultPage((page) => Math.min(totalResultPages, page + 1))}
+                  disabled={resultPage >= totalResultPages}
+                  className="w-8 h-8 rounded-[8px] bg-[#F5F5F7] flex items-center justify-center disabled:opacity-40 hover:bg-black/10 transition-colors"
+                  title="Next page"
+                >
+                  <ChevronRight className="w-4 h-4 text-[#1D1D1F]" />
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

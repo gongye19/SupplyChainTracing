@@ -52,7 +52,8 @@ def search_companies(
     country: Optional[List[str]] = Query(None),
     hs_code: Optional[List[str]] = Query(None),
     hs_code_prefix: Optional[List[str]] = Query(None),
-    limit: int = Query(20, ge=1, le=50),
+    role: Optional[str] = Query(None),
+    limit: int = Query(20, ge=1, le=200),
     db: Session = Depends(get_db),
 ):
     params: dict = {"limit": limit}
@@ -67,6 +68,13 @@ def search_companies(
         where += f" AND s.country_code IN ({ph})"
         for i, code in enumerate(country):
             params[f"country_{i}"] = code
+
+    if role == "importer":
+        where += " AND s.role IN ('importer', 'both')"
+    elif role == "exporter":
+        where += " AND s.role IN ('exporter', 'both')"
+    elif role == "both":
+        where += " AND s.role = 'both'"
 
     hs_exists_where = " WHERE h.company_name = s.name"
     hs_exists_where, params = _hs_filter(hs_exists_where, params, hs_code, hs_code_prefix)

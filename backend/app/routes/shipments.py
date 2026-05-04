@@ -78,6 +78,8 @@ def get_shipments(
                 conds.append(f"hs_code LIKE :hsp_{i}")
             query += f" AND ({' OR '.join(conds)})"
 
+        query += " ORDER BY sum_of_usd DESC NULLS LAST, trade_count DESC NULLS LAST"
+
         if limit:
             query += " LIMIT :lim"
             params["lim"] = limit

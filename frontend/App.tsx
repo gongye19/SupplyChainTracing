@@ -238,40 +238,21 @@ const App: React.FC = () => {
     const loadInitialData = async () => {
       try {
         setInitialLoading(true);
-        const [hsCodeCatsData, locationsData, hsCodesData] = await Promise.all([
+        const [hsCodeCatsData, locationsData, hsCodesData, countryAggregateData] = await Promise.all([
           hsCodeCategoriesAPI.getAll(),
           countryLocationsAPI.getAll(),
           countryTradeStatsAPI.getAvailableHSCodes(),
+          countryTradeStatsAPI.getCountryAggregate({
+            tradeDirection: 'all',
+            startYearMonth: startDate,
+            endYearMonth: endDate,
+            limit: 300,
+          }),
         ]);
-        let allShipmentsData: Shipment[] = [];
-
-        // 仅在分类或国家坐标接口为空时，才回退读取 shipments；
-        // 且初始化时只加载 Trade Map 默认国家（CHN/USA），避免全量预加载。
-        if (hsCodeCatsData.length === 0 || locationsData.length === 0) {
-          allShipmentsData = await shipmentsAPI.getAll({
-            startDate,
-            endDate,
-            selectedCountries: defaultCountryMapFilters.selectedCountries,
-          });
-        }
-        logger.debug('[Init] HS categories:', hsCodeCatsData.length, 'countries:', locationsData.length, 'shipments:', allShipmentsData.length);
+        logger.debug('[Init] HS categories:', hsCodeCatsData.length, 'countries:', locationsData.length, 'country aggregate:', countryAggregateData.length);
         
         // 处理 HS Code Categories
         let finalHsCodeCats = hsCodeCatsData;
-        if (finalHsCodeCats.length === 0 && allShipmentsData.length > 0) {
-          // 从 shipments 数据中提取 HS Code 分类
-          const hsCodeSet = new Set<string>();
-          allShipmentsData.forEach(s => {
-            if (s.hsCode && s.hsCode.length >= 2) {
-              hsCodeSet.add(s.hsCode.slice(0, 2));
-            }
-          });
-          finalHsCodeCats = Array.from(hsCodeSet).sort().map(code => ({
-            hsCode: code,
-            chapterName: `Chapter ${code}` // 默认名称，可以后续改进
-          }));
-          logger.debug('[Init] Generated HS categories from shipments:', finalHsCodeCats.length);
-        }
         setHsCodeCategories(finalHsCodeCats);
         setAvailableHSCodes(hsCodesData);
         
@@ -287,16 +268,9 @@ const App: React.FC = () => {
             region: loc.region,
             continent: loc.continent
           }));
-        } else if (allShipmentsData.length > 0) {
-          // 从 shipments 数据中提取国家代码
-          const countryCodeSet = new Set<string>();
-          allShipmentsData.forEach(s => {
-            if (s.originCountryCode) countryCodeSet.add(s.originCountryCode);
-            if (s.destinationCountryCode) countryCodeSet.add(s.destinationCountryCode);
-          });
-          
+        } else if (countryAggregateData.length > 0) {
           // 使用国家坐标映射表生成 countries
-          const countryCoords = getCountriesFromCodes(Array.from(countryCodeSet));
+          const countryCoords = getCountriesFromCodes(countryAggregateData.map((item) => item.countryCode));
           finalCountries = countryCoords.map(coord => ({
             countryCode: coord.countryCode,
             countryName: coord.countryName,
@@ -305,7 +279,7 @@ const App: React.FC = () => {
             region: coord.region,
             continent: coord.continent
           }));
-          logger.debug('[Init] Generated countries from shipments:', finalCountries.length);
+          logger.debug('[Init] Generated countries from country aggregate:', finalCountries.length);
         }
         setCountries(finalCountries);
         
@@ -633,7 +607,7 @@ const App: React.FC = () => {
       const startTime = performance.now();
       const data = await shipmentsAPI.getAll(filtersToUse, {
         signal: controller.signal,
-        limit: mode === 'preview' ? 5000 : 20000,
+        limit: mode === 'preview' ? 1200 : 5000,
       });
       const duration = performance.now() - startTime;
 

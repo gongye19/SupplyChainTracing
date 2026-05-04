@@ -704,12 +704,14 @@ export const companiesAPI = {
     query?: string;
     countries?: string[];
     hsCodePrefix?: string[];
+    role?: 'importer' | 'exporter' | 'both' | '';
     limit?: number;
   }): Promise<CompanySearchResult[]> => {
     const params = new URLSearchParams();
     if (filters.query?.trim()) params.append('q', filters.query.trim());
     filters.countries?.forEach((country) => params.append('country', country));
     filters.hsCodePrefix?.forEach((prefix) => params.append('hs_code_prefix', prefix));
+    if (filters.role) params.append('role', filters.role);
     params.append('limit', String(filters.limit ?? 12));
     const data = await fetchAPI<any[]>(`/api/companies/search?${params.toString()}`);
     return data.map((item) => ({
