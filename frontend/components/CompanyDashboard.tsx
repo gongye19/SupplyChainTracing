@@ -229,8 +229,8 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
             </button>
           </div>
 
-          <div className="mt-3 grid grid-cols-1 md:grid-cols-4 gap-2">
-            <FilterSelect
+          <div className="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <FilterChips
               label="Continent"
               value={selectedContinent}
               onChange={(value) => {
@@ -239,13 +239,15 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
               }}
               options={CONTINENT_OPTIONS.map((item) => ({ value: item.id, label: item.label }))}
             />
-            <FilterSelect
+            <FilterChips
               label="Country"
               value={selectedCountry}
               onChange={setSelectedCountry}
               options={countryOptions.map((item) => ({ value: item.countryCode, label: item.countryCode }))}
+              disabled={!selectedContinent}
+              emptyText="Select continent first"
             />
-            <FilterSelect
+            <FilterChips
               label="Category"
               value={selectedHsPrefix}
               onChange={setSelectedHsPrefix}
@@ -254,7 +256,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
                 label: HS_CATEGORY_LABELS[item.hsPrefix] || `HS ${item.hsPrefix}`,
               }))}
             />
-            <FilterSelect
+            <FilterChips
               label="Role"
               value={selectedRole}
               onChange={(value) => setSelectedRole(value as CompanyRoleFilter)}
@@ -465,28 +467,74 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
   );
 };
 
-const FilterSelect: React.FC<{
+const FilterChips: React.FC<{
   label: string;
   value: string;
   onChange: (value: string) => void;
   options: Array<{ value: string; label: string }>;
-}> = ({ label, value, onChange, options }) => (
-  <label className="h-[42px] flex items-center gap-2 px-3 rounded-[10px] bg-white border border-black/[0.08] min-w-0">
-    <span className="text-[10px] font-bold uppercase tracking-wider text-[#86868B] shrink-0">{label}</span>
-    <select
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-      className="min-w-0 flex-1 bg-transparent outline-none text-[12px] font-semibold text-[#1D1D1F]"
-    >
-      <option value="">All</option>
-      {options.map((option) => (
-        <option key={option.value} value={option.value}>
-          {option.label}
-        </option>
-      ))}
-    </select>
-  </label>
-);
+  disabled?: boolean;
+  emptyText?: string;
+}> = ({ label, value, onChange, options, disabled = false, emptyText = 'No options' }) => {
+  const visibleOptions = disabled ? [] : options;
+
+  return (
+    <div className={`rounded-[12px] border border-black/[0.08] bg-white p-3 min-w-0 ${disabled ? 'opacity-75' : ''}`}>
+      <div className="flex items-center justify-between gap-3 mb-2">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-[#86868B]">{label}</span>
+        {value && !disabled && (
+          <button
+            type="button"
+            onClick={() => onChange('')}
+            className="text-[10px] font-bold text-[#86868B] hover:text-[#1D1D1F] transition-colors"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-1.5 max-h-[96px] overflow-y-auto pr-1">
+        {disabled ? (
+          <span className="px-2.5 py-1.5 rounded-[8px] bg-[#F5F5F7] text-[11px] font-semibold text-[#86868B]">
+            {emptyText}
+          </span>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={() => onChange('')}
+              className={`px-2.5 py-1.5 rounded-[8px] text-[11px] font-semibold transition-colors ${
+                value === ''
+                  ? 'bg-[#007AFF] text-white'
+                  : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-black/10'
+              }`}
+            >
+              All
+            </button>
+            {visibleOptions.map((option) => (
+              <button
+                type="button"
+                key={option.value}
+                onClick={() => onChange(option.value)}
+                className={`px-2.5 py-1.5 rounded-[8px] text-[11px] font-semibold transition-colors ${
+                  value === option.value
+                    ? 'bg-[#007AFF] text-white'
+                    : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-black/10'
+                }`}
+                title={option.label}
+              >
+                {option.label}
+              </button>
+            ))}
+            {visibleOptions.length === 0 && (
+              <span className="px-2.5 py-1.5 rounded-[8px] bg-[#F5F5F7] text-[11px] font-semibold text-[#86868B]">
+                {emptyText}
+              </span>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
 
 const Metric: React.FC<{ label: string; value: string }> = ({ label, value }) => (
   <div className="text-right">
