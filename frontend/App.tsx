@@ -4,7 +4,7 @@ import StatsPanel from './components/StatsPanel';
 import SidebarFilters from './components/SidebarFilters';
 import CountryTradeSidebar from './components/CountryTradeSidebar';
 import type { TopCountriesDatum } from './components/TopCountriesHorizontalBar';
-import { Transaction, Filters, HSCodeCategory, CountryLocation, Location, Shipment, CountryMonthlyTradeStat, CountryTradeStatSummary, CountryTradeTrend, TopCountry, CountryTradeFilters, CountryQuarterTop, CountryAggregate, CountryQuarterAggregate, HSAggregate, HSQuarterAggregate } from './types';
+import { Filters, HSCodeCategory, CountryLocation, Location, Shipment, CountryMonthlyTradeStat, CountryTradeStatSummary, CountryTradeTrend, TopCountry, CountryTradeFilters, CountryQuarterTop, CountryAggregate, CountryQuarterAggregate, HSAggregate, HSQuarterAggregate } from './types';
 import { shipmentsAPI, hsCodeCategoriesAPI, countryLocationsAPI, chatAPI, ChatMessage, countryTradeStatsAPI } from './services/api';
 import { Globe, Map as MapIcon, Package, TrendingUp, Users, ChevronRight, Filter, Building2 } from 'lucide-react';
 import { useLanguage } from './contexts/LanguageContext';
@@ -118,7 +118,6 @@ const App: React.FC = () => {
   const [hsCodeCategories, setHsCodeCategories] = useState<HSCodeCategory[]>([]);
   const [availableHSCodes, setAvailableHSCodes] = useState<string[]>([]);
   const [countries, setCountries] = useState<CountryLocation[]>([]);
-  const [companies, setCompanies] = useState<string[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
   const [filterLoading, setFilterLoading] = useState(false);
   const [isInteracting, setIsInteracting] = useState(false); // 是否正在交互(拖动/快速点击)
@@ -283,8 +282,6 @@ const App: React.FC = () => {
         }
         setCountries(finalCountries);
         
-        // 注意：聚合数据不包含公司信息，所以公司列表为空
-        setCompanies([]);
         logger.debug('[Init] Company dimension disabled for aggregated dataset');
       } catch (error) {
         logger.error('Failed to load initial data:', error);

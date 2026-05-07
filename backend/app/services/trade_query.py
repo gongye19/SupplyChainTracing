@@ -11,6 +11,9 @@ from ..utils.db_helpers import is_missing_table_error
 
 
 TABLE = "country_origin_trade_stats"
+PARTICIPATION_SCOPE_NOTE = (
+    "trade_direction=all uses both-side participation scope: each flow contributes once to origin and once to destination."
+)
 
 
 @dataclass(frozen=True)
@@ -96,3 +99,66 @@ def metric_sql(metric: Optional[str]) -> tuple[str, str, str, str]:
     share_denominator = "SUM(SUM(trade_count)) OVER()" if metric_key == "trade_count" else "SUM(SUM(sum_of_usd)) OVER()"
     order_metric = "trade_count" if metric_key == "trade_count" else "sum_of_usd"
     return metric_key, share_numerator, share_denominator, order_metric
+
+
+def country_side_source(
+    filters: TradeFilters,
+    params: dict,
+    *,
+    include_hs: bool = False,
+    include_period: bool = False,
+) -> tuple[str, dict, str]:
+    """Return a FROM source and country expression for country-side participation queries."""
+    direction = normalize_direction(filters.trade_direction)
+    where, params = apply_filters(" WHERE 1=1", params, filters)
+
+    if direction == "all":
+        prefix_cols = []
+        if include_hs:
+            prefix_cols.append("hs_code")
+        if include_period:
+            prefix_cols.extend(["year", "month"])
+        prefix = ", ".join(prefix_cols)
+        prefix = f"{prefix}, " if prefix else ""
+        source = f"""
+            (
+                SELECT {prefix}origin_country_code AS country_code, sum_of_usd, trade_count
+                FROM {TABLE}{where}
+                UNION ALL
+                SELECT {prefix}destination_country_code AS country_code, sum_of_usd, trade_count
+                FROM {TABLE}{where}
+            ) side_scope
+        """
+        return source, params, "country_code"
+
+    col = country_col(direction)
+    return f"{TABLE}{where}", params, col or "country_code"
+
+
+def hs_participation_source(
+    filters: TradeFilters,
+    params: dict,
+    *,
+    include_period: bool = False,
+) -> tuple[str, dict]:
+    """Return a FROM source for HS participation queries.
+
+    The all-direction source intentionally duplicates each flow once per side to
+    keep existing both-side participation semantics.
+    """
+    direction = normalize_direction(filters.trade_direction)
+    where, params = apply_filters(" WHERE 1=1", params, filters)
+    period_cols = "year, month, " if include_period else ""
+
+    if direction == "all":
+        return f"""
+            (
+                SELECT {period_cols}hs_code, sum_of_usd, trade_count FROM {TABLE}{where}
+                UNION ALL
+                SELECT {period_cols}hs_code, sum_of_usd, trade_count FROM {TABLE}{where}
+            ) side_scope
+        """, params
+
+    col = country_col(direction)
+    where += f" AND {col} IS NOT NULL"
+    return f"{TABLE}{where}", params

@@ -14,7 +14,16 @@ from ..schemas import (
     HSAggregate,
     HSQuarterAggregate,
 )
-from ..services.trade_query import TABLE, TradeFilters, apply_filters, country_col, execute_safe, metric_sql
+from ..services.trade_query import (
+    TABLE,
+    TradeFilters,
+    apply_filters,
+    country_col,
+    country_side_source,
+    execute_safe,
+    hs_participation_source,
+    metric_sql,
+)
 from ..utils.db_helpers import rows_to_dicts
 
 router = APIRouter()
@@ -51,6 +60,29 @@ def _apply_filters(
 
 _country_col = country_col
 _safe = execute_safe
+
+
+def _filters(
+    *,
+    hs_code: Optional[List[str]] = None,
+    hs_code_prefix: Optional[List[str]] = None,
+    year: Optional[int] = None,
+    month: Optional[int] = None,
+    country: Optional[List[str]] = None,
+    start_year_month: Optional[str] = None,
+    end_year_month: Optional[str] = None,
+    trade_direction: Optional[str] = None,
+) -> TradeFilters:
+    return TradeFilters(
+        hs_code=hs_code,
+        hs_code_prefix=hs_code_prefix,
+        year=year,
+        month=month,
+        country=country,
+        start_year_month=start_year_month,
+        end_year_month=end_year_month,
+        trade_direction=trade_direction,
+    )
 
 
 # ── 主查询：按国家聚合 ─────────────────────────────────────────
@@ -458,53 +490,26 @@ def get_country_aggregate(
     limit: int = Query(300),
     db: Session = Depends(get_db),
 ):
-    td = trade_direction or "all"
     params: dict = {"lim": limit}
-    if td == "all":
-        base_where = " WHERE 1=1"
-        base_where, params = _apply_filters(
-            base_where, params,
+    source, params, country_expr = country_side_source(
+        _filters(
             hs_code=hs_code, hs_code_prefix=hs_code_prefix,
             country=country,
             start_year_month=start_year_month, end_year_month=end_year_month,
-            trade_direction=td,
-        )
-        query = f"""
-            SELECT
-                country_code,
-                SUM(sum_of_usd) AS sum_of_usd,
-                SUM(trade_count) AS trade_count
-            FROM (
-                SELECT origin_country_code AS country_code, sum_of_usd, trade_count
-                FROM {TABLE}{base_where}
-                UNION ALL
-                SELECT destination_country_code AS country_code, sum_of_usd, trade_count
-                FROM {TABLE}{base_where}
-            ) sub
-            GROUP BY country_code
-            ORDER BY sum_of_usd DESC
-            LIMIT :lim
-        """
-    else:
-        cc = _country_col(td)
-        where = " WHERE 1=1"
-        where, params = _apply_filters(
-            where, params,
-            hs_code=hs_code, hs_code_prefix=hs_code_prefix,
-            country=country,
-            start_year_month=start_year_month, end_year_month=end_year_month,
-            trade_direction=td,
-        )
-        query = f"""
-            SELECT
-                {cc} AS country_code,
-                SUM(sum_of_usd) AS sum_of_usd,
-                SUM(trade_count) AS trade_count
-            FROM {TABLE}{where}
-            GROUP BY {cc}
-            ORDER BY sum_of_usd DESC
-            LIMIT :lim
-        """
+            trade_direction=trade_direction,
+        ),
+        params,
+    )
+    query = f"""
+        SELECT
+            {country_expr} AS country_code,
+            SUM(sum_of_usd) AS sum_of_usd,
+            SUM(trade_count) AS trade_count
+        FROM {source}
+        GROUP BY {country_expr}
+        ORDER BY sum_of_usd DESC
+        LIMIT :lim
+    """
     result = _safe(db, query, params, fallback=[])
     if result == []:
         return []
@@ -534,42 +539,56 @@ def get_country_quarterly(
             trade_direction=td,
         )
         query = f"""
+            WITH side_scope AS (
+                SELECT
+                    year,
+                    ((month - 1) / 3 + 1) AS quarter,
+                    origin_country_code AS country_code,
+                    SUM(sum_of_usd) AS sum_of_usd,
+                    SUM(trade_count) AS trade_count
+                FROM {TABLE}{base_where}
+                GROUP BY year, quarter, origin_country_code
+                UNION ALL
+                SELECT
+                    year,
+                    ((month - 1) / 3 + 1) AS quarter,
+                    destination_country_code AS country_code,
+                    SUM(sum_of_usd) AS sum_of_usd,
+                    SUM(trade_count) AS trade_count
+                FROM {TABLE}{base_where}
+                GROUP BY year, quarter, destination_country_code
+            )
             SELECT
                 year,
-                ((month - 1) / 3 + 1) AS quarter,
+                quarter,
                 country_code,
                 SUM(sum_of_usd) AS sum_of_usd,
                 SUM(trade_count) AS trade_count
-            FROM (
-                SELECT year, month, origin_country_code AS country_code, sum_of_usd, trade_count
-                FROM {TABLE}{base_where}
-                UNION ALL
-                SELECT year, month, destination_country_code AS country_code, sum_of_usd, trade_count
-                FROM {TABLE}{base_where}
-            ) sub
+            FROM side_scope
             GROUP BY year, quarter, country_code
             ORDER BY year, quarter, sum_of_usd DESC
             LIMIT :lim
         """
     else:
-        cc = _country_col(td)
-        where = " WHERE 1=1"
-        where, params = _apply_filters(
-            where, params,
-            hs_code=hs_code, hs_code_prefix=hs_code_prefix,
-            country=country,
-            start_year_month=start_year_month, end_year_month=end_year_month,
-            trade_direction=td,
+        source, params, country_expr = country_side_source(
+            _filters(
+                hs_code=hs_code, hs_code_prefix=hs_code_prefix,
+                country=country,
+                start_year_month=start_year_month, end_year_month=end_year_month,
+                trade_direction=td,
+            ),
+            params,
+            include_period=True,
         )
         query = f"""
             SELECT
                 year,
                 ((month - 1) / 3 + 1) AS quarter,
-                {cc} AS country_code,
+                {country_expr} AS country_code,
                 SUM(sum_of_usd) AS sum_of_usd,
                 SUM(trade_count) AS trade_count
-            FROM {TABLE}{where}
-            GROUP BY year, quarter, {cc}
+            FROM {source}
+            GROUP BY year, quarter, {country_expr}
             ORDER BY year, quarter, sum_of_usd DESC
             LIMIT :lim
         """
@@ -590,57 +609,26 @@ def get_hs_aggregate(
     limit: int = Query(200),
     db: Session = Depends(get_db),
 ):
-    td = trade_direction or "all"
     params: dict = {"lim": limit}
-
-    # trade_direction 决定从哪一侧统计，不依赖 country 是否存在
-    if td == "all":
-        base_where = " WHERE 1=1"
-        base_where, params = _apply_filters(
-            base_where, params,
+    source, params = hs_participation_source(
+        _filters(
             hs_code=hs_code, hs_code_prefix=hs_code_prefix,
             country=country,
             start_year_month=start_year_month, end_year_month=end_year_month,
-            trade_direction=td,
-        )
-        query = f"""
-            SELECT
-                hs_code,
-                SUM(sum_of_usd) AS sum_of_usd,
-                SUM(trade_count) AS trade_count
-            FROM (
-                SELECT hs_code, sum_of_usd, trade_count FROM {TABLE}{base_where}
-                UNION ALL
-                SELECT hs_code, sum_of_usd, trade_count FROM {TABLE}{base_where}
-            ) sub
-            GROUP BY hs_code
-            ORDER BY sum_of_usd DESC
-            LIMIT :lim
-        """
-    else:
-        # import: 统计目的地侧（destination）的 hs_code 汇总
-        # export: 统计来源侧（origin）的 hs_code 汇总
-        cc = _country_col(td)  # destination_country_code or origin_country_code
-        where = " WHERE 1=1"
-        where, params = _apply_filters(
-            where, params,
-            hs_code=hs_code, hs_code_prefix=hs_code_prefix,
-            country=country,
-            start_year_month=start_year_month, end_year_month=end_year_month,
-            trade_direction=td,
-        )
-        # 用方向对应的列做非空过滤，确保只取该方向有效的记录
-        where += f" AND {cc} IS NOT NULL"
-        query = f"""
-            SELECT
-                hs_code,
-                SUM(sum_of_usd) AS sum_of_usd,
-                SUM(trade_count) AS trade_count
-            FROM {TABLE}{where}
-            GROUP BY hs_code
-            ORDER BY sum_of_usd DESC
-            LIMIT :lim
-        """
+            trade_direction=trade_direction,
+        ),
+        params,
+    )
+    query = f"""
+        SELECT
+            hs_code,
+            SUM(sum_of_usd) AS sum_of_usd,
+            SUM(trade_count) AS trade_count
+        FROM {source}
+        GROUP BY hs_code
+        ORDER BY sum_of_usd DESC
+        LIMIT :lim
+    """
 
     result = _safe(db, query, params, fallback=[])
     if result == []:
@@ -659,57 +647,29 @@ def get_hs_quarterly(
     limit: int = Query(4000),
     db: Session = Depends(get_db),
 ):
-    td = trade_direction or "all"
     params: dict = {"lim": limit}
-
-    if td == "all":
-        base_where = " WHERE 1=1"
-        base_where, params = _apply_filters(
-            base_where, params,
+    source, params = hs_participation_source(
+        _filters(
             hs_code=hs_code, hs_code_prefix=hs_code_prefix,
             country=country,
             start_year_month=start_year_month, end_year_month=end_year_month,
-            trade_direction=td,
-        )
-        query = f"""
-            SELECT
-                year,
-                ((month - 1) / 3 + 1) AS quarter,
-                hs_code,
-                SUM(sum_of_usd) AS sum_of_usd,
-                SUM(trade_count) AS trade_count
-            FROM (
-                SELECT year, month, hs_code, sum_of_usd, trade_count FROM {TABLE}{base_where}
-                UNION ALL
-                SELECT year, month, hs_code, sum_of_usd, trade_count FROM {TABLE}{base_where}
-            ) sub
-            GROUP BY year, quarter, hs_code
-            ORDER BY year, quarter, sum_of_usd DESC
-            LIMIT :lim
-        """
-    else:
-        cc = _country_col(td)
-        where = " WHERE 1=1"
-        where, params = _apply_filters(
-            where, params,
-            hs_code=hs_code, hs_code_prefix=hs_code_prefix,
-            country=country,
-            start_year_month=start_year_month, end_year_month=end_year_month,
-            trade_direction=td,
-        )
-        where += f" AND {cc} IS NOT NULL"
-        query = f"""
-            SELECT
-                year,
-                ((month - 1) / 3 + 1) AS quarter,
-                hs_code,
-                SUM(sum_of_usd) AS sum_of_usd,
-                SUM(trade_count) AS trade_count
-            FROM {TABLE}{where}
-            GROUP BY year, quarter, hs_code
-            ORDER BY year, quarter, sum_of_usd DESC
-            LIMIT :lim
-        """
+            trade_direction=trade_direction,
+        ),
+        params,
+        include_period=True,
+    )
+    query = f"""
+        SELECT
+            year,
+            ((month - 1) / 3 + 1) AS quarter,
+            hs_code,
+            SUM(sum_of_usd) AS sum_of_usd,
+            SUM(trade_count) AS trade_count
+        FROM {source}
+        GROUP BY year, quarter, hs_code
+        ORDER BY year, quarter, sum_of_usd DESC
+        LIMIT :lim
+    """
 
     result = _safe(db, query, params, fallback=[])
     if result == []:
