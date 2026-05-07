@@ -1,6 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import text
 from typing import List, Optional
 
 from ..database import get_db
@@ -15,11 +14,10 @@ from ..schemas import (
     HSAggregate,
     HSQuarterAggregate,
 )
-from ..utils.db_helpers import is_missing_table_error, rows_to_dicts
+from ..services.trade_query import TABLE, TradeFilters, apply_filters, country_col, execute_safe, metric_sql
+from ..utils.db_helpers import rows_to_dicts
 
 router = APIRouter()
-
-TABLE = "country_origin_trade_stats"
 
 
 def _apply_filters(
@@ -35,69 +33,24 @@ def _apply_filters(
     end_year_month: Optional[str] = None,
     trade_direction: Optional[str] = None,
 ) -> tuple[str, dict]:
-    """在 WHERE 子句中追加通用过滤条件。"""
-    if hs_code:
-        ph = ", ".join([f":hs_{i}" for i in range(len(hs_code))])
-        query += f" AND hs_code IN ({ph})"
-        for i, c in enumerate(hs_code):
-            params[f"hs_{i}"] = c
-
-    if hs_code_prefix:
-        conds = []
-        for i, p in enumerate(hs_code_prefix):
-            params[f"hsp_{i}"] = f"{p}%"
-            conds.append(f"hs_code LIKE :hsp_{i}")
-        query += f" AND ({' OR '.join(conds)})"
-
-    if year is not None:
-        query += " AND year = :year"
-        params["year"] = year
-    if month is not None:
-        query += " AND month = :month"
-        params["month"] = month
-
-    if country:
-        ph = ", ".join([f":ctry_{i}" for i in range(len(country))])
-        if trade_direction == "import":
-            col = "destination_country_code"
-        elif trade_direction == "export":
-            col = "origin_country_code"
-        else:
-            col = None
-        if col:
-            query += f" AND {col} IN ({ph})"
-        else:
-            query += f" AND (origin_country_code IN ({ph}) OR destination_country_code IN ({ph}))"
-        for i, c in enumerate(country):
-            params[f"ctry_{i}"] = c
-
-    if start_year_month:
-        y, m = start_year_month.split("-")
-        query += " AND (year > :sy OR (year = :sy AND month >= :sm))"
-        params["sy"], params["sm"] = int(y), int(m)
-    if end_year_month:
-        y, m = end_year_month.split("-")
-        query += " AND (year < :ey OR (year = :ey AND month <= :em))"
-        params["ey"], params["em"] = int(y), int(m)
-
-    return query, params
+    return apply_filters(
+        query,
+        params,
+        TradeFilters(
+            hs_code=hs_code,
+            hs_code_prefix=hs_code_prefix,
+            year=year,
+            month=month,
+            country=country,
+            start_year_month=start_year_month,
+            end_year_month=end_year_month,
+            trade_direction=trade_direction,
+        ),
+    )
 
 
-def _safe(db: Session, query: str, params: dict, fallback):
-    try:
-        return db.execute(text(query), params)
-    except Exception as exc:
-        if is_missing_table_error(exc):
-            return fallback
-        raise HTTPException(status_code=500, detail=f"数据库查询错误: {exc}")
-
-
-def _country_col(td: Optional[str]):
-    if td == "import":
-        return "destination_country_code"
-    if td == "export":
-        return "origin_country_code"
-    return None
+_country_col = country_col
+_safe = execute_safe
 
 
 # ── 主查询：按国家聚合 ─────────────────────────────────────────
@@ -318,11 +271,8 @@ def get_top_countries(
     db: Session = Depends(get_db),
 ):
     td = trade_direction or "all"
-    metric_key = "trade_count" if metric == "trade_count" else "trade_value"
     params: dict = {}
-    share_numerator = "SUM(trade_count)" if metric_key == "trade_count" else "SUM(sum_of_usd)"
-    share_denominator = "SUM(SUM(trade_count)) OVER()" if metric_key == "trade_count" else "SUM(SUM(sum_of_usd)) OVER()"
-    order_metric = "trade_count" if metric_key == "trade_count" else "sum_of_usd"
+    _metric_key, share_numerator, share_denominator, order_metric = metric_sql(metric)
 
     if td == "all":
         base_where = " WHERE 1=1"
@@ -394,8 +344,7 @@ def get_top_countries_quarterly(
     db: Session = Depends(get_db),
 ):
     td = trade_direction or "all"
-    metric_key = "trade_count" if metric == "trade_count" else "trade_value"
-    order_expr = "trade_count" if metric_key == "trade_count" else "sum_of_usd"
+    _metric_key, _share_numerator, _share_denominator, order_expr = metric_sql(metric)
     params: dict = {"lim": limit}
 
     if td == "all":

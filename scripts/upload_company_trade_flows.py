@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import csv
 import io
+import argparse
 import os
 import re
 import sys
@@ -33,6 +34,8 @@ from typing import Any
 import openpyxl
 import pycountry
 from sqlalchemy import create_engine, text
+
+from importers.schema import TABLE_COLUMNS, create_indexes, create_tables, drop_tables, swap_staging_tables
 
 
 DATABASE_URL = os.getenv(
@@ -89,86 +92,6 @@ COUNTRY_NAME_TO_ISO3 = {
     "MYANMA (FORMER REP. OF BIRMAN)": "MMR",
     "ST.PIERRE AND MIQUELON (SP)": "SPM",
 }
-
-DDL = """
-DROP TABLE IF EXISTS company_trade_flows CASCADE;
-DROP TABLE IF EXISTS company_search_stats CASCADE;
-DROP TABLE IF EXISTS company_monthly_trade_stats CASCADE;
-DROP TABLE IF EXISTS company_hs_trade_stats CASCADE;
-DROP TABLE IF EXISTS company_counterparty_trade_stats CASCADE;
-DROP TABLE IF EXISTS country_origin_trade_stats CASCADE;
-DROP TABLE IF EXISTS country_monthly_trade_stats CASCADE;
-
-CREATE TABLE company_search_stats (
-    name TEXT NOT NULL,
-    country_code VARCHAR(3),
-    role VARCHAR(10) NOT NULL,
-    total_trade_value NUMERIC(24,2),
-    trade_count INTEGER,
-    import_trade_value NUMERIC(24,2),
-    export_trade_value NUMERIC(24,2)
-);
-
-CREATE TABLE company_monthly_trade_stats (
-    company_name TEXT NOT NULL,
-    country_code VARCHAR(3),
-    role VARCHAR(10) NOT NULL,
-    year INTEGER NOT NULL,
-    month INTEGER NOT NULL,
-    sum_of_usd NUMERIC(24,2),
-    trade_count INTEGER
-);
-
-CREATE TABLE company_hs_trade_stats (
-    company_name TEXT NOT NULL,
-    country_code VARCHAR(3),
-    role VARCHAR(10) NOT NULL,
-    hs_code VARCHAR(6) NOT NULL,
-    product_desc_zh TEXT,
-    product_desc_en TEXT,
-    sum_of_usd NUMERIC(24,2),
-    trade_count INTEGER
-);
-
-CREATE TABLE company_counterparty_trade_stats (
-    company_name TEXT NOT NULL,
-    country_code VARCHAR(3),
-    role VARCHAR(10) NOT NULL,
-    counterparty_name TEXT NOT NULL,
-    counterparty_country_code VARCHAR(3),
-    sum_of_usd NUMERIC(24,2),
-    trade_count INTEGER
-);
-
-CREATE TABLE country_origin_trade_stats (
-    hs_code                  VARCHAR(6)  NOT NULL,
-    year                     INTEGER     NOT NULL,
-    month                    INTEGER     NOT NULL,
-    origin_country_code      VARCHAR(3)  NOT NULL,
-    destination_country_code VARCHAR(3)  NOT NULL,
-    sum_of_usd               NUMERIC(20,2),
-    trade_count              INTEGER,
-    product_desc_zh          TEXT,
-    product_desc_en          TEXT,
-    created_at               TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at               TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT uq_pair UNIQUE (hs_code, year, month, origin_country_code, destination_country_code)
-);
-"""
-
-INDEX_DDL = """
-CREATE INDEX idx_css_name ON company_search_stats(name);
-CREATE INDEX idx_cmts_company_ym ON company_monthly_trade_stats(company_name, year, month);
-CREATE INDEX idx_chts_company_hs ON company_hs_trade_stats(company_name, hs_code);
-CREATE INDEX idx_ccts_company_role ON company_counterparty_trade_stats(company_name, role);
-CREATE INDEX idx_cots_hs ON country_origin_trade_stats(hs_code);
-CREATE INDEX idx_cots_ym ON country_origin_trade_stats(year, month);
-CREATE INDEX idx_cots_origin ON country_origin_trade_stats(origin_country_code);
-CREATE INDEX idx_cots_dest ON country_origin_trade_stats(destination_country_code);
-CREATE INDEX idx_cots_hs_ym ON country_origin_trade_stats(hs_code, year, month);
-CREATE INDEX idx_cots_dest_ym ON country_origin_trade_stats(destination_country_code, year, month);
-CREATE INDEX idx_cots_origin_ym ON country_origin_trade_stats(origin_country_code, year, month);
-"""
 
 COPY_BATCH_ROWS = 20_000
 TOP_COMPANIES = int(os.getenv("COMPANY_IMPORT_TOP_COMPANIES", "2000"))
@@ -484,16 +407,6 @@ def write_csvs(aggregates: dict[str, dict], output_dir: Path) -> dict[str, Path]
     return paths
 
 
-def recreate_tables(engine) -> None:
-    with engine.begin() as conn:
-        conn.execute(text(DDL))
-
-
-def create_indexes(engine) -> None:
-    with engine.begin() as conn:
-        conn.execute(text(INDEX_DDL))
-
-
 def copy_csv(engine, table: str, columns: list[str], csv_path: Path) -> int:
     total = 0
     batch_no = 0
@@ -534,9 +447,50 @@ def copy_csv(engine, table: str, columns: list[str], csv_path: Path) -> int:
     return total
 
 
+def validate_loaded_tables(engine, table_suffix: str) -> dict[str, int]:
+    tables = {
+        "company_search_stats": f"company_search_stats{table_suffix}",
+        "company_monthly_trade_stats": f"company_monthly_trade_stats{table_suffix}",
+        "company_hs_trade_stats": f"company_hs_trade_stats{table_suffix}",
+        "company_counterparty_trade_stats": f"company_counterparty_trade_stats{table_suffix}",
+        "country_origin_trade_stats": f"country_origin_trade_stats{table_suffix}",
+    }
+    with engine.connect() as conn:
+        counts = {
+            logical_name: conn.execute(text(f"SELECT COUNT(*) FROM {table_name}")).scalar() or 0
+            for logical_name, table_name in tables.items()
+        }
+        months = conn.execute(
+            text(
+                f"""
+                SELECT MIN(year * 100 + month), MAX(year * 100 + month)
+                FROM company_monthly_trade_stats{table_suffix}
+                """
+            )
+        ).fetchone()
+
+    required = ["company_search_stats", "company_monthly_trade_stats", "country_origin_trade_stats"]
+    empty_required = [name for name in required if counts[name] <= 0]
+    if empty_required:
+        raise RuntimeError(f"导入结果异常，关键表为空: {', '.join(empty_required)}")
+    if not months or months[0] is None or months[1] is None:
+        raise RuntimeError("导入结果异常，无法读取月份范围")
+
+    print("staging 数据库记录数:", counts)
+    print(f"staging 月份范围: {months[0]} ~ {months[1]}")
+    return counts
+
+
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Upload HKUST company-level trade data as compact aggregates.")
+    parser.add_argument("--data-dir", default=None, help="Directory containing HKUST XLSX files")
+    parser.add_argument("--database-url", default=None, help="PostgreSQL connection URL")
+    parser.add_argument("--clear", action="store_true", help="Backward compatible no-op; imports always rebuild via staging")
+    args = parser.parse_args()
+
     project_root = Path(__file__).resolve().parents[1]
-    data_dir = project_root / "data" / "hkust_文件汇总"
+    data_dir = Path(args.data_dir).expanduser().resolve() if args.data_dir else project_root / "data" / "hkust_文件汇总"
+    database_url = args.database_url or DATABASE_URL
 
     print("=" * 72)
     print("上传 hkust_文件汇总 公司级聚合数据到数据库")
@@ -548,7 +502,7 @@ def main() -> None:
         print(f"❌ 数据目录不存在: {data_dir}")
         sys.exit(1)
 
-    engine = create_engine(DATABASE_URL, pool_pre_ping=True, connect_args=DB_CONNECT_ARGS)
+    engine = create_engine(database_url, pool_pre_ping=True, connect_args=DB_CONNECT_ARGS)
     try:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
@@ -576,17 +530,24 @@ def main() -> None:
         csv_counts = {table: sum(1 for _ in path.open("r", encoding="utf-8")) for table, path in paths.items()}
         print("CSV 行数:", csv_counts)
 
-        print("重建数据库表 ...")
-        recreate_tables(engine)
+        staging_suffix = "__import_" + datetime.now().strftime("%Y%m%d%H%M%S")
+        print(f"创建 staging 表 {staging_suffix} ...")
+        try:
+            create_tables(engine, suffix=staging_suffix)
 
-        copy_csv(engine, "company_search_stats", ["name", "country_code", "role", "total_trade_value", "trade_count", "import_trade_value", "export_trade_value"], paths["company_search_stats"])
-        copy_csv(engine, "company_monthly_trade_stats", ["company_name", "country_code", "role", "year", "month", "sum_of_usd", "trade_count"], paths["company_monthly_trade_stats"])
-        copy_csv(engine, "company_hs_trade_stats", ["company_name", "country_code", "role", "hs_code", "product_desc_zh", "product_desc_en", "sum_of_usd", "trade_count"], paths["company_hs_trade_stats"])
-        copy_csv(engine, "company_counterparty_trade_stats", ["company_name", "country_code", "role", "counterparty_name", "counterparty_country_code", "sum_of_usd", "trade_count"], paths["company_counterparty_trade_stats"])
-        copy_csv(engine, "country_origin_trade_stats", ["hs_code", "year", "month", "origin_country_code", "destination_country_code", "sum_of_usd", "trade_count", "product_desc_zh", "product_desc_en"], paths["country_origin_trade_stats"])
+            for table, path in paths.items():
+                copy_csv(engine, f"{table}{staging_suffix}", TABLE_COLUMNS[table], path)
 
-    print("创建查询索引 ...")
-    create_indexes(engine)
+            print("创建 staging 查询索引 ...")
+            create_indexes(engine, suffix=staging_suffix)
+            validate_loaded_tables(engine, staging_suffix)
+
+            print("切换 staging 表为正式表 ...")
+            swap_staging_tables(engine, staging_suffix=staging_suffix)
+        except Exception:
+            print("导入失败，正式表未切换，正在清理 staging 表 ...")
+            drop_tables(engine, suffix=staging_suffix)
+            raise
 
     elapsed = (datetime.now() - start).total_seconds()
     with engine.connect() as conn:
