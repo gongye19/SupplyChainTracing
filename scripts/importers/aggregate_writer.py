@@ -26,18 +26,23 @@ def write_csvs(
     for (company, _country, _role, _year, _month), bucket in aggregates["monthly"].items():
         name_totals[company] += bucket["sum_of_usd"]
 
-    top_company_names = {
-        company
-        for company, _value in sorted(name_totals.items(), key=lambda item: item[1], reverse=True)[:top_companies]
-    }
+    top_company_names = set()
+    if top_companies > 0:
+        top_company_names = {
+            company
+            for company, _value in sorted(name_totals.items(), key=lambda item: item[1], reverse=True)[:top_companies]
+        }
     forced_company_names = force_company_names or set()
     included_company_names = top_company_names | forced_company_names
-    print(
-        "公司看板导入范围: "
-        f"交易额 Top {len(top_company_names):,} 公司"
-        f" + 品牌白名单 {len(forced_company_names):,} 公司"
-        f" = 去重后 {len(included_company_names):,} 公司"
-    )
+    if top_company_names:
+        print(
+            "公司看板导入范围: "
+            f"品牌白名单 {len(forced_company_names):,} 公司"
+            f" + 额外交易额 Top {len(top_company_names):,} 公司"
+            f" = 去重后 {len(included_company_names):,} 公司"
+        )
+    else:
+        print(f"公司看板导入范围: 仅215品牌白名单 {len(included_company_names):,} 公司")
 
     role_totals: dict[tuple, dict[str, Decimal | int]] = defaultdict(
         lambda: {"import": Decimal("0"), "export": Decimal("0"), "trade_count": 0}

@@ -54,7 +54,7 @@ DB_CONNECT_ARGS = {
 }
 
 COPY_BATCH_ROWS = 20_000
-TOP_COMPANIES = int(os.getenv("COMPANY_IMPORT_TOP_COMPANIES", "2000"))
+EXTRA_TOP_COMPANIES = int(os.getenv("COMPANY_IMPORT_EXTRA_TOP_COMPANIES", "0"))
 TOP_COUNTERPARTIES_PER_COMPANY_ROLE = int(os.getenv("COMPANY_IMPORT_TOP_COUNTERPARTIES", "25"))
 
 
@@ -207,6 +207,8 @@ def main() -> None:
     source_brand_companies = set(aggregates.get("brand_companies") or set())
     list_brand_companies = load_brand_company_list(brand_list)
     force_company_names = source_brand_companies | list_brand_companies
+    if not force_company_names:
+        raise RuntimeError("未找到215品牌白名单公司，停止导入，避免误导入空公司看板")
     print("聚合完成:", stats)
     if force_company_names:
         print(
@@ -232,7 +234,7 @@ def main() -> None:
         paths = write_csvs(
             aggregates,
             Path(tmp),
-            top_companies=TOP_COMPANIES,
+            top_companies=EXTRA_TOP_COMPANIES,
             top_counterparties_per_company_role=TOP_COUNTERPARTIES_PER_COMPANY_ROLE,
             force_company_names=force_company_names,
         )
