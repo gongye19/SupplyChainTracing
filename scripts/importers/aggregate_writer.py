@@ -12,6 +12,7 @@ def write_csvs(
     *,
     top_companies: int,
     top_counterparties_per_company_role: int,
+    force_company_names: set[str] | None = None,
 ) -> dict[str, Path]:
     paths = {
         "company_monthly_trade_stats": output_dir / "company_monthly_trade_stats.csv",
@@ -29,7 +30,14 @@ def write_csvs(
         company
         for company, _value in sorted(name_totals.items(), key=lambda item: item[1], reverse=True)[:top_companies]
     }
-    print(f"公司看板仅导入交易额 Top {len(top_company_names):,} 公司")
+    forced_company_names = force_company_names or set()
+    included_company_names = top_company_names | forced_company_names
+    print(
+        "公司看板导入范围: "
+        f"交易额 Top {len(top_company_names):,} 公司"
+        f" + 品牌白名单 {len(forced_company_names):,} 公司"
+        f" = 去重后 {len(included_company_names):,} 公司"
+    )
 
     role_totals: dict[tuple, dict[str, Decimal | int]] = defaultdict(
         lambda: {"import": Decimal("0"), "export": Decimal("0"), "trade_count": 0}
@@ -38,7 +46,7 @@ def write_csvs(
     with paths["company_monthly_trade_stats"].open("w", newline="", encoding="utf-8") as fh:
         writer = csv.writer(fh)
         for (company, country, role, year, month), bucket in aggregates["monthly"].items():
-            if company not in top_company_names:
+            if company not in included_company_names:
                 continue
             writer.writerow([company, country, role, year, month, bucket["sum_of_usd"], bucket["trade_count"]])
             totals = role_totals[(company, country)]
@@ -67,7 +75,7 @@ def write_csvs(
     with paths["company_hs_trade_stats"].open("w", newline="", encoding="utf-8") as fh:
         writer = csv.writer(fh)
         for (company, country, role, hs_code), bucket in aggregates["hs"].items():
-            if company not in top_company_names:
+            if company not in included_company_names:
                 continue
             writer.writerow([
                 company,
@@ -85,7 +93,7 @@ def write_csvs(
         grouped_counterparties: dict[tuple, list[tuple[tuple, dict]]] = defaultdict(list)
         for key, bucket in aggregates["counterparty"].items():
             company, country, role, _counterparty_name, _counterparty_country = key
-            if company not in top_company_names:
+            if company not in included_company_names:
                 continue
             grouped_counterparties[(company, country, role)].append((key, bucket))
 

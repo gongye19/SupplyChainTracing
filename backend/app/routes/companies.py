@@ -46,6 +46,12 @@ def _safe(db: Session, query: str, params: dict, fallback):
         raise HTTPException(status_code=500, detail=f"数据库查询错误: {exc}")
 
 
+def _ranking_sql(metric: Optional[str]) -> tuple[str, str, str]:
+    if metric == "trade_count":
+        return "trade_count", "sum_of_usd", "SUM(trade_count) OVER()"
+    return "sum_of_usd", "trade_count", "SUM(sum_of_usd) OVER()"
+
+
 @router.get("/search", response_model=List[CompanySearchResult])
 def search_companies(
     q: Optional[str] = Query(None),
@@ -53,6 +59,7 @@ def search_companies(
     hs_code: Optional[List[str]] = Query(None),
     hs_code_prefix: Optional[List[str]] = Query(None),
     role: Optional[str] = Query(None),
+    metric: Optional[str] = Query("trade_value"),
     limit: int = Query(20, ge=1, le=200),
     db: Session = Depends(get_db),
 ):
@@ -81,11 +88,55 @@ def search_companies(
     if hs_code or hs_code_prefix:
         where += f" AND EXISTS (SELECT 1 FROM company_hs_trade_stats h{hs_exists_where})"
 
+    order_col = "trade_count" if metric == "trade_count" else "total_trade_value"
+    secondary_col = "total_trade_value" if order_col == "trade_count" else "trade_count"
+
     query = f"""
-        SELECT s.name, s.country_code, s.role, s.total_trade_value, s.trade_count
-        FROM company_search_stats s
-        {where}
-        ORDER BY total_trade_value DESC, trade_count DESC
+        WITH filtered AS (
+            SELECT s.*
+            FROM company_search_stats s
+            {where}
+        ),
+        country_rank AS (
+            SELECT
+                name,
+                country_code,
+                COALESCE(SUM(total_trade_value), 0) AS country_trade_value,
+                COALESCE(SUM(trade_count), 0) AS country_trade_count,
+                ROW_NUMBER() OVER (
+                    PARTITION BY name
+                    ORDER BY COALESCE(SUM(total_trade_value), 0) DESC, COALESCE(SUM(trade_count), 0) DESC
+                ) AS rn
+            FROM filtered
+            WHERE country_code IS NOT NULL
+            GROUP BY name, country_code
+        ),
+        agg AS (
+            SELECT
+                name,
+                COALESCE(SUM(total_trade_value), 0) AS total_trade_value,
+                COALESCE(SUM(trade_count), 0) AS trade_count,
+                COALESCE(SUM(import_trade_value), 0) AS import_trade_value,
+                COALESCE(SUM(export_trade_value), 0) AS export_trade_value,
+                COUNT(DISTINCT country_code) FILTER (WHERE country_code IS NOT NULL) AS country_count
+            FROM filtered
+            GROUP BY name
+        )
+        SELECT
+            a.name,
+            cr.country_code,
+            a.country_count,
+            CASE
+                WHEN a.import_trade_value > 0 AND a.export_trade_value > 0 THEN 'both'
+                WHEN a.import_trade_value > 0 THEN 'importer'
+                WHEN a.export_trade_value > 0 THEN 'exporter'
+                ELSE 'unknown'
+            END AS role,
+            a.total_trade_value,
+            a.trade_count
+        FROM agg a
+        LEFT JOIN country_rank cr ON cr.name = a.name AND cr.rn = 1
+        ORDER BY a.{order_col} DESC, a.{secondary_col} DESC, a.name
         LIMIT :limit
     """
     result = _safe(db, query, params, fallback=[])
@@ -127,6 +178,7 @@ def get_company_dashboard(
     end_year_month: Optional[str] = Query(None),
     hs_code: Optional[List[str]] = Query(None),
     hs_code_prefix: Optional[List[str]] = Query(None),
+    metric: Optional[str] = Query("trade_value"),
     limit: int = Query(10, ge=1, le=50),
     db: Session = Depends(get_db),
 ):
@@ -158,7 +210,8 @@ def get_company_dashboard(
                 GROUP BY country_code
                 ORDER BY SUM(sum_of_usd) DESC
                 LIMIT 1
-            ) AS country_code
+            ) AS country_code,
+            COUNT(DISTINCT country_code) FILTER (WHERE country_code IS NOT NULL) AS country_count
         FROM base
     """
     result = _safe(db, summary_query, params, fallback=None)
@@ -172,6 +225,8 @@ def get_company_dashboard(
     hs_params = {"name": company_name, "limit": limit}
     hs_where = " WHERE company_name = :name"
     hs_where, hs_params = _hs_filter(hs_where, hs_params, hs_code, hs_code_prefix)
+    order_metric, secondary_metric, share_denominator = _ranking_sql(metric)
+
     categories_query = f"""
         WITH agg AS (
             SELECT
@@ -188,16 +243,16 @@ def get_company_dashboard(
             COALESCE('HS ' || hs_code || ' · ' || NULLIF(product_desc_en, ''), 'HS ' || hs_code) AS label,
             sum_of_usd,
             trade_count,
-            CASE WHEN SUM(sum_of_usd) OVER() = 0 THEN 0
-                 ELSE sum_of_usd / SUM(sum_of_usd) OVER()
+            CASE WHEN {share_denominator} = 0 THEN 0
+                 ELSE {order_metric}::numeric / {share_denominator}
             END AS share_pct
         FROM agg
-        ORDER BY sum_of_usd DESC, trade_count DESC
+        ORDER BY {order_metric} DESC, {secondary_metric} DESC
         LIMIT :limit
     """
 
-    suppliers_query = """
-        WITH agg AS (
+    suppliers_query = f"""
+        WITH country_agg AS (
             SELECT
                 counterparty_name AS company,
                 counterparty_country_code AS country_code,
@@ -206,23 +261,40 @@ def get_company_dashboard(
             FROM company_counterparty_trade_stats
             WHERE company_name = :name AND role = 'importer'
             GROUP BY counterparty_name, counterparty_country_code
+        ),
+        agg AS (
+            SELECT
+                company,
+                COALESCE(SUM(sum_of_usd), 0) AS sum_of_usd,
+                COALESCE(SUM(trade_count), 0) AS trade_count
+            FROM country_agg
+            GROUP BY company
+        ),
+        country_pick AS (
+            SELECT DISTINCT ON (company)
+                company,
+                country_code
+            FROM country_agg
+            WHERE country_code IS NOT NULL
+            ORDER BY company, sum_of_usd DESC, trade_count DESC
         )
         SELECT
-            ROW_NUMBER() OVER (ORDER BY sum_of_usd DESC, trade_count DESC) AS rank,
-            company,
-            country_code,
-            sum_of_usd,
-            trade_count,
-            CASE WHEN SUM(sum_of_usd) OVER() = 0 THEN 0
-                 ELSE sum_of_usd / SUM(sum_of_usd) OVER()
+            ROW_NUMBER() OVER (ORDER BY a.{order_metric} DESC, a.{secondary_metric} DESC, a.company) AS rank,
+            a.company,
+            cp.country_code,
+            a.sum_of_usd,
+            a.trade_count,
+            CASE WHEN SUM(a.{order_metric}) OVER() = 0 THEN 0
+                 ELSE a.{order_metric}::numeric / SUM(a.{order_metric}) OVER()
             END AS share_pct
-        FROM agg
+        FROM agg a
+        LEFT JOIN country_pick cp ON cp.company = a.company
         ORDER BY rank
         LIMIT :limit
     """
 
-    customers_query = """
-        WITH agg AS (
+    customers_query = f"""
+        WITH country_agg AS (
             SELECT
                 counterparty_name AS company,
                 counterparty_country_code AS country_code,
@@ -231,17 +303,34 @@ def get_company_dashboard(
             FROM company_counterparty_trade_stats
             WHERE company_name = :name AND role = 'exporter'
             GROUP BY counterparty_name, counterparty_country_code
+        ),
+        agg AS (
+            SELECT
+                company,
+                COALESCE(SUM(sum_of_usd), 0) AS sum_of_usd,
+                COALESCE(SUM(trade_count), 0) AS trade_count
+            FROM country_agg
+            GROUP BY company
+        ),
+        country_pick AS (
+            SELECT DISTINCT ON (company)
+                company,
+                country_code
+            FROM country_agg
+            WHERE country_code IS NOT NULL
+            ORDER BY company, sum_of_usd DESC, trade_count DESC
         )
         SELECT
-            ROW_NUMBER() OVER (ORDER BY sum_of_usd DESC, trade_count DESC) AS rank,
-            company,
-            country_code,
-            sum_of_usd,
-            trade_count,
-            CASE WHEN SUM(sum_of_usd) OVER() = 0 THEN 0
-                 ELSE sum_of_usd / SUM(sum_of_usd) OVER()
+            ROW_NUMBER() OVER (ORDER BY a.{order_metric} DESC, a.{secondary_metric} DESC, a.company) AS rank,
+            a.company,
+            cp.country_code,
+            a.sum_of_usd,
+            a.trade_count,
+            CASE WHEN SUM(a.{order_metric}) OVER() = 0 THEN 0
+                 ELSE a.{order_metric}::numeric / SUM(a.{order_metric}) OVER()
             END AS share_pct
-        FROM agg
+        FROM agg a
+        LEFT JOIN country_pick cp ON cp.company = a.company
         ORDER BY rank
         LIMIT :limit
     """
@@ -269,6 +358,7 @@ def get_company_dashboard(
     return {
         "name": company_name,
         "country_code": summary.get("country_code"),
+        "country_count": int(summary.get("country_count") or 0),
         "role": summary.get("role") or "unknown",
         "total_trade_value": float(summary.get("total_trade_value") or 0),
         "total_trade_count": int(summary.get("total_trade_count") or 0),

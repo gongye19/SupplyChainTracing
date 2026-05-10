@@ -47,6 +47,12 @@ const ROLE_OPTIONS = [
 ] as const;
 
 type CompanyRoleFilter = typeof ROLE_OPTIONS[number]['value'];
+type CompanyRankMetric = 'trade_value' | 'trade_count';
+
+const RANK_METRIC_OPTIONS: Array<{ value: CompanyRankMetric; label: string }> = [
+  { value: 'trade_value', label: 'Trade Value' },
+  { value: 'trade_count', label: 'Trade Count' },
+];
 
 const RESULTS_PER_PAGE = 10;
 
@@ -72,6 +78,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
   const [selectedCountry, setSelectedCountry] = useState('');
   const [selectedHsPrefix, setSelectedHsPrefix] = useState('');
   const [selectedRole, setSelectedRole] = useState<CompanyRoleFilter>('');
+  const [rankMetric, setRankMetric] = useState<CompanyRankMetric>('trade_value');
   const [filterOptions, setFilterOptions] = useState<CompanyFilterOptions>({ countries: [], hsCategories: [] });
   const [results, setResults] = useState<CompanySearchResult[]>([]);
   const [resultPage, setResultPage] = useState(1);
@@ -119,7 +126,15 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
 
   useEffect(() => {
     setResultPage(1);
-  }, [searchInput, selectedContinent, selectedCountry, selectedHsPrefix, selectedRole]);
+  }, [searchInput, selectedContinent, selectedCountry, selectedHsPrefix, selectedRole, rankMetric]);
+
+  const countrySummary = (countryCode?: string, countryCount = 0) => {
+    if (!countryCode) return 'N/A';
+    if (countryCount > 1) return `${countryCode} +${countryCount - 1}`;
+    return countryCode;
+  };
+
+  const rankMetricLabel = rankMetric === 'trade_count' ? 'Trade Count' : 'Trade Value';
 
   const loadCompany = async (name: string) => {
     const trimmed = name.trim();
@@ -133,6 +148,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
         startYearMonth: startDate,
         endYearMonth: endDate,
         hsCodePrefix: selectedHsPrefix ? [selectedHsPrefix] : undefined,
+        metric: rankMetric,
         limit: 10,
       });
       setCompany(data);
@@ -157,6 +173,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
         countries: activeCountries,
         hsCodePrefix: selectedHsPrefix ? [selectedHsPrefix] : undefined,
         role: selectedRole,
+        metric: rankMetric,
         limit: 100,
       });
       setResults(data);
@@ -265,6 +282,13 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
                 label: option.label,
               }))}
             />
+            <FilterChips
+              label="Rank By"
+              value={rankMetric}
+              onChange={(value) => setRankMetric((value || 'trade_value') as CompanyRankMetric)}
+              options={RANK_METRIC_OPTIONS}
+              includeAll={false}
+            />
           </div>
 
           <div className="mt-3 flex items-center justify-end gap-2">
@@ -274,6 +298,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
                 setSelectedCountry('');
                 setSelectedHsPrefix('');
                 setSelectedRole('');
+                setRankMetric('trade_value');
                 setResults([]);
                 setSearching(false);
               }}
@@ -309,11 +334,15 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
               >
                 <div className="min-w-0">
                   <div className="text-[13px] font-bold text-[#1D1D1F] truncate">{result.name}</div>
-                  <div className="text-[11px] text-[#86868B]">{result.countryCode || 'N/A'} · {roleLabel(result.role)}</div>
+                  <div className="text-[11px] text-[#86868B]">{countrySummary(result.countryCode, result.countryCount)} · {roleLabel(result.role)}</div>
                 </div>
                 <div className="text-right shrink-0">
-                  <div className="text-[12px] font-bold text-[#1D1D1F]">{formatMoney(result.totalTradeValue)}</div>
-                  <div className="text-[10px] text-[#86868B]">{result.tradeCount.toLocaleString()} trades</div>
+                  <div className="text-[12px] font-bold text-[#1D1D1F]">
+                    {rankMetric === 'trade_count' ? result.tradeCount.toLocaleString() : formatMoney(result.totalTradeValue)}
+                  </div>
+                  <div className="text-[10px] text-[#86868B]">
+                    {rankMetric === 'trade_count' ? formatMoney(result.totalTradeValue) : `${result.tradeCount.toLocaleString()} trades`}
+                  </div>
                 </div>
               </button>
             ))}
@@ -381,7 +410,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
               <div className="min-w-0">
                 <h2 className="text-[18px] font-bold text-[#1D1D1F] truncate">{company.name}</h2>
                 <div className="text-[12px] text-[#86868B] font-medium mt-0.5">
-                  {company.countryCode || 'N/A'} · {roleLabel(company.role)}
+                  {countrySummary(company.countryCode, company.countryCount)} · {roleLabel(company.role)}
                 </div>
               </div>
             </div>
@@ -450,15 +479,17 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
             <RankTable
               title="Top 10 Suppliers"
-              subtitle="Exporters selling to this company"
+              subtitle={`Exporters selling to this company · ranked by ${rankMetricLabel}`}
               items={company.topSuppliers}
               accentColor="#007AFF"
+              rankMetric={rankMetric}
             />
             <RankTable
               title="Top 10 Customers"
-              subtitle="Importers buying from this company"
+              subtitle={`Importers buying from this company · ranked by ${rankMetricLabel}`}
               items={company.topCustomers}
               accentColor="#34C759"
+              rankMetric={rankMetric}
             />
           </div>
         </div>
@@ -474,7 +505,8 @@ const FilterChips: React.FC<{
   options: Array<{ value: string; label: string }>;
   disabled?: boolean;
   emptyText?: string;
-}> = ({ label, value, onChange, options, disabled = false, emptyText = 'No options' }) => {
+  includeAll?: boolean;
+}> = ({ label, value, onChange, options, disabled = false, emptyText = 'No options', includeAll = true }) => {
   const visibleOptions = disabled ? [] : options;
 
   return (
@@ -498,17 +530,19 @@ const FilterChips: React.FC<{
           </span>
         ) : (
           <>
-            <button
-              type="button"
-              onClick={() => onChange('')}
-              className={`px-2.5 py-1.5 rounded-[8px] text-[11px] font-semibold transition-colors ${
-                value === ''
-                  ? 'bg-[#007AFF] text-white'
-                  : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-black/10'
-              }`}
-            >
-              All
-            </button>
+            {includeAll && (
+              <button
+                type="button"
+                onClick={() => onChange('')}
+                className={`px-2.5 py-1.5 rounded-[8px] text-[11px] font-semibold transition-colors ${
+                  value === ''
+                    ? 'bg-[#007AFF] text-white'
+                    : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-black/10'
+                }`}
+              >
+                All
+              </button>
+            )}
             {visibleOptions.map((option) => (
               <button
                 type="button"
@@ -548,7 +582,8 @@ const RankTable: React.FC<{
   subtitle: string;
   items: CompanyRankItem[];
   accentColor: string;
-}> = ({ title, subtitle, items, accentColor }) => (
+  rankMetric: CompanyRankMetric;
+}> = ({ title, subtitle, items, accentColor, rankMetric }) => (
   <div className="bg-white rounded-[20px] border border-black/5 shadow-sm p-6">
     <div className="flex items-center gap-2 mb-1">
       <Users className="w-4 h-4" style={{ color: accentColor }} />
@@ -575,8 +610,12 @@ const RankTable: React.FC<{
               <div className="text-[10px] text-[#86868B]">{item.countryCode || 'N/A'} · {item.tradeCount.toLocaleString()} trades</div>
             </div>
             <div className="text-right shrink-0">
-              <div className="text-[13px] font-bold text-[#1D1D1F]">{formatMoney(item.sumOfUsd)}</div>
-              <div className="text-[10px] text-[#86868B]">{(item.sharePct * 100).toFixed(1)}%</div>
+              <div className="text-[13px] font-bold text-[#1D1D1F]">
+                {rankMetric === 'trade_count' ? item.tradeCount.toLocaleString() : formatMoney(item.sumOfUsd)}
+              </div>
+              <div className="text-[10px] text-[#86868B]">
+                {rankMetric === 'trade_count' ? formatMoney(item.sumOfUsd) : `${item.tradeCount.toLocaleString()} trades`} · {(item.sharePct * 100).toFixed(1)}%
+              </div>
             </div>
             <div className="w-14 h-1.5 bg-[#F5F5F7] rounded-full overflow-hidden shrink-0">
               <div className="h-full rounded-full" style={{ width: `${Math.min(item.sharePct * 100, 100)}%`, backgroundColor: accentColor, opacity: 0.7 }} />

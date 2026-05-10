@@ -214,6 +214,7 @@ export interface HSQuarterAggregate {
 export interface CompanySearchResult {
   name: string;
   countryCode?: string;
+  countryCount: number;
   role: 'importer' | 'exporter' | 'both' | 'unknown';
   totalTradeValue: number;
   tradeCount: number;
@@ -261,6 +262,7 @@ export interface CompanyTrendPoint {
 export interface CompanyDashboardData {
   name: string;
   countryCode?: string;
+  countryCount: number;
   role: 'importer' | 'exporter' | 'both' | 'unknown';
   totalTradeValue: number;
   totalTradeCount: number;

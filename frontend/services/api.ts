@@ -705,6 +705,7 @@ export const companiesAPI = {
     countries?: string[];
     hsCodePrefix?: string[];
     role?: 'importer' | 'exporter' | 'both' | '';
+    metric?: 'trade_value' | 'trade_count';
     limit?: number;
   }): Promise<CompanySearchResult[]> => {
     const params = new URLSearchParams();
@@ -712,11 +713,13 @@ export const companiesAPI = {
     filters.countries?.forEach((country) => params.append('country', country));
     filters.hsCodePrefix?.forEach((prefix) => params.append('hs_code_prefix', prefix));
     if (filters.role) params.append('role', filters.role);
+    if (filters.metric) params.append('metric', filters.metric);
     params.append('limit', String(filters.limit ?? 12));
     const data = await fetchAPI<any[]>(`/api/companies/search?${params.toString()}`);
     return data.map((item) => ({
       name: item.name,
       countryCode: item.country_code || undefined,
+      countryCount: parseInt(item.country_count) || 0,
       role: item.role || 'unknown',
       totalTradeValue: parseFloat(item.total_trade_value) || 0,
       tradeCount: parseInt(item.trade_count) || 0,
@@ -744,6 +747,7 @@ export const companiesAPI = {
     endYearMonth?: string;
     hsCode?: string[];
     hsCodePrefix?: string[];
+    metric?: 'trade_value' | 'trade_count';
     limit?: number;
   }): Promise<CompanyDashboardData> => {
     const params = new URLSearchParams();
@@ -752,12 +756,14 @@ export const companiesAPI = {
     if (filters.endYearMonth) params.append('end_year_month', filters.endYearMonth);
     if (filters.hsCode?.length) filters.hsCode.forEach((code) => params.append('hs_code', code));
     if (filters.hsCodePrefix?.length) filters.hsCodePrefix.forEach((prefix) => params.append('hs_code_prefix', prefix));
+    if (filters.metric) params.append('metric', filters.metric);
     params.append('limit', String(filters.limit ?? 10));
 
     const item = await fetchAPI<any>(`/api/companies/dashboard?${params.toString()}`);
     return {
       name: item.name,
       countryCode: item.country_code || undefined,
+      countryCount: parseInt(item.country_count) || 0,
       role: item.role || 'unknown',
       totalTradeValue: parseFloat(item.total_trade_value) || 0,
       totalTradeCount: parseInt(item.total_trade_count) || 0,

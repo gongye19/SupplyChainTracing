@@ -38,6 +38,7 @@ TABLE_SPECS = [
             ("idx_css_name", "(name)"),
             ("idx_css_country_role", "(country_code, role)"),
             ("idx_css_total_value", "(total_trade_value DESC)"),
+            ("idx_css_trade_count", "(trade_count DESC)"),
         ],
     ),
     TableSpec(

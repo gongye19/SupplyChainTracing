@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-Upload HKUST company-level trade data as compact dashboard aggregates.
+Upload company-level trade data as compact dashboard aggregates.
 
 Source:
-  data/hkust_文件汇总/*.xlsx
+  data/pure_company_pair_usd_count.zip (preferred, CSV)
+  data/hkust_文件汇总/*.xlsx (legacy fallback)
 
 Targets:
   company_search_stats
@@ -18,9 +19,9 @@ Usage:
 
 from __future__ import annotations
 
+import argparse
 import csv
 import io
-import argparse
 import os
 import sys
 import tempfile
@@ -30,7 +31,8 @@ from pathlib import Path
 from sqlalchemy import create_engine, text
 
 from importers.aggregate_writer import write_csvs
-from importers.hkust_company import build_aggregates
+from importers.company_pair_csv import build_aggregates as build_company_pair_aggregates
+from importers.hkust_company import build_aggregates as build_hkust_aggregates
 from importers.schema import TABLE_COLUMNS, create_indexes, create_tables, drop_tables, swap_staging_tables
 
 
@@ -130,25 +132,65 @@ def validate_loaded_tables(engine, table_suffix: str) -> dict[str, int]:
     return counts
 
 
+def pick_default_source(project_root: Path) -> Path:
+    zip_source = project_root / "data" / "pure_company_pair_usd_count.zip"
+    if zip_source.exists():
+        return zip_source
+    return project_root / "data" / "hkust_文件汇总"
+
+
+def load_brand_company_list(path: Path) -> set[str]:
+    import openpyxl
+
+    if not path.exists():
+        return set()
+
+    wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+    try:
+        ws = wb["明细"] if "明细" in wb.sheetnames else wb.active
+        companies: set[str] = set()
+        for row in ws.iter_rows(min_row=2, values_only=True):
+            if len(row) < 3 or row[2] is None:
+                continue
+            company = str(row[2]).strip()
+            if company:
+                companies.add(company)
+        return companies
+    finally:
+        wb.close()
+
+
+def build_source_aggregates(source: Path) -> tuple[dict[str, int], dict[str, dict]]:
+    if source.is_file() and source.suffix.lower() in {".zip", ".csv"}:
+        return build_company_pair_aggregates(source)
+    return build_hkust_aggregates(source)
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Upload HKUST company-level trade data as compact aggregates.")
+    parser = argparse.ArgumentParser(description="Upload company-level trade data as compact aggregates.")
+    parser.add_argument("--source", default=None, help="Source zip/csv file or legacy HKUST XLSX directory")
     parser.add_argument("--data-dir", default=None, help="Directory containing HKUST XLSX files")
+    parser.add_argument("--brand-list", default=None, help="Optional Excel brand company list; defaults to 215-brand workbook when present")
     parser.add_argument("--database-url", default=None, help="PostgreSQL connection URL")
     parser.add_argument("--clear", action="store_true", help="Backward compatible no-op; imports always rebuild via staging")
     args = parser.parse_args()
 
     project_root = Path(__file__).resolve().parents[1]
-    data_dir = Path(args.data_dir).expanduser().resolve() if args.data_dir else project_root / "data" / "hkust_文件汇总"
+    source = Path(args.source or args.data_dir).expanduser().resolve() if (args.source or args.data_dir) else pick_default_source(project_root)
+    default_brand_list = project_root / "data" / "可匹配品牌企业名录（全量215品牌）.xlsx"
+    brand_list = Path(args.brand_list).expanduser().resolve() if args.brand_list else default_brand_list
     database_url = args.database_url or DATABASE_URL
 
     print("=" * 72)
-    print("上传 hkust_文件汇总 公司级聚合数据到数据库")
+    print("上传公司级聚合数据到数据库")
     print("=" * 72)
     print("模式: 全量重建")
-    print("数据目录:", data_dir)
+    print("数据源:", source)
+    if brand_list.exists():
+        print("品牌白名单:", brand_list)
 
-    if not data_dir.exists():
-        print(f"❌ 数据目录不存在: {data_dir}")
+    if not source.exists():
+        print(f"❌ 数据源不存在: {source}")
         sys.exit(1)
 
     engine = create_engine(database_url, pool_pre_ping=True, connect_args=DB_CONNECT_ARGS)
@@ -161,8 +203,20 @@ def main() -> None:
         sys.exit(1)
 
     start = datetime.now()
-    stats, aggregates = build_aggregates(data_dir)
+    stats, aggregates = build_source_aggregates(source)
+    source_brand_companies = set(aggregates.get("brand_companies") or set())
+    list_brand_companies = load_brand_company_list(brand_list)
+    force_company_names = source_brand_companies | list_brand_companies
     print("聚合完成:", stats)
+    if force_company_names:
+        print(
+            "215品牌白名单公司:",
+            {
+                "source_brand_companies": len(source_brand_companies),
+                "excel_brand_companies": len(list_brand_companies),
+                "union": len(force_company_names),
+            },
+        )
     print(
         "聚合行数:",
         {
@@ -180,6 +234,7 @@ def main() -> None:
             Path(tmp),
             top_companies=TOP_COMPANIES,
             top_counterparties_per_company_role=TOP_COUNTERPARTIES_PER_COMPANY_ROLE,
+            force_company_names=force_company_names,
         )
         csv_counts = {table: sum(1 for _ in path.open("r", encoding="utf-8")) for table, path in paths.items()}
         print("CSV 行数:", csv_counts)

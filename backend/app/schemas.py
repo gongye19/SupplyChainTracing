@@ -276,6 +276,7 @@ class HSQuarterAggregate(BaseModel):
 class CompanySearchResult(BaseModel):
     name: str
     country_code: Optional[str] = None
+    country_count: int = 0
     role: str
     total_trade_value: float
     trade_count: int
@@ -307,6 +308,7 @@ class CompanyTrendPoint(BaseModel):
 class CompanyDashboardResponse(BaseModel):
     name: str
     country_code: Optional[str] = None
+    country_count: int = 0
     role: str
     total_trade_value: float
     total_trade_count: int
