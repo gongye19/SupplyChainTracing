@@ -58,6 +58,15 @@ EXTRA_TOP_COMPANIES = int(os.getenv("COMPANY_IMPORT_EXTRA_TOP_COMPANIES", "0"))
 TOP_COUNTERPARTIES_PER_COMPANY_ROLE = int(os.getenv("COMPANY_IMPORT_TOP_COUNTERPARTIES", "25"))
 
 
+def make_engine(database_url: str):
+    return create_engine(
+        database_url,
+        pool_pre_ping=True,
+        pool_recycle=60,
+        connect_args=DB_CONNECT_ARGS,
+    )
+
+
 def copy_csv(engine, table: str, columns: list[str], csv_path: Path) -> int:
     total = 0
     batch_no = 0
@@ -194,7 +203,7 @@ def main() -> None:
         print(f"❌ 数据源不存在: {source}")
         sys.exit(1)
 
-    engine = create_engine(database_url, pool_pre_ping=True, connect_args=DB_CONNECT_ARGS)
+    engine = make_engine(database_url)
     try:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
@@ -245,6 +254,12 @@ def main() -> None:
         csv_counts = {table: sum(1 for _ in path.open("r", encoding="utf-8")) for table, path in paths.items()}
         print("CSV 行数:", csv_counts)
 
+        print("刷新数据库连接 ...")
+        engine.dispose()
+        engine = make_engine(database_url)
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+
         staging_suffix = "__import_" + datetime.now().strftime("%Y%m%d%H%M%S")
         print(f"创建 staging 表 {staging_suffix} ...")
         try:
@@ -261,7 +276,13 @@ def main() -> None:
             swap_staging_tables(engine, staging_suffix=staging_suffix)
         except Exception:
             print("导入失败，正式表未切换，正在清理 staging 表 ...")
-            drop_tables(engine, suffix=staging_suffix)
+            try:
+                engine.dispose()
+                cleanup_engine = make_engine(database_url)
+                drop_tables(cleanup_engine, suffix=staging_suffix)
+                cleanup_engine.dispose()
+            except Exception as cleanup_exc:
+                print(f"清理 staging 表失败，可稍后手动清理: {cleanup_exc}")
             raise
 
     elapsed = (datetime.now() - start).total_seconds()
