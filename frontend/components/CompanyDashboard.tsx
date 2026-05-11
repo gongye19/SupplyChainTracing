@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Building2, ChevronLeft, ChevronRight, Package, Search, TrendingUp, Users, X } from 'lucide-react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { companiesAPI } from '../services/api';
@@ -60,6 +60,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
   const [loading, setLoading] = useState(false);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const suppressSuggestionsRef = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -140,6 +141,11 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
 
   useEffect(() => {
     const trimmed = searchInput.trim();
+    if (suppressSuggestionsRef.current) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
     if (trimmed.length < 2) {
       setSuggestions([]);
       setShowSuggestions(false);
@@ -177,6 +183,9 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
 
   const runSearch = async () => {
     const trimmed = searchInput.trim();
+    suppressSuggestionsRef.current = true;
+    setSuggestions([]);
+    setShowSuggestions(false);
     setLoading(true);
     setSearching(false);
     setError(null);
@@ -265,11 +274,15 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
               type="text"
               value={searchInput}
               onChange={(event) => {
+                suppressSuggestionsRef.current = false;
                 setSearchInput(event.target.value);
                 setError(null);
               }}
               onFocus={() => {
-                if (suggestions.length > 0) setShowSuggestions(true);
+                if (!suppressSuggestionsRef.current && suggestions.length > 0) setShowSuggestions(true);
+              }}
+              onBlur={() => {
+                window.setTimeout(() => setShowSuggestions(false), 120);
               }}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') runSearch();
