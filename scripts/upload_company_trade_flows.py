@@ -25,6 +25,7 @@ import io
 import os
 import sys
 import tempfile
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -53,7 +54,9 @@ DB_CONNECT_ARGS = {
     "options": "-c statement_timeout=180000",
 }
 
-COPY_BATCH_ROWS = 20_000
+COPY_BATCH_ROWS = int(os.getenv("COMPANY_IMPORT_COPY_BATCH_ROWS", "10000"))
+COPY_MAX_RETRIES = int(os.getenv("COMPANY_IMPORT_COPY_MAX_RETRIES", "4"))
+COPY_RETRY_SECONDS = float(os.getenv("COMPANY_IMPORT_COPY_RETRY_SECONDS", "5"))
 EXTRA_TOP_COMPANIES = int(os.getenv("COMPANY_IMPORT_EXTRA_TOP_COMPANIES", "0"))
 TOP_COUNTERPARTIES_PER_COMPANY_ROLE = int(os.getenv("COMPANY_IMPORT_TOP_COUNTERPARTIES", "25"))
 
@@ -77,18 +80,45 @@ def copy_csv(engine, table: str, columns: list[str], csv_path: Path) -> int:
         nonlocal total, batch_no
         if not rows:
             return
-        buffer = io.StringIO()
-        writer = csv.writer(buffer)
-        writer.writerows(rows)
-        buffer.seek(0)
 
-        raw = engine.raw_connection()
-        try:
-            with raw.cursor() as cur:
-                cur.copy_expert(copy_sql, buffer)
-            raw.commit()
-        finally:
-            raw.close()
+        csv_payload = io.StringIO()
+        writer = csv.writer(csv_payload)
+        writer.writerows(rows)
+        payload_text = csv_payload.getvalue()
+
+        for attempt in range(1, COPY_MAX_RETRIES + 1):
+            raw = None
+            try:
+                buffer = io.StringIO(payload_text)
+                raw = engine.raw_connection()
+                with raw.cursor() as cur:
+                    cur.copy_expert(copy_sql, buffer)
+                raw.commit()
+                break
+            except Exception as exc:
+                if raw is not None:
+                    try:
+                        raw.rollback()
+                    except Exception:
+                        pass
+                    try:
+                        raw.close()
+                    except Exception:
+                        pass
+                engine.dispose()
+                if attempt >= COPY_MAX_RETRIES:
+                    raise
+                print(
+                    f"  {table} batch retry {attempt}/{COPY_MAX_RETRIES - 1} after COPY error: {exc}",
+                    flush=True,
+                )
+                time.sleep(COPY_RETRY_SECONDS)
+            finally:
+                if raw is not None:
+                    try:
+                        raw.close()
+                    except Exception:
+                        pass
 
         batch_no += 1
         total += len(rows)
