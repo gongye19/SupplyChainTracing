@@ -139,23 +139,24 @@ def pick_default_source(project_root: Path) -> Path:
     return project_root / "data" / "hkust_文件汇总"
 
 
-def load_brand_company_list(path: Path) -> set[str]:
+def load_brand_company_map(path: Path) -> dict[str, str]:
     import openpyxl
 
     if not path.exists():
-        return set()
+        return {}
 
     wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
     try:
         ws = wb["明细"] if "明细" in wb.sheetnames else wb.active
-        companies: set[str] = set()
+        brand_by_company: dict[str, str] = {}
         for row in ws.iter_rows(min_row=2, values_only=True):
             if len(row) < 3 or row[2] is None:
                 continue
+            brand = "" if row[1] is None else str(row[1]).strip()
             company = str(row[2]).strip()
             if company:
-                companies.add(company)
-        return companies
+                brand_by_company[company] = brand
+        return brand_by_company
     finally:
         wb.close()
 
@@ -205,8 +206,10 @@ def main() -> None:
     start = datetime.now()
     stats, aggregates = build_source_aggregates(source)
     source_brand_companies = set(aggregates.get("brand_companies") or set())
-    list_brand_companies = load_brand_company_list(brand_list)
-    force_company_names = source_brand_companies | list_brand_companies
+    source_brand_map = dict(aggregates.get("brand_by_company") or {})
+    list_brand_map = load_brand_company_map(brand_list)
+    brand_by_company = {**source_brand_map, **list_brand_map}
+    force_company_names = source_brand_companies | set(list_brand_map)
     if not force_company_names:
         raise RuntimeError("未找到215品牌白名单公司，停止导入，避免误导入空公司看板")
     print("聚合完成:", stats)
@@ -215,7 +218,7 @@ def main() -> None:
             "215品牌白名单公司:",
             {
                 "source_brand_companies": len(source_brand_companies),
-                "excel_brand_companies": len(list_brand_companies),
+                "excel_brand_companies": len(list_brand_map),
                 "union": len(force_company_names),
             },
         )
@@ -237,6 +240,7 @@ def main() -> None:
             top_companies=EXTRA_TOP_COMPANIES,
             top_counterparties_per_company_role=TOP_COUNTERPARTIES_PER_COMPANY_ROLE,
             force_company_names=force_company_names,
+            brand_by_company=brand_by_company,
         )
         csv_counts = {table: sum(1 for _ in path.open("r", encoding="utf-8")) for table, path in paths.items()}
         print("CSV 行数:", csv_counts)

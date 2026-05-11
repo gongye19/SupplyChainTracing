@@ -213,6 +213,7 @@ export interface HSQuarterAggregate {
 
 export interface CompanySearchResult {
   name: string;
+  brandName?: string;
   countryCode?: string;
   countryCount: number;
   role: 'importer' | 'exporter' | 'both' | 'unknown';
@@ -247,6 +248,7 @@ export interface CompanyCategoryStat {
 export interface CompanyRankItem {
   rank: number;
   company: string;
+  brandName?: string;
   countryCode?: string;
   sumOfUsd: number;
   tradeCount: number;
@@ -261,6 +263,7 @@ export interface CompanyTrendPoint {
 
 export interface CompanyDashboardData {
   name: string;
+  brandName?: string;
   countryCode?: string;
   countryCount: number;
   role: 'importer' | 'exporter' | 'both' | 'unknown';
@@ -272,6 +275,17 @@ export interface CompanyDashboardData {
   topSuppliers: CompanyRankItem[];
   topCustomers: CompanyRankItem[];
   trends: CompanyTrendPoint[];
+}
+
+export type CompanyRoleFilter = 'importer' | 'exporter' | 'both' | '';
+export type CompanyRankMetric = 'trade_value' | 'trade_count';
+
+export interface CompanyDashboardControls {
+  selectedContinent: string;
+  selectedCountry: string;
+  selectedHsPrefix: string;
+  selectedRole: CompanyRoleFilter;
+  rankMetric: CompanyRankMetric;
 }
 
 // 国家贸易统计筛选条件

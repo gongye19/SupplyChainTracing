@@ -18,6 +18,7 @@ TABLE_SPECS = [
         name="company_search_stats",
         columns=[
             "name",
+            "brand_name",
             "country_code",
             "role",
             "total_trade_value",
@@ -27,6 +28,7 @@ TABLE_SPECS = [
         ],
         create_sql="""
             name TEXT NOT NULL,
+            brand_name TEXT,
             country_code VARCHAR(3),
             role VARCHAR(10) NOT NULL,
             total_trade_value NUMERIC(24,2),
@@ -36,6 +38,7 @@ TABLE_SPECS = [
         """,
         indexes=[
             ("idx_css_name", "(name)"),
+            ("idx_css_brand", "(brand_name)"),
             ("idx_css_country_role", "(country_code, role)"),
             ("idx_css_total_value", "(total_trade_value DESC)"),
             ("idx_css_trade_count", "(trade_count DESC)"),

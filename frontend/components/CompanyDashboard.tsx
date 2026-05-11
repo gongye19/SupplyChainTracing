@@ -2,11 +2,13 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Building2, ChevronLeft, ChevronRight, Package, Search, TrendingUp, Users, X } from 'lucide-react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { companiesAPI } from '../services/api';
-import { CompanyDashboardData, CompanyFilterOptions, CompanyRankItem, CompanySearchResult } from '../types';
+import { CompanyDashboardControls, CompanyDashboardData, CompanyRankItem, CompanyRankMetric, CompanySearchResult } from '../types';
+import { getCompanyActiveCountries } from '../utils/companyDashboardFilters';
 
 interface CompanyDashboardProps {
   startDate: string;
   endDate: string;
+  controls: CompanyDashboardControls;
 }
 
 const HS2_COLOR_PALETTE: Record<string, string> = {
@@ -39,47 +41,10 @@ const SUGGESTED_COMPANIES = [
   'SAMSUNG ELECTRONICS VIETNAM CO LTD',
 ];
 
-const ROLE_OPTIONS = [
-  { value: '', label: 'All' },
-  { value: 'importer', label: 'Import' },
-  { value: 'exporter', label: 'Export' },
-  { value: 'both', label: 'Both' },
-] as const;
-
-type CompanyRoleFilter = typeof ROLE_OPTIONS[number]['value'];
-type CompanyRankMetric = 'trade_value' | 'trade_count';
-
-const RANK_METRIC_OPTIONS: Array<{ value: CompanyRankMetric; label: string }> = [
-  { value: 'trade_value', label: 'Trade Value' },
-  { value: 'trade_count', label: 'Trade Count' },
-];
-
 const RESULTS_PER_PAGE = 10;
 
-const CONTINENT_OPTIONS = [
-  { id: 'asia', label: 'Asia', countries: ['ARE', 'ARM', 'AZE', 'BGD', 'BHR', 'BRN', 'CHN', 'GEO', 'HKG', 'IDN', 'IND', 'ISR', 'JOR', 'JPN', 'KAZ', 'KHM', 'KOR', 'KWT', 'LAO', 'LKA', 'MAC', 'MMR', 'MNG', 'MYS', 'OMN', 'PAK', 'PHL', 'QAT', 'SAU', 'SGP', 'THA', 'TUR', 'TWN', 'VNM'] },
-  { id: 'europe', label: 'Europe', countries: ['AUT', 'BEL', 'BGR', 'CHE', 'CZE', 'DEU', 'DNK', 'ESP', 'EST', 'FIN', 'FRA', 'GBR', 'GRC', 'HRV', 'HUN', 'IRL', 'ITA', 'LTU', 'LUX', 'LVA', 'NLD', 'NOR', 'POL', 'PRT', 'ROU', 'RUS', 'SVK', 'SVN', 'SWE', 'UKR'] },
-  { id: 'north_america', label: 'North America', countries: ['CAN', 'CRI', 'DOM', 'GTM', 'HND', 'MEX', 'NIC', 'PAN', 'SLV', 'USA'] },
-  { id: 'south_america', label: 'South America', countries: ['ARG', 'BOL', 'BRA', 'CHL', 'COL', 'ECU', 'PER', 'PRY', 'URY', 'VEN'] },
-  { id: 'africa', label: 'Africa', countries: ['AGO', 'EGY', 'ETH', 'GHA', 'KEN', 'MAR', 'MUS', 'NGA', 'TUN', 'TZA', 'UGA', 'ZAF'] },
-  { id: 'oceania', label: 'Oceania', countries: ['AUS', 'FJI', 'NZL'] },
-];
-
-const HS_CATEGORY_LABELS: Record<string, string> = {
-  '38': 'HS 38 Materials',
-  '84': 'HS 84 Equipment',
-  '85': 'HS 85 IC & Components',
-  '90': 'HS 90 Instruments',
-};
-
-const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate }) => {
+const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate, controls }) => {
   const [searchInput, setSearchInput] = useState('');
-  const [selectedContinent, setSelectedContinent] = useState('');
-  const [selectedCountry, setSelectedCountry] = useState('');
-  const [selectedHsPrefix, setSelectedHsPrefix] = useState('');
-  const [selectedRole, setSelectedRole] = useState<CompanyRoleFilter>('');
-  const [rankMetric, setRankMetric] = useState<CompanyRankMetric>('trade_value');
-  const [filterOptions, setFilterOptions] = useState<CompanyFilterOptions>({ countries: [], hsCategories: [] });
   const [results, setResults] = useState<CompanySearchResult[]>([]);
   const [resultPage, setResultPage] = useState(1);
   const [company, setCompany] = useState<CompanyDashboardData | null>(null);
@@ -87,46 +52,13 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let active = true;
-    companiesAPI.getFilters()
-      .then((data) => {
-        if (active) setFilterOptions(data);
-      })
-      .catch(() => {
-        if (active) setFilterOptions({ countries: [], hsCategories: [] });
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  const availableCountryCodes = useMemo(
-    () => new Set(filterOptions.countries.map((item) => item.countryCode)),
-    [filterOptions.countries]
-  );
-
-  const continentCountryCodes = useMemo(() => {
-    const selected = CONTINENT_OPTIONS.find((item) => item.id === selectedContinent);
-    if (!selected) return [];
-    return selected.countries.filter((code) => availableCountryCodes.has(code));
-  }, [availableCountryCodes, selectedContinent]);
-
-  const countryOptions = useMemo(() => {
-    if (!selectedContinent) return filterOptions.countries;
-    const allowed = new Set(continentCountryCodes);
-    return filterOptions.countries.filter((item) => allowed.has(item.countryCode));
-  }, [continentCountryCodes, filterOptions.countries, selectedContinent]);
-
   const activeCountries = useMemo(() => {
-    if (selectedCountry) return [selectedCountry];
-    if (selectedContinent) return continentCountryCodes;
-    return [];
-  }, [continentCountryCodes, selectedContinent, selectedCountry]);
+    return getCompanyActiveCountries(controls);
+  }, [controls]);
 
   useEffect(() => {
     setResultPage(1);
-  }, [searchInput, selectedContinent, selectedCountry, selectedHsPrefix, selectedRole, rankMetric]);
+  }, [searchInput, controls]);
 
   const countrySummary = (countryCode?: string, countryCount = 0) => {
     if (!countryCode) return 'N/A';
@@ -134,7 +66,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
     return countryCode;
   };
 
-  const rankMetricLabel = rankMetric === 'trade_count' ? 'Trade Count' : 'Trade Value';
+  const rankMetricLabel = controls.rankMetric === 'trade_count' ? 'Trade Count' : 'Trade Value';
 
   const loadCompany = async (name: string) => {
     const trimmed = name.trim();
@@ -147,8 +79,8 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
         name: trimmed,
         startYearMonth: startDate,
         endYearMonth: endDate,
-        hsCodePrefix: selectedHsPrefix ? [selectedHsPrefix] : undefined,
-        metric: rankMetric,
+        hsCodePrefix: controls.selectedHsPrefix ? [controls.selectedHsPrefix] : undefined,
+        metric: controls.rankMetric,
         limit: 10,
       });
       setCompany(data);
@@ -171,9 +103,9 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
       const data = await companiesAPI.search({
         query: trimmed,
         countries: activeCountries,
-        hsCodePrefix: selectedHsPrefix ? [selectedHsPrefix] : undefined,
-        role: selectedRole,
-        metric: rankMetric,
+        hsCodePrefix: controls.selectedHsPrefix ? [controls.selectedHsPrefix] : undefined,
+        role: controls.selectedRole,
+        metric: controls.rankMetric,
         limit: 100,
       });
       setResults(data);
@@ -246,74 +178,6 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
             </button>
           </div>
 
-          <div className="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-3">
-            <FilterChips
-              label="Continent"
-              value={selectedContinent}
-              onChange={(value) => {
-                setSelectedContinent(value);
-                setSelectedCountry('');
-              }}
-              options={CONTINENT_OPTIONS.map((item) => ({ value: item.id, label: item.label }))}
-            />
-            <FilterChips
-              label="Country"
-              value={selectedCountry}
-              onChange={setSelectedCountry}
-              options={countryOptions.map((item) => ({ value: item.countryCode, label: item.countryCode }))}
-              disabled={!selectedContinent}
-              emptyText="Select continent first"
-            />
-            <FilterChips
-              label="Category"
-              value={selectedHsPrefix}
-              onChange={setSelectedHsPrefix}
-              options={filterOptions.hsCategories.map((item) => ({
-                value: item.hsPrefix,
-                label: HS_CATEGORY_LABELS[item.hsPrefix] || `HS ${item.hsPrefix}`,
-              }))}
-            />
-            <FilterChips
-              label="Role"
-              value={selectedRole}
-              onChange={(value) => setSelectedRole(value as CompanyRoleFilter)}
-              options={ROLE_OPTIONS.filter((option) => option.value).map((option) => ({
-                value: option.value,
-                label: option.label,
-              }))}
-            />
-            <FilterChips
-              label="Rank By"
-              value={rankMetric}
-              onChange={(value) => setRankMetric((value || 'trade_value') as CompanyRankMetric)}
-              options={RANK_METRIC_OPTIONS}
-              includeAll={false}
-            />
-          </div>
-
-          <div className="mt-3 flex items-center justify-end gap-2">
-            <button
-              onClick={() => {
-                setSelectedContinent('');
-                setSelectedCountry('');
-                setSelectedHsPrefix('');
-                setSelectedRole('');
-                setRankMetric('trade_value');
-                setResults([]);
-                setSearching(false);
-              }}
-              className="h-[34px] px-3 rounded-[9px] bg-[#F5F5F7] text-[12px] font-semibold text-[#86868B] hover:text-[#1D1D1F] transition-colors"
-            >
-              Clear Filters
-            </button>
-            <button
-              onClick={runSearch}
-              disabled={loading}
-              className="h-[34px] px-4 rounded-[9px] bg-[#007AFF] text-white text-[12px] font-semibold hover:bg-[#0066CC] transition-colors disabled:opacity-60"
-            >
-              {loading ? 'Searching' : 'Apply Search'}
-            </button>
-          </div>
         </div>
 
         {results.length > 0 && (
@@ -334,14 +198,16 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
               >
                 <div className="min-w-0">
                   <div className="text-[13px] font-bold text-[#1D1D1F] truncate">{result.name}</div>
-                  <div className="text-[11px] text-[#86868B]">{countrySummary(result.countryCode, result.countryCount)} · {roleLabel(result.role)}</div>
+                  <div className="text-[11px] text-[#86868B] truncate">
+                    {result.brandName || 'Unbranded'} · {countrySummary(result.countryCode, result.countryCount)} · {roleLabel(result.role)}
+                  </div>
                 </div>
                 <div className="text-right shrink-0">
                   <div className="text-[12px] font-bold text-[#1D1D1F]">
-                    {rankMetric === 'trade_count' ? result.tradeCount.toLocaleString() : formatMoney(result.totalTradeValue)}
+                    {controls.rankMetric === 'trade_count' ? result.tradeCount.toLocaleString() : formatMoney(result.totalTradeValue)}
                   </div>
                   <div className="text-[10px] text-[#86868B]">
-                    {rankMetric === 'trade_count' ? formatMoney(result.totalTradeValue) : `${result.tradeCount.toLocaleString()} trades`}
+                    {controls.rankMetric === 'trade_count' ? formatMoney(result.totalTradeValue) : `${result.tradeCount.toLocaleString()} trades`}
                   </div>
                 </div>
               </button>
@@ -410,7 +276,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
               <div className="min-w-0">
                 <h2 className="text-[18px] font-bold text-[#1D1D1F] truncate">{company.name}</h2>
                 <div className="text-[12px] text-[#86868B] font-medium mt-0.5">
-                  {countrySummary(company.countryCode, company.countryCount)} · {roleLabel(company.role)}
+                  {company.brandName || 'Unbranded'} · {countrySummary(company.countryCode, company.countryCount)} · {roleLabel(company.role)}
                 </div>
               </div>
             </div>
@@ -482,90 +348,18 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate 
               subtitle={`Exporters selling to this company · ranked by ${rankMetricLabel}`}
               items={company.topSuppliers}
               accentColor="#007AFF"
-              rankMetric={rankMetric}
+              rankMetric={controls.rankMetric}
             />
             <RankTable
               title="Top 10 Customers"
               subtitle={`Importers buying from this company · ranked by ${rankMetricLabel}`}
               items={company.topCustomers}
               accentColor="#34C759"
-              rankMetric={rankMetric}
+              rankMetric={controls.rankMetric}
             />
           </div>
         </div>
       )}
-    </div>
-  );
-};
-
-const FilterChips: React.FC<{
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  options: Array<{ value: string; label: string }>;
-  disabled?: boolean;
-  emptyText?: string;
-  includeAll?: boolean;
-}> = ({ label, value, onChange, options, disabled = false, emptyText = 'No options', includeAll = true }) => {
-  const visibleOptions = disabled ? [] : options;
-
-  return (
-    <div className={`rounded-[12px] border border-black/[0.08] bg-white p-3 min-w-0 ${disabled ? 'opacity-75' : ''}`}>
-      <div className="flex items-center justify-between gap-3 mb-2">
-        <span className="text-[10px] font-bold uppercase tracking-wider text-[#86868B]">{label}</span>
-        {value && !disabled && (
-          <button
-            type="button"
-            onClick={() => onChange('')}
-            className="text-[10px] font-bold text-[#86868B] hover:text-[#1D1D1F] transition-colors"
-          >
-            Clear
-          </button>
-        )}
-      </div>
-      <div className="flex flex-wrap gap-1.5 max-h-[96px] overflow-y-auto pr-1">
-        {disabled ? (
-          <span className="px-2.5 py-1.5 rounded-[8px] bg-[#F5F5F7] text-[11px] font-semibold text-[#86868B]">
-            {emptyText}
-          </span>
-        ) : (
-          <>
-            {includeAll && (
-              <button
-                type="button"
-                onClick={() => onChange('')}
-                className={`px-2.5 py-1.5 rounded-[8px] text-[11px] font-semibold transition-colors ${
-                  value === ''
-                    ? 'bg-[#007AFF] text-white'
-                    : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-black/10'
-                }`}
-              >
-                All
-              </button>
-            )}
-            {visibleOptions.map((option) => (
-              <button
-                type="button"
-                key={option.value}
-                onClick={() => onChange(option.value)}
-                className={`px-2.5 py-1.5 rounded-[8px] text-[11px] font-semibold transition-colors ${
-                  value === option.value
-                    ? 'bg-[#007AFF] text-white'
-                    : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-black/10'
-                }`}
-                title={option.label}
-              >
-                {option.label}
-              </button>
-            ))}
-            {visibleOptions.length === 0 && (
-              <span className="px-2.5 py-1.5 rounded-[8px] bg-[#F5F5F7] text-[11px] font-semibold text-[#86868B]">
-                {emptyText}
-              </span>
-            )}
-          </>
-        )}
-      </div>
     </div>
   );
 };
@@ -607,7 +401,9 @@ const RankTable: React.FC<{
             </span>
             <div className="flex-1 min-w-0">
               <div className="text-[13px] font-semibold text-[#1D1D1F] truncate">{item.company}</div>
-              <div className="text-[10px] text-[#86868B]">{item.countryCode || 'N/A'} · {item.tradeCount.toLocaleString()} trades</div>
+              <div className="text-[10px] text-[#86868B] truncate">
+                {item.brandName || 'Unbranded'} · {item.countryCode || 'N/A'} · {item.tradeCount.toLocaleString()} trades
+              </div>
             </div>
             <div className="text-right shrink-0">
               <div className="text-[13px] font-bold text-[#1D1D1F]">

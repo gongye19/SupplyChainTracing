@@ -13,6 +13,7 @@ def write_csvs(
     top_companies: int,
     top_counterparties_per_company_role: int,
     force_company_names: set[str] | None = None,
+    brand_by_company: dict[str, str] | None = None,
 ) -> dict[str, Path]:
     paths = {
         "company_monthly_trade_stats": output_dir / "company_monthly_trade_stats.csv",
@@ -33,6 +34,7 @@ def write_csvs(
             for company, _value in sorted(name_totals.items(), key=lambda item: item[1], reverse=True)[:top_companies]
         }
     forced_company_names = force_company_names or set()
+    company_brands = brand_by_company or {}
     included_company_names = top_company_names | forced_company_names
     if top_company_names:
         print(
@@ -69,6 +71,7 @@ def write_csvs(
             role = "both" if import_value and export_value else "importer" if import_value else "exporter"
             writer.writerow([
                 company,
+                company_brands.get(company, ""),
                 country,
                 role,
                 import_value + export_value,

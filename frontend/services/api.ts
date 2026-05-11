@@ -718,6 +718,7 @@ export const companiesAPI = {
     const data = await fetchAPI<any[]>(`/api/companies/search?${params.toString()}`);
     return data.map((item) => ({
       name: item.name,
+      brandName: item.brand_name || undefined,
       countryCode: item.country_code || undefined,
       countryCount: parseInt(item.country_count) || 0,
       role: item.role || 'unknown',
@@ -762,6 +763,7 @@ export const companiesAPI = {
     const item = await fetchAPI<any>(`/api/companies/dashboard?${params.toString()}`);
     return {
       name: item.name,
+      brandName: item.brand_name || undefined,
       countryCode: item.country_code || undefined,
       countryCount: parseInt(item.country_count) || 0,
       role: item.role || 'unknown',
@@ -779,6 +781,7 @@ export const companiesAPI = {
       topSuppliers: (item.top_suppliers || []).map((rank: any) => ({
         rank: parseInt(rank.rank) || 0,
         company: rank.company,
+        brandName: rank.brand_name || undefined,
         countryCode: rank.country_code || undefined,
         sumOfUsd: parseFloat(rank.sum_of_usd) || 0,
         tradeCount: parseInt(rank.trade_count) || 0,
@@ -787,6 +790,7 @@ export const companiesAPI = {
       topCustomers: (item.top_customers || []).map((rank: any) => ({
         rank: parseInt(rank.rank) || 0,
         company: rank.company,
+        brandName: rank.brand_name || undefined,
         countryCode: rank.country_code || undefined,
         sumOfUsd: parseFloat(rank.sum_of_usd) || 0,
         tradeCount: parseInt(rank.trade_count) || 0,

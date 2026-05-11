@@ -3,14 +3,15 @@ import React, { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspens
 import StatsPanel from './components/StatsPanel';
 import SidebarFilters from './components/SidebarFilters';
 import CountryTradeSidebar from './components/CountryTradeSidebar';
+import CompanyDashboardSidebar from './components/CompanyDashboardSidebar';
 import type { TopCountriesDatum } from './components/TopCountriesHorizontalBar';
-import { Filters, HSCodeCategory, CountryLocation, Location, Shipment, CountryMonthlyTradeStat, CountryTradeStatSummary, CountryTradeTrend, TopCountry, CountryTradeFilters, CountryQuarterTop, CountryAggregate, CountryQuarterAggregate, HSAggregate, HSQuarterAggregate } from './types';
+import { CompanyDashboardControls, Filters, HSCodeCategory, CountryLocation, Location, Shipment, CountryMonthlyTradeStat, CountryTradeStatSummary, CountryTradeTrend, TopCountry, CountryTradeFilters, CountryQuarterTop, CountryAggregate, CountryQuarterAggregate, HSAggregate, HSQuarterAggregate } from './types';
 import { shipmentsAPI, hsCodeCategoriesAPI, countryLocationsAPI, chatAPI, ChatMessage, countryTradeStatsAPI } from './services/api';
 import { Globe, Map as MapIcon, Package, TrendingUp, Users, ChevronRight, Filter, Building2 } from 'lucide-react';
 import { useLanguage } from './contexts/LanguageContext';
-import MonthRangeSlider from './components/MonthRangeSlider';
 import { getCountriesFromCodes } from './utils/countryCoordinates';
 import { logger } from './utils/logger';
+import { DEFAULT_COMPANY_CONTROLS } from './utils/companyDashboardFilters';
 
 const SupplyMap = lazy(() => import('./components/SupplyMap'));
 const AIAssistant = lazy(() => import('./components/AIAssistant'));
@@ -37,41 +38,6 @@ const MAX_CACHE_ENTRIES = 24;
 type CacheEntry<T> = {
   data: T;
   ts: number;
-};
-
-const CompanyDashboardSidebar: React.FC<{
-  filters: Filters;
-  setFilters: React.Dispatch<React.SetStateAction<Filters>>;
-}> = ({ filters, setFilters }) => {
-  const now = new Date();
-  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  return (
-    <div className="flex flex-col gap-8 p-1">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-[#007AFF]">
-          <Filter className="w-4 h-4" />
-          <span className="text-[12px] font-bold uppercase tracking-widest text-[#1D1D1F]">Filter Control</span>
-        </div>
-        <button
-          onClick={() => setFilters((prev) => ({ ...prev, startDate: '2021-01', endDate: currentMonth }))}
-          className="text-[12px] text-[#007AFF] hover:underline font-semibold"
-        >
-          Reset
-        </button>
-      </div>
-      <div className="flex flex-col gap-3">
-        <MonthRangeSlider
-          title="Time Range"
-          startLabel="START"
-          endLabel="END"
-          minMonth="2021-01"
-          startMonth={filters.startDate || '2021-01'}
-          endMonth={filters.endDate}
-          onChange={(startMonth, endMonth) => setFilters((prev) => ({ ...prev, startDate: startMonth, endDate: endMonth }))}
-        />
-      </div>
-    </div>
-  );
 };
 
 const App: React.FC = () => {
@@ -109,6 +75,7 @@ const App: React.FC = () => {
   const [mapCountryFilters, setMapCountryFilters] = useState<Filters>(defaultCountryMapFilters);
   const [mapHsFilters, setMapHsFilters] = useState<Filters>(defaultHsMapFilters);
   const [companyDashboardFilters, setCompanyDashboardFilters] = useState<Filters>(defaultFilters);
+  const [companyDashboardControls, setCompanyDashboardControls] = useState<CompanyDashboardControls>(DEFAULT_COMPANY_CONTROLS);
 
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [countryOverallQuarterlyValue, setCountryOverallQuarterlyValue] = useState<CountryQuarterTop[]>([]);
@@ -1334,6 +1301,8 @@ const App: React.FC = () => {
             <CompanyDashboardSidebar
               filters={companyDashboardFilters}
               setFilters={setCompanyDashboardFilters}
+              controls={companyDashboardControls}
+              setControls={setCompanyDashboardControls}
             />
           )}
           
@@ -1762,6 +1731,7 @@ const App: React.FC = () => {
             <CompanyDashboard
               startDate={companyDashboardFilters.startDate}
               endDate={companyDashboardFilters.endDate}
+              controls={companyDashboardControls}
             />
           ) : (
             <div className="pr-4">

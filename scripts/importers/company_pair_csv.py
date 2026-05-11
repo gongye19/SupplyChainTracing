@@ -84,6 +84,7 @@ def build_aggregates(source: Path) -> tuple[dict[str, int], dict[str, dict]]:
     counterparty: dict[tuple, dict[str, Any]] = defaultdict(empty_amount_bucket)
     country_stats: dict[tuple, dict[str, Any]] = defaultdict(empty_amount_bucket)
     branded_companies: set[str] = set()
+    brand_by_company: dict[str, str] = {}
 
     print(f"读取公司对 CSV 源: {source}")
 
@@ -146,6 +147,7 @@ def build_aggregates(source: Path) -> tuple[dict[str, int], dict[str, dict]]:
                 add_amount(hs_stats[(importer_name, importer_country, "importer", hs_code)], amount, trade_count, desc_zh, desc_en)
                 if importer_brand:
                     branded_companies.add(importer_name)
+                    brand_by_company.setdefault(importer_name, importer_brand)
                 if exporter_name:
                     add_amount(
                         counterparty[(importer_name, importer_country, "importer", exporter_name, export_side_country)],
@@ -158,6 +160,7 @@ def build_aggregates(source: Path) -> tuple[dict[str, int], dict[str, dict]]:
                 add_amount(hs_stats[(exporter_name, export_side_country, "exporter", hs_code)], amount, trade_count, desc_zh, desc_en)
                 if exporter_brand:
                     branded_companies.add(exporter_name)
+                    brand_by_company.setdefault(exporter_name, exporter_brand)
                 if importer_name:
                     add_amount(
                         counterparty[(exporter_name, export_side_country, "exporter", importer_name, importer_country)],
@@ -183,4 +186,5 @@ def build_aggregates(source: Path) -> tuple[dict[str, int], dict[str, dict]]:
         "counterparty": counterparty,
         "country": country_stats,
         "brand_companies": branded_companies,
+        "brand_by_company": brand_by_company,
     }

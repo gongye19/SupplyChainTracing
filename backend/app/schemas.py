@@ -275,6 +275,7 @@ class HSQuarterAggregate(BaseModel):
 
 class CompanySearchResult(BaseModel):
     name: str
+    brand_name: Optional[str] = None
     country_code: Optional[str] = None
     country_count: int = 0
     role: str
@@ -293,6 +294,7 @@ class CompanyCategoryStat(BaseModel):
 class CompanyRankItem(BaseModel):
     rank: int
     company: str
+    brand_name: Optional[str] = None
     country_code: Optional[str] = None
     sum_of_usd: float
     trade_count: int
@@ -307,6 +309,7 @@ class CompanyTrendPoint(BaseModel):
 
 class CompanyDashboardResponse(BaseModel):
     name: str
+    brand_name: Optional[str] = None
     country_code: Optional[str] = None
     country_count: int = 0
     role: str
