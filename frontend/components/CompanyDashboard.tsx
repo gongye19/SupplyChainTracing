@@ -61,6 +61,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const suppressSuggestionsRef = useRef(false);
+  const lastDashboardKeyRef = useRef('');
 
   useEffect(() => {
     let active = true;
@@ -103,6 +104,10 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
   };
 
   const rankMetricLabel = controls.rankMetric === 'trade_count' ? 'Trade Count' : 'Trade Value';
+  const trendMetricKey = controls.rankMetric === 'trade_count' ? 'tradeCount' : 'sumOfUsd';
+  const formatTrendMetric = (value: number) => (
+    controls.rankMetric === 'trade_count' ? value.toLocaleString() : formatMoney(value)
+  );
   const metaText = (brandName?: string, countryCode?: string, countryCount = 0, role?: CompanyDashboardData['role']) => (
     [brandName, countrySummary(countryCode, countryCount), role ? roleLabel(role) : undefined].filter(Boolean).join(' · ')
   );
@@ -111,9 +116,20 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
     setControls((prev) => ({ ...prev, ...patch }));
   };
 
+  const getDashboardKey = (name: string) => [
+    name,
+    startDate,
+    endDate,
+    controls.selectedHsPrefix || 'all-hs',
+    controls.rankMetric,
+  ].join('|');
+
   const loadCompany = async (name: string) => {
     const trimmed = name.trim();
     if (!trimmed) return;
+    suppressSuggestionsRef.current = true;
+    setSuggestions([]);
+    setShowSuggestions(false);
     setLoading(true);
     setSearching(false);
     setError(null);
@@ -126,6 +142,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
         metric: controls.rankMetric,
         limit: 10,
       });
+      lastDashboardKeyRef.current = getDashboardKey(data.name);
       setCompany(data);
       setSearchInput(data.name);
       setResults([]);
@@ -163,12 +180,12 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
           metric: controls.rankMetric,
           limit: 10,
         });
-        if (active) {
+        if (active && !suppressSuggestionsRef.current) {
           setSuggestions(data);
           setShowSuggestions(data.length > 0);
         }
       } catch {
-        if (active) {
+        if (active && !suppressSuggestionsRef.current) {
           setSuggestions([]);
           setShowSuggestions(false);
         }
@@ -203,6 +220,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
       setResultPage(1);
       if (data.length === 0) {
         setCompany(null);
+        lastDashboardKeyRef.current = '';
         setError('No company found');
       }
     } catch (err) {
@@ -212,8 +230,50 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
     }
   };
 
+  useEffect(() => {
+    const selectedName = company?.name;
+    if (!selectedName) return;
+
+    const dashboardKey = getDashboardKey(selectedName);
+    if (lastDashboardKeyRef.current === dashboardKey) return;
+
+    let active = true;
+    suppressSuggestionsRef.current = true;
+    setSuggestions([]);
+    setShowSuggestions(false);
+    setLoading(true);
+    setError(null);
+
+    companiesAPI.getDashboard({
+      name: selectedName,
+      startYearMonth: startDate,
+      endYearMonth: endDate,
+      hsCodePrefix: controls.selectedHsPrefix ? [controls.selectedHsPrefix] : undefined,
+      metric: controls.rankMetric,
+      limit: 10,
+    })
+      .then((data) => {
+        if (!active) return;
+        lastDashboardKeyRef.current = getDashboardKey(data.name);
+        setCompany(data);
+        setSearchInput(data.name);
+        setResults([]);
+      })
+      .catch((err) => {
+        if (!active) return;
+        setError(err instanceof Error ? err.message : 'Unable to refresh company');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [company?.name, controls.rankMetric, controls.selectedHsPrefix, endDate, startDate]);
+
   const trendData = useMemo(
-    () => company?.trends.map((point) => ({ ...point, valueLabel: formatMoney(point.sumOfUsd) })) || [],
+    () => company?.trends || [],
     [company]
   );
 
@@ -294,9 +354,13 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
             {searchInput && (
               <button
                 onClick={() => {
+                  suppressSuggestionsRef.current = false;
                   setSearchInput('');
                   setResults([]);
                   setCompany(null);
+                  lastDashboardKeyRef.current = '';
+                  setSuggestions([]);
+                  setShowSuggestions(false);
                   setError(null);
                   setSearching(false);
                 }}
@@ -464,9 +528,9 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="#E5E5EA" />
                       <XAxis dataKey="yearMonth" tick={{ fontSize: 10, fill: '#86868B' }} minTickGap={28} />
-                      <YAxis tickFormatter={formatMoney} tick={{ fontSize: 10, fill: '#86868B' }} width={62} />
-                      <Tooltip formatter={(value: number) => [formatMoney(value), 'Trade Value']} />
-                      <Area type="monotone" dataKey="sumOfUsd" stroke="#007AFF" fill="url(#companyTrend)" strokeWidth={2} />
+                      <YAxis tickFormatter={(value) => formatTrendMetric(Number(value))} tick={{ fontSize: 10, fill: '#86868B' }} width={72} />
+                      <Tooltip formatter={(value: number) => [formatTrendMetric(Number(value)), rankMetricLabel]} />
+                      <Area type="monotone" dataKey={trendMetricKey} stroke="#007AFF" fill="url(#companyTrend)" strokeWidth={2} />
                     </AreaChart>
                   </ResponsiveContainer>
                 ) : (
@@ -493,7 +557,11 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
                     <div className="h-1.5 bg-[#F5F5F7] rounded-full overflow-hidden">
                       <div className="h-full rounded-full" style={{ width: `${Math.min(category.sharePct * 100, 100)}%`, backgroundColor: getHsColor(category.hsCode) }} />
                     </div>
-                    <div className="text-[10px] text-[#86868B] mt-1">{formatMoney(category.sumOfUsd)} · {category.tradeCount.toLocaleString()} trades</div>
+                    <div className="text-[10px] text-[#86868B] mt-1">
+                      {controls.rankMetric === 'trade_count'
+                        ? `${category.tradeCount.toLocaleString()} trades · ${formatMoney(category.sumOfUsd)}`
+                        : `${formatMoney(category.sumOfUsd)} · ${category.tradeCount.toLocaleString()} trades`}
+                    </div>
                   </div>
                 ))}
               </div>
