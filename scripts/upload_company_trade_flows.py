@@ -57,6 +57,8 @@ DB_CONNECT_ARGS = {
 COPY_BATCH_ROWS = int(os.getenv("COMPANY_IMPORT_COPY_BATCH_ROWS", "10000"))
 COPY_MAX_RETRIES = int(os.getenv("COMPANY_IMPORT_COPY_MAX_RETRIES", "4"))
 COPY_RETRY_SECONDS = float(os.getenv("COMPANY_IMPORT_COPY_RETRY_SECONDS", "5"))
+DB_CONNECT_MAX_RETRIES = int(os.getenv("COMPANY_IMPORT_DB_CONNECT_MAX_RETRIES", "12"))
+DB_CONNECT_RETRY_SECONDS = float(os.getenv("COMPANY_IMPORT_DB_CONNECT_RETRY_SECONDS", "10"))
 EXTRA_TOP_COMPANIES = int(os.getenv("COMPANY_IMPORT_EXTRA_TOP_COMPANIES", "0"))
 TOP_COUNTERPARTIES_PER_COMPANY_ROLE = int(os.getenv("COMPANY_IMPORT_TOP_COUNTERPARTIES", "25"))
 
@@ -68,6 +70,29 @@ def make_engine(database_url: str):
         pool_recycle=60,
         connect_args=DB_CONNECT_ARGS,
     )
+
+
+def wait_for_database(engine, label: str) -> None:
+    last_error: Exception | None = None
+    for attempt in range(1, DB_CONNECT_MAX_RETRIES + 1):
+        try:
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            if attempt > 1:
+                print(f"✓ {label} 成功")
+            return
+        except Exception as exc:
+            last_error = exc
+            engine.dispose()
+            if attempt >= DB_CONNECT_MAX_RETRIES:
+                break
+            print(
+                f"{label} 失败，{DB_CONNECT_RETRY_SECONDS:g}s 后重试 "
+                f"({attempt}/{DB_CONNECT_MAX_RETRIES - 1}): {exc}",
+                flush=True,
+            )
+            time.sleep(DB_CONNECT_RETRY_SECONDS)
+    raise RuntimeError(f"{label} 失败: {last_error}") from last_error
 
 
 def copy_csv(engine, table: str, columns: list[str], csv_path: Path) -> int:
@@ -235,8 +260,7 @@ def main() -> None:
 
     engine = make_engine(database_url)
     try:
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
+        wait_for_database(engine, "数据库连接")
         print("✓ 数据库连接成功")
     except Exception as exc:
         print(f"❌ 数据库连接失败: {exc}")
@@ -287,8 +311,7 @@ def main() -> None:
         print("刷新数据库连接 ...")
         engine.dispose()
         engine = make_engine(database_url)
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
+        wait_for_database(engine, "刷新数据库连接")
 
         staging_suffix = "__import_" + datetime.now().strftime("%Y%m%d%H%M%S")
         print(f"创建 staging 表 {staging_suffix} ...")
