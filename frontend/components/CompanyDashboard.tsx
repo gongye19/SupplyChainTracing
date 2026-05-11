@@ -3,12 +3,18 @@ import { Building2, ChevronLeft, ChevronRight, Package, Search, TrendingUp, User
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { companiesAPI } from '../services/api';
 import { CompanyDashboardControls, CompanyDashboardData, CompanyRankItem, CompanyRankMetric, CompanySearchResult } from '../types';
-import { getCompanyActiveCountries } from '../utils/companyDashboardFilters';
+import {
+  CONTINENT_OPTIONS,
+  HS_CATEGORY_LABELS,
+  ROLE_OPTIONS,
+  getCompanyActiveCountries,
+} from '../utils/companyDashboardFilters';
 
 interface CompanyDashboardProps {
   startDate: string;
   endDate: string;
   controls: CompanyDashboardControls;
+  setControls: React.Dispatch<React.SetStateAction<CompanyDashboardControls>>;
 }
 
 const HS2_COLOR_PALETTE: Record<string, string> = {
@@ -43,8 +49,11 @@ const SUGGESTED_COMPANIES = [
 
 const RESULTS_PER_PAGE = 10;
 
-const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate, controls }) => {
+const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate, controls, setControls }) => {
   const [searchInput, setSearchInput] = useState('');
+  const [filterOptions, setFilterOptions] = useState<{ countries: { countryCode: string }[]; hsCategories: { hsPrefix: string }[] }>({ countries: [], hsCategories: [] });
+  const [suggestions, setSuggestions] = useState<CompanySearchResult[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [results, setResults] = useState<CompanySearchResult[]>([]);
   const [resultPage, setResultPage] = useState(1);
   const [company, setCompany] = useState<CompanyDashboardData | null>(null);
@@ -52,9 +61,35 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    let active = true;
+    companiesAPI.getFilters()
+      .then((data) => {
+        if (active) setFilterOptions(data);
+      })
+      .catch(() => {
+        if (active) setFilterOptions({ countries: [], hsCategories: [] });
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const availableCountryCodes = useMemo(
+    () => new Set(filterOptions.countries.map((item) => item.countryCode)),
+    [filterOptions.countries]
+  );
+
+  const countryOptions = useMemo(() => {
+    if (!controls.selectedContinent) return [];
+    const selected = CONTINENT_OPTIONS.find((item) => item.id === controls.selectedContinent);
+    const allowed = new Set((selected?.countries || []).filter((code) => availableCountryCodes.has(code)));
+    return filterOptions.countries.filter((item) => allowed.has(item.countryCode));
+  }, [availableCountryCodes, controls.selectedContinent, filterOptions.countries]);
+
   const activeCountries = useMemo(() => {
-    return getCompanyActiveCountries(controls);
-  }, [controls]);
+    return getCompanyActiveCountries(controls, availableCountryCodes);
+  }, [availableCountryCodes, controls]);
 
   useEffect(() => {
     setResultPage(1);
@@ -67,6 +102,13 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
   };
 
   const rankMetricLabel = controls.rankMetric === 'trade_count' ? 'Trade Count' : 'Trade Value';
+  const metaText = (brandName?: string, countryCode?: string, countryCount = 0, role?: CompanyDashboardData['role']) => (
+    [brandName, countrySummary(countryCode, countryCount), role ? roleLabel(role) : undefined].filter(Boolean).join(' · ')
+  );
+
+  const updateControls = (patch: Partial<CompanyDashboardControls>) => {
+    setControls((prev) => ({ ...prev, ...patch }));
+  };
 
   const loadCompany = async (name: string) => {
     const trimmed = name.trim();
@@ -86,6 +128,8 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
       setCompany(data);
       setSearchInput(data.name);
       setResults([]);
+      setSuggestions([]);
+      setShowSuggestions(false);
     } catch (err) {
       setCompany(null);
       setError(err instanceof Error ? err.message : 'Unable to load company');
@@ -93,6 +137,43 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const trimmed = searchInput.trim();
+    if (trimmed.length < 2) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    let active = true;
+    const timer = window.setTimeout(async () => {
+      try {
+        const data = await companiesAPI.search({
+          query: trimmed,
+          countries: activeCountries,
+          hsCodePrefix: controls.selectedHsPrefix ? [controls.selectedHsPrefix] : undefined,
+          role: controls.selectedRole,
+          metric: controls.rankMetric,
+          limit: 10,
+        });
+        if (active) {
+          setSuggestions(data);
+          setShowSuggestions(data.length > 0);
+        }
+      } catch {
+        if (active) {
+          setSuggestions([]);
+          setShowSuggestions(false);
+        }
+      }
+    }, 250);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [activeCountries, controls.rankMetric, controls.selectedHsPrefix, controls.selectedRole, searchInput]);
 
   const runSearch = async () => {
     const trimmed = searchInput.trim();
@@ -109,6 +190,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
         limit: 100,
       });
       setResults(data);
+      setShowSuggestions(false);
       setResultPage(1);
       if (data.length === 0) {
         setCompany(null);
@@ -141,15 +223,57 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
       </div>
 
       <div className="w-full max-w-4xl mx-auto">
+        <div className="mb-3 grid grid-cols-1 lg:grid-cols-2 gap-3">
+          <FilterChips
+            label="Continent"
+            value={controls.selectedContinent}
+            onChange={(value) => updateControls({ selectedContinent: value, selectedCountry: '' })}
+            options={CONTINENT_OPTIONS.map((item) => ({ value: item.id, label: item.label }))}
+          />
+          <FilterChips
+            label="Country"
+            value={controls.selectedCountry}
+            onChange={(value) => updateControls({ selectedCountry: value })}
+            options={countryOptions.map((item) => ({ value: item.countryCode, label: item.countryCode }))}
+            disabled={!controls.selectedContinent}
+            emptyText="Select continent first"
+          />
+          <FilterChips
+            label="Category"
+            value={controls.selectedHsPrefix}
+            onChange={(value) => updateControls({ selectedHsPrefix: value })}
+            options={filterOptions.hsCategories.map((item) => ({
+              value: item.hsPrefix,
+              label: HS_CATEGORY_LABELS[item.hsPrefix] || `HS ${item.hsPrefix}`,
+            }))}
+          />
+          <FilterChips
+            label="Role"
+            value={controls.selectedRole}
+            onChange={(value) => updateControls({ selectedRole: value as CompanyDashboardControls['selectedRole'] })}
+            options={ROLE_OPTIONS.filter((option) => option.value).map((option) => ({
+              value: option.value,
+              label: option.label,
+            }))}
+          />
+        </div>
+
         <div className="bg-white rounded-[18px] border border-black/[0.08] shadow-[0_4px_24px_rgba(0,0,0,0.06)] p-3">
           <div className="relative flex items-center bg-[#F5F5F7] rounded-[12px] border border-transparent focus-within:bg-white focus-within:border-[#007AFF]/30 transition-colors">
             <Search className="w-5 h-5 text-[#86868B] ml-4 shrink-0" />
             <input
               type="text"
               value={searchInput}
-              onChange={(event) => setSearchInput(event.target.value)}
+              onChange={(event) => {
+                setSearchInput(event.target.value);
+                setError(null);
+              }}
+              onFocus={() => {
+                if (suggestions.length > 0) setShowSuggestions(true);
+              }}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') runSearch();
+                if (event.key === 'Escape') setShowSuggestions(false);
               }}
               placeholder="Search company name"
               className="flex-1 min-w-0 px-3 py-3 text-[15px] font-medium text-[#1D1D1F] placeholder:text-[#C7C7CC] bg-transparent outline-none"
@@ -176,8 +300,35 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
             >
               {loading || searching ? 'Loading' : 'Search'}
             </button>
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-20 bg-white border border-black/10 rounded-[14px] shadow-[0_14px_40px_rgba(0,0,0,0.14)] overflow-hidden">
+                {suggestions.map((item) => (
+                  <button
+                    key={`${item.name}-${item.countryCode || 'NA'}-${item.role}`}
+                    type="button"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => loadCompany(item.name)}
+                    className="w-full px-4 py-3 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 text-left hover:bg-[#F5F5F7] border-b border-black/5 last:border-b-0"
+                  >
+                    <div className="min-w-0">
+                      <div className="text-[13px] font-bold text-[#1D1D1F] truncate">{item.name}</div>
+                      <div className="text-[11px] text-[#86868B] truncate">
+                        {metaText(item.brandName, item.countryCode, item.countryCount, item.role)}
+                      </div>
+                    </div>
+                    <div className="text-[11px] font-bold text-[#86868B] shrink-0">
+                      {controls.rankMetric === 'trade_count' ? item.tradeCount.toLocaleString() : formatMoney(item.totalTradeValue)}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-
+          {error && (
+            <div className="mt-3 rounded-[12px] bg-[#FFF2F2] border border-[#FF3B30]/15 px-4 py-3 text-[13px] font-semibold text-[#FF3B30]">
+              {error}
+            </div>
+          )}
         </div>
 
         {results.length > 0 && (
@@ -199,7 +350,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
                 <div className="min-w-0">
                   <div className="text-[13px] font-bold text-[#1D1D1F] truncate">{result.name}</div>
                   <div className="text-[11px] text-[#86868B] truncate">
-                    {result.brandName || 'Unbranded'} · {countrySummary(result.countryCode, result.countryCount)} · {roleLabel(result.role)}
+                    {metaText(result.brandName, result.countryCode, result.countryCount, result.role)}
                   </div>
                 </div>
                 <div className="text-right shrink-0">
@@ -236,12 +387,6 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
         )}
       </div>
 
-      {error && (
-        <div className="bg-white border border-black/5 rounded-[16px] px-5 py-4 text-[13px] font-semibold text-[#FF3B30] w-fit">
-          {error}
-        </div>
-      )}
-
       {!company && !error && (
         <div className="flex flex-col items-center justify-start flex-1 pt-16 pb-24 gap-5 text-center">
           <div>
@@ -276,7 +421,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
               <div className="min-w-0">
                 <h2 className="text-[18px] font-bold text-[#1D1D1F] truncate">{company.name}</h2>
                 <div className="text-[12px] text-[#86868B] font-medium mt-0.5">
-                  {company.brandName || 'Unbranded'} · {countrySummary(company.countryCode, company.countryCount)} · {roleLabel(company.role)}
+                  {metaText(company.brandName, company.countryCode, company.countryCount, company.role)}
                 </div>
               </div>
             </div>
@@ -371,6 +516,67 @@ const Metric: React.FC<{ label: string; value: string }> = ({ label, value }) =>
   </div>
 );
 
+const FilterChips: React.FC<{
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: Array<{ value: string; label: string }>;
+  disabled?: boolean;
+  emptyText?: string;
+}> = ({ label, value, onChange, options, disabled = false, emptyText = 'No options' }) => (
+  <div className={`rounded-[14px] border border-black/[0.08] bg-white p-3 min-w-0 ${disabled ? 'opacity-75' : ''}`}>
+    <div className="flex items-center justify-between gap-3 mb-2">
+      <span className="text-[10px] font-bold uppercase tracking-wider text-[#86868B]">{label}</span>
+      {value && !disabled && (
+        <button
+          type="button"
+          onClick={() => onChange('')}
+          className="text-[10px] font-bold text-[#86868B] hover:text-[#1D1D1F] transition-colors"
+        >
+          Clear
+        </button>
+      )}
+    </div>
+    <div className="flex flex-wrap gap-1.5 max-h-[92px] overflow-y-auto pr-1">
+      {disabled ? (
+        <span className="px-2.5 py-1.5 rounded-[8px] bg-[#F5F5F7] text-[11px] font-semibold text-[#86868B]">
+          {emptyText}
+        </span>
+      ) : (
+        <>
+          <button
+            type="button"
+            onClick={() => onChange('')}
+            className={`px-2.5 py-1.5 rounded-[8px] text-[11px] font-semibold transition-colors ${
+              value === '' ? 'bg-[#007AFF] text-white' : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-black/10'
+            }`}
+          >
+            All
+          </button>
+          {options.map((option) => (
+            <button
+              type="button"
+              key={option.value}
+              onClick={() => onChange(option.value)}
+              className={`px-2.5 py-1.5 rounded-[8px] text-[11px] font-semibold transition-colors ${
+                value === option.value ? 'bg-[#007AFF] text-white' : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-black/10'
+              }`}
+              title={option.label}
+            >
+              {option.label}
+            </button>
+          ))}
+          {options.length === 0 && (
+            <span className="px-2.5 py-1.5 rounded-[8px] bg-[#F5F5F7] text-[11px] font-semibold text-[#86868B]">
+              {emptyText}
+            </span>
+          )}
+        </>
+      )}
+    </div>
+  </div>
+);
+
 const RankTable: React.FC<{
   title: string;
   subtitle: string;
@@ -402,7 +608,7 @@ const RankTable: React.FC<{
             <div className="flex-1 min-w-0">
               <div className="text-[13px] font-semibold text-[#1D1D1F] truncate">{item.company}</div>
               <div className="text-[10px] text-[#86868B] truncate">
-                {item.brandName || 'Unbranded'} · {item.countryCode || 'N/A'} · {item.tradeCount.toLocaleString()} trades
+                {[item.brandName, item.countryCode || 'N/A', `${item.tradeCount.toLocaleString()} trades`].filter(Boolean).join(' · ')}
               </div>
             </div>
             <div className="text-right shrink-0">

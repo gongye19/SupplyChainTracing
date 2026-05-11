@@ -1732,6 +1732,7 @@ const App: React.FC = () => {
               startDate={companyDashboardFilters.startDate}
               endDate={companyDashboardFilters.endDate}
               controls={companyDashboardControls}
+              setControls={setCompanyDashboardControls}
             />
           ) : (
             <div className="pr-4">

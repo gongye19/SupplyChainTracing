@@ -1,14 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React from 'react';
 import { Filter } from 'lucide-react';
 import MonthRangeSlider from './MonthRangeSlider';
-import { companiesAPI } from '../services/api';
-import type { CompanyDashboardControls, CompanyFilterOptions, Filters } from '../types';
+import type { CompanyDashboardControls, Filters } from '../types';
 import {
-  CONTINENT_OPTIONS,
   DEFAULT_COMPANY_CONTROLS,
-  HS_CATEGORY_LABELS,
   RANK_METRIC_OPTIONS,
-  ROLE_OPTIONS,
 } from '../utils/companyDashboardFilters';
 
 interface CompanyDashboardSidebarProps {
@@ -26,33 +22,6 @@ const CompanyDashboardSidebar: React.FC<CompanyDashboardSidebarProps> = ({
 }) => {
   const now = new Date();
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  const [filterOptions, setFilterOptions] = useState<CompanyFilterOptions>({ countries: [], hsCategories: [] });
-
-  useEffect(() => {
-    let active = true;
-    companiesAPI.getFilters()
-      .then((data) => {
-        if (active) setFilterOptions(data);
-      })
-      .catch(() => {
-        if (active) setFilterOptions({ countries: [], hsCategories: [] });
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  const availableCountryCodes = useMemo(
-    () => new Set(filterOptions.countries.map((item) => item.countryCode)),
-    [filterOptions.countries]
-  );
-
-  const countryOptions = useMemo(() => {
-    if (!controls.selectedContinent) return [];
-    const continent = CONTINENT_OPTIONS.find((item) => item.id === controls.selectedContinent);
-    const allowed = new Set((continent?.countries || []).filter((code) => availableCountryCodes.has(code)));
-    return filterOptions.countries.filter((item) => allowed.has(item.countryCode));
-  }, [availableCountryCodes, controls.selectedContinent, filterOptions.countries]);
 
   const updateControls = (patch: Partial<CompanyDashboardControls>) => {
     setControls((prev) => ({ ...prev, ...patch }));
@@ -68,7 +37,7 @@ const CompanyDashboardSidebar: React.FC<CompanyDashboardSidebarProps> = ({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-[#007AFF]">
           <Filter className="w-4 h-4" />
-          <span className="text-[12px] font-bold uppercase tracking-widest text-[#1D1D1F]">Company Filters</span>
+          <span className="text-[12px] font-bold uppercase tracking-widest text-[#1D1D1F]">Company Control</span>
         </div>
         <button
           onClick={resetAll}
@@ -89,38 +58,6 @@ const CompanyDashboardSidebar: React.FC<CompanyDashboardSidebarProps> = ({
       />
 
       <div className="flex flex-col gap-3">
-        <SidebarChips
-          label="Continent"
-          value={controls.selectedContinent}
-          onChange={(value) => updateControls({ selectedContinent: value, selectedCountry: '' })}
-          options={CONTINENT_OPTIONS.map((item) => ({ value: item.id, label: item.label }))}
-        />
-        <SidebarChips
-          label="Country"
-          value={controls.selectedCountry}
-          onChange={(value) => updateControls({ selectedCountry: value })}
-          options={countryOptions.map((item) => ({ value: item.countryCode, label: item.countryCode }))}
-          disabled={!controls.selectedContinent}
-          emptyText="Select continent first"
-        />
-        <SidebarChips
-          label="Category"
-          value={controls.selectedHsPrefix}
-          onChange={(value) => updateControls({ selectedHsPrefix: value })}
-          options={filterOptions.hsCategories.map((item) => ({
-            value: item.hsPrefix,
-            label: HS_CATEGORY_LABELS[item.hsPrefix] || `HS ${item.hsPrefix}`,
-          }))}
-        />
-        <SidebarChips
-          label="Role"
-          value={controls.selectedRole}
-          onChange={(value) => updateControls({ selectedRole: value as CompanyDashboardControls['selectedRole'] })}
-          options={ROLE_OPTIONS.filter((option) => option.value).map((option) => ({
-            value: option.value,
-            label: option.label,
-          }))}
-        />
         <SidebarChips
           label="Rank By"
           value={controls.rankMetric}
