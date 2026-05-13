@@ -42,9 +42,9 @@ const roleLabel = (role: CompanyDashboardData['role']) => {
 };
 
 const SUGGESTED_COMPANIES = [
-  'INTEL PRODUCTS VIETNAM CO LTD',
-  'SAMSUNG ELECTRONICS CO LTD',
-  'SAMSUNG ELECTRONICS VIETNAM CO LTD',
+  'INTEL PRODUCTS VIETNAM',
+  'NVIDIA SINGAPORE PTE LTD',
+  'QUALCOMM CDMA TECHNOLOGIES ASIA PACIFIC',
 ];
 
 const RESULTS_PER_PAGE = 10;
@@ -402,8 +402,10 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
             )}
           </div>
           {error && (
-            <div className="mt-3 rounded-[12px] bg-[#FFF2F2] border border-[#FF3B30]/15 px-4 py-3 text-[13px] font-semibold text-[#FF3B30]">
-              {error}
+            <div className="mt-3 flex justify-center">
+              <div className="w-fit max-w-full rounded-[12px] bg-[#FFF2F2] border border-[#FF3B30]/15 px-4 py-3 text-center text-[13px] font-semibold text-[#FF3B30]">
+                {error}
+              </div>
             </div>
           )}
         </div>
