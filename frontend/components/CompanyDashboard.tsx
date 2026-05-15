@@ -561,8 +561,8 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
                     </div>
                     <div className="text-[10px] text-[#86868B] mt-1">
                       {controls.rankMetric === 'trade_count'
-                        ? `${category.tradeCount.toLocaleString()} trades · ${formatMoney(category.sumOfUsd)}`
-                        : `${formatMoney(category.sumOfUsd)} · ${category.tradeCount.toLocaleString()} trades`}
+                        ? `${category.tradeCount.toLocaleString()} trades`
+                        : formatMoney(category.sumOfUsd)}
                     </div>
                   </div>
                 ))}
