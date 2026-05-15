@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Building2, ChevronLeft, ChevronRight, Package, Search, TrendingUp, Users, X } from 'lucide-react';
+import { Building2, ChevronDown, ChevronLeft, ChevronRight, Package, Search, TrendingUp, Users, X } from 'lucide-react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { companiesAPI } from '../services/api';
 import { CompanyDashboardControls, CompanyDashboardData, CompanyRankItem, CompanyRankMetric, CompanySearchResult } from '../types';
@@ -92,6 +92,14 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
     const allowed = new Set((selected?.countries || []).filter((code) => availableCountryCodes.has(code)));
     return filterOptions.countries.filter((item) => allowed.has(item.countryCode));
   }, [availableCountryCodes, controls.selectedContinent, filterOptions.countries]);
+
+  const brandOptions = useMemo(
+    () => filterOptions.brands
+      .slice()
+      .sort((a, b) => a.brandName.localeCompare(b.brandName))
+      .map((item) => ({ value: item.brandName, label: item.brandName })),
+    [filterOptions.brands]
+  );
 
   const activeCountries = useMemo(() => {
     return getCompanyActiveCountries(controls, availableCountryCodes);
@@ -304,14 +312,11 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
       <div className="w-full max-w-4xl mx-auto">
         <div className="mb-3 grid grid-cols-1 lg:grid-cols-2 gap-3">
           <div className="lg:col-span-2">
-            <FilterChips
+            <BrandSelect
               label="Brand"
               value={controls.selectedBrand}
               onChange={(value) => updateControls({ selectedBrand: value })}
-              options={filterOptions.brands
-                .slice()
-                .sort((a, b) => a.brandName.localeCompare(b.brandName))
-                .map((item) => ({ value: item.brandName, label: item.brandName }))}
+              options={brandOptions}
             />
           </div>
           <FilterChips
@@ -617,6 +622,43 @@ const Metric: React.FC<{ label: string; value: string }> = ({ label, value }) =>
   <div className="text-right">
     <div className="text-[11px] text-[#86868B] font-bold uppercase tracking-wider mb-0.5">{label}</div>
     <div className="text-[18px] font-black text-[#1D1D1F] whitespace-nowrap">{value}</div>
+  </div>
+);
+
+const BrandSelect: React.FC<{
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: Array<{ value: string; label: string }>;
+}> = ({ label, value, onChange, options }) => (
+  <div className="rounded-[14px] border border-black/[0.08] bg-white p-3 min-w-0">
+    <div className="flex items-center justify-between gap-3 mb-2">
+      <span className="text-[10px] font-bold uppercase tracking-wider text-[#86868B]">{label}</span>
+      {value && (
+        <button
+          type="button"
+          onClick={() => onChange('')}
+          className="text-[10px] font-bold text-[#86868B] hover:text-[#1D1D1F] transition-colors"
+        >
+          Clear
+        </button>
+      )}
+    </div>
+    <div className="relative">
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="w-full appearance-none rounded-[10px] bg-[#F5F5F7] border border-transparent px-3.5 py-2.5 pr-10 text-[12px] font-semibold text-[#1D1D1F] outline-none transition-colors hover:bg-black/[0.06] focus:bg-white focus:border-[#007AFF]/30"
+      >
+        <option value="">All Brands</option>
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#86868B]" />
+    </div>
   </div>
 );
 
