@@ -29,6 +29,7 @@ export const HS_CATEGORY_LABELS: Record<string, string> = {
 };
 
 export const DEFAULT_COMPANY_CONTROLS: CompanyDashboardControls = {
+  selectedBrand: '',
   selectedContinent: '',
   selectedCountry: '',
   selectedHsPrefix: '',

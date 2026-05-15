@@ -51,7 +51,11 @@ const RESULTS_PER_PAGE = 10;
 
 const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate, controls, setControls }) => {
   const [searchInput, setSearchInput] = useState('');
-  const [filterOptions, setFilterOptions] = useState<{ countries: { countryCode: string }[]; hsCategories: { hsPrefix: string }[] }>({ countries: [], hsCategories: [] });
+  const [filterOptions, setFilterOptions] = useState<{
+    brands: { brandName: string }[];
+    countries: { countryCode: string }[];
+    hsCategories: { hsPrefix: string }[];
+  }>({ brands: [], countries: [], hsCategories: [] });
   const [suggestions, setSuggestions] = useState<CompanySearchResult[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [results, setResults] = useState<CompanySearchResult[]>([]);
@@ -70,7 +74,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
         if (active) setFilterOptions(data);
       })
       .catch(() => {
-        if (active) setFilterOptions({ countries: [], hsCategories: [] });
+        if (active) setFilterOptions({ brands: [], countries: [], hsCategories: [] });
       });
     return () => {
       active = false;
@@ -176,6 +180,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
       try {
         const data = await companiesAPI.search({
           query: trimmed,
+          brands: controls.selectedBrand ? [controls.selectedBrand] : undefined,
           countries: activeCountries,
           hsCodePrefix: controls.selectedHsPrefix ? [controls.selectedHsPrefix] : undefined,
           role: controls.selectedRole,
@@ -198,7 +203,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
       active = false;
       window.clearTimeout(timer);
     };
-  }, [activeCountries, controls.rankMetric, controls.selectedHsPrefix, controls.selectedRole, searchInput]);
+  }, [activeCountries, controls.rankMetric, controls.selectedBrand, controls.selectedHsPrefix, controls.selectedRole, searchInput]);
 
   const runSearch = async () => {
     const trimmed = searchInput.trim();
@@ -211,6 +216,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
     try {
       const data = await companiesAPI.search({
         query: trimmed,
+        brands: controls.selectedBrand ? [controls.selectedBrand] : undefined,
         countries: activeCountries,
         hsCodePrefix: controls.selectedHsPrefix ? [controls.selectedHsPrefix] : undefined,
         role: controls.selectedRole,
@@ -297,6 +303,17 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
 
       <div className="w-full max-w-4xl mx-auto">
         <div className="mb-3 grid grid-cols-1 lg:grid-cols-2 gap-3">
+          <div className="lg:col-span-2">
+            <FilterChips
+              label="Brand"
+              value={controls.selectedBrand}
+              onChange={(value) => updateControls({ selectedBrand: value })}
+              options={filterOptions.brands
+                .slice()
+                .sort((a, b) => a.brandName.localeCompare(b.brandName))
+                .map((item) => ({ value: item.brandName, label: item.brandName }))}
+            />
+          </div>
           <FilterChips
             label="Continent"
             value={controls.selectedContinent}
@@ -352,7 +369,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
                 if (event.key === 'Enter') runSearch();
                 if (event.key === 'Escape') setShowSuggestions(false);
               }}
-              placeholder="Search company name"
+              placeholder="No company name yet? Select filters above, then click Search to browse companies"
               className="flex-1 min-w-0 px-3 py-3 text-[15px] font-medium text-[#1D1D1F] placeholder:text-[#C7C7CC] bg-transparent outline-none"
             />
             {searchInput && (

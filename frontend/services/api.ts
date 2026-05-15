@@ -702,6 +702,7 @@ export const countryTradeStatsAPI = {
 export const companiesAPI = {
   search: async (filters: {
     query?: string;
+    brands?: string[];
     countries?: string[];
     hsCodePrefix?: string[];
     role?: 'importer' | 'exporter' | 'both' | '';
@@ -710,6 +711,7 @@ export const companiesAPI = {
   }): Promise<CompanySearchResult[]> => {
     const params = new URLSearchParams();
     if (filters.query?.trim()) params.append('q', filters.query.trim());
+    filters.brands?.forEach((brand) => params.append('brand', brand));
     filters.countries?.forEach((country) => params.append('country', country));
     filters.hsCodePrefix?.forEach((prefix) => params.append('hs_code_prefix', prefix));
     if (filters.role) params.append('role', filters.role);
@@ -730,6 +732,10 @@ export const companiesAPI = {
   getFilters: async (): Promise<CompanyFilterOptions> => {
     const data = await fetchAPI<any>('/api/companies/filters');
     return {
+      brands: (data.brands || []).map((item: any) => ({
+        brandName: item.brand_name,
+        totalTradeValue: parseFloat(item.total_trade_value) || 0,
+      })),
       countries: (data.countries || []).map((item: any) => ({
         countryCode: item.country_code,
         totalTradeValue: parseFloat(item.total_trade_value) || 0,

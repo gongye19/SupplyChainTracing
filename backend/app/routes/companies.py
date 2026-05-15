@@ -73,6 +73,7 @@ def _has_column(db: Session, table_name: str, column_name: str) -> bool:
 @router.get("/search", response_model=List[CompanySearchResult])
 def search_companies(
     q: Optional[str] = Query(None),
+    brand: Optional[List[str]] = Query(None),
     country: Optional[List[str]] = Query(None),
     hs_code: Optional[List[str]] = Query(None),
     hs_code_prefix: Optional[List[str]] = Query(None),
@@ -92,6 +93,12 @@ def search_companies(
         else:
             where += " AND s.name ILIKE :keyword"
         params["keyword"] = f"%{keyword}%"
+
+    if brand and has_brand:
+        ph = ", ".join(f":brand_{i}" for i in range(len(brand)))
+        where += f" AND s.brand_name IN ({ph})"
+        for i, value in enumerate(brand):
+            params[f"brand_{i}"] = value
 
     if country:
         ph = ", ".join(f":country_{i}" for i in range(len(country)))
@@ -136,6 +143,14 @@ def search_companies(
 
 @router.get("/filters")
 def get_company_filters(db: Session = Depends(get_db)):
+    has_brand = _has_column(db, "company_search_stats", "brand_name")
+    brands_query = """
+        SELECT brand_name, COALESCE(SUM(total_trade_value), 0) AS total_trade_value
+        FROM company_search_stats
+        WHERE NULLIF(brand_name, '') IS NOT NULL
+        GROUP BY brand_name
+        ORDER BY LOWER(brand_name)
+    """ if has_brand else "SELECT NULL::text AS brand_name, 0::numeric AS total_trade_value WHERE FALSE"
     countries_query = """
         SELECT country_code, COALESCE(SUM(total_trade_value), 0) AS total_trade_value
         FROM company_search_stats
@@ -152,9 +167,11 @@ def get_company_filters(db: Session = Depends(get_db)):
         GROUP BY LEFT(hs_code, 2)
         ORDER BY total_trade_value DESC
     """
+    brands_result = _safe(db, brands_query, {}, fallback=[])
     countries_result = _safe(db, countries_query, {}, fallback=[])
     hs_result = _safe(db, hs_query, {}, fallback=[])
     return {
+        "brands": rows_to_dicts(brands_result, brands_result.fetchall()) if brands_result != [] else [],
         "countries": rows_to_dicts(countries_result, countries_result.fetchall()) if countries_result != [] else [],
         "hs_categories": rows_to_dicts(hs_result, hs_result.fetchall()) if hs_result != [] else [],
     }

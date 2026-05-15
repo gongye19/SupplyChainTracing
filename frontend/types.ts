@@ -226,6 +226,11 @@ export interface CompanyCountryFilter {
   totalTradeValue: number;
 }
 
+export interface CompanyBrandFilter {
+  brandName: string;
+  totalTradeValue: number;
+}
+
 export interface CompanyHSCategoryFilter {
   hsPrefix: string;
   totalTradeValue: number;
@@ -233,6 +238,7 @@ export interface CompanyHSCategoryFilter {
 }
 
 export interface CompanyFilterOptions {
+  brands: CompanyBrandFilter[];
   countries: CompanyCountryFilter[];
   hsCategories: CompanyHSCategoryFilter[];
 }
@@ -281,6 +287,7 @@ export type CompanyRoleFilter = 'importer' | 'exporter' | 'both' | '';
 export type CompanyRankMetric = 'trade_value' | 'trade_count';
 
 export interface CompanyDashboardControls {
+  selectedBrand: string;
   selectedContinent: string;
   selectedCountry: string;
   selectedHsPrefix: string;
