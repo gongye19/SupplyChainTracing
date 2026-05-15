@@ -744,6 +744,7 @@ export const companiesAPI = {
 
   getDashboard: async (filters: {
     name: string;
+    countryCode?: string;
     startYearMonth?: string;
     endYearMonth?: string;
     hsCode?: string[];
@@ -753,6 +754,7 @@ export const companiesAPI = {
   }): Promise<CompanyDashboardData> => {
     const params = new URLSearchParams();
     params.append('name', filters.name);
+    if (filters.countryCode) params.append('country_code', filters.countryCode);
     if (filters.startYearMonth) params.append('start_year_month', filters.startYearMonth);
     if (filters.endYearMonth) params.append('end_year_month', filters.endYearMonth);
     if (filters.hsCode?.length) filters.hsCode.forEach((code) => params.append('hs_code', code));

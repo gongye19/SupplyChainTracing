@@ -106,7 +106,7 @@ def search_companies(
     elif role == "both":
         where += " AND s.role = 'both'"
 
-    hs_exists_where = " WHERE h.company_name = s.name"
+    hs_exists_where = " WHERE h.company_name = s.name AND h.country_code IS NOT DISTINCT FROM s.country_code"
     hs_exists_where, params = _hs_filter(hs_exists_where, params, hs_code, hs_code_prefix)
     if hs_code or hs_code_prefix:
         where += f" AND EXISTS (SELECT 1 FROM company_hs_trade_stats h{hs_exists_where})"
@@ -115,61 +115,17 @@ def search_companies(
     secondary_col = "total_trade_value" if order_col == "trade_count" else "trade_count"
 
     query = f"""
-        WITH filtered AS (
-            SELECT
-                s.name,
-                {brand_select} AS brand_name,
-                s.country_code,
-                s.role,
-                s.total_trade_value,
-                s.trade_count,
-                s.import_trade_value,
-                s.export_trade_value
-            FROM company_search_stats s
-            {where}
-        ),
-        country_rank AS (
-            SELECT
-                name,
-                country_code,
-                COALESCE(SUM(total_trade_value), 0) AS country_trade_value,
-                COALESCE(SUM(trade_count), 0) AS country_trade_count,
-                ROW_NUMBER() OVER (
-                    PARTITION BY name
-                    ORDER BY COALESCE(SUM(total_trade_value), 0) DESC, COALESCE(SUM(trade_count), 0) DESC
-                ) AS rn
-            FROM filtered
-            WHERE country_code IS NOT NULL
-            GROUP BY name, country_code
-        ),
-        agg AS (
-            SELECT
-                name,
-                NULLIF(MAX(brand_name), '') AS brand_name,
-                COALESCE(SUM(total_trade_value), 0) AS total_trade_value,
-                COALESCE(SUM(trade_count), 0) AS trade_count,
-                COALESCE(SUM(import_trade_value), 0) AS import_trade_value,
-                COALESCE(SUM(export_trade_value), 0) AS export_trade_value,
-                COUNT(DISTINCT country_code) FILTER (WHERE country_code IS NOT NULL) AS country_count
-            FROM filtered
-            GROUP BY name
-        )
         SELECT
-            a.name,
-            a.brand_name,
-            cr.country_code,
-            a.country_count,
-            CASE
-                WHEN a.import_trade_value > 0 AND a.export_trade_value > 0 THEN 'both'
-                WHEN a.import_trade_value > 0 THEN 'importer'
-                WHEN a.export_trade_value > 0 THEN 'exporter'
-                ELSE 'unknown'
-            END AS role,
-            a.total_trade_value,
-            a.trade_count
-        FROM agg a
-        LEFT JOIN country_rank cr ON cr.name = a.name AND cr.rn = 1
-        ORDER BY a.{order_col} DESC, a.{secondary_col} DESC, a.name
+            s.name,
+            NULLIF({brand_select}, '') AS brand_name,
+            s.country_code,
+            CASE WHEN s.country_code IS NULL THEN 0 ELSE 1 END AS country_count,
+            s.role,
+            COALESCE(s.total_trade_value, 0) AS total_trade_value,
+            COALESCE(s.trade_count, 0) AS trade_count
+        FROM company_search_stats s
+        {where}
+        ORDER BY s.{order_col} DESC, s.{secondary_col} DESC, s.name, s.country_code
         LIMIT :limit
     """
     result = _safe(db, query, params, fallback=[])
@@ -207,6 +163,7 @@ def get_company_filters(db: Session = Depends(get_db)):
 @router.get("/dashboard", response_model=CompanyDashboardResponse)
 def get_company_dashboard(
     name: str = Query(..., min_length=1),
+    country_code: Optional[str] = Query(None),
     start_year_month: Optional[str] = Query(None),
     end_year_month: Optional[str] = Query(None),
     hs_code: Optional[List[str]] = Query(None),
@@ -216,15 +173,21 @@ def get_company_dashboard(
     db: Session = Depends(get_db),
 ):
     company_name = name.strip()
+    company_country = country_code.strip().upper() if country_code else None
+    company_country_clause = " AND country_code = :country_code" if company_country else ""
     has_brand = _has_column(db, "company_search_stats", "brand_name")
-    brand_query = """
+    brand_query = f"""
         SELECT NULLIF(MAX(brand_name), '') AS brand_name
         FROM company_search_stats
-        WHERE name = :name
+        WHERE name = :name{company_country_clause}
     """ if has_brand else "SELECT NULL::text AS brand_name"
     params: dict = {"name": company_name, "limit": limit}
+    if company_country:
+        params["country_code"] = company_country
 
     monthly_where = " WHERE company_name = :name"
+    if company_country:
+        monthly_where += " AND country_code = :country_code"
     monthly_where, params = _date_filter(monthly_where, params, start_year_month, end_year_month)
 
     summary_query = f"""
@@ -260,14 +223,27 @@ def get_company_dashboard(
     if not row or (row.total_trade_count or 0) == 0:
         raise HTTPException(status_code=404, detail="未找到公司")
     summary = dict(row._mapping)
-    brand_result = _safe(db, brand_query, {"name": company_name}, fallback=None)
+    brand_params = {"name": company_name}
+    if company_country:
+        brand_params["country_code"] = company_country
+    brand_result = _safe(db, brand_query, brand_params, fallback=None)
     brand_row = brand_result.fetchone() if brand_result is not None else None
     brand_name = brand_row.brand_name if brand_row is not None else None
 
     hs_params = {"name": company_name, "limit": limit}
     hs_where = " WHERE company_name = :name"
+    if company_country:
+        hs_params["country_code"] = company_country
+        hs_where += " AND country_code = :country_code"
     hs_where, hs_params = _hs_filter(hs_where, hs_params, hs_code, hs_code_prefix)
     order_metric, secondary_metric, share_denominator = _ranking_sql(metric)
+    counterparty_params = {"name": company_name, "limit": limit}
+    importer_counterparty_where = "company_name = :name AND role = 'importer'"
+    exporter_counterparty_where = "company_name = :name AND role = 'exporter'"
+    if company_country:
+        counterparty_params["country_code"] = company_country
+        importer_counterparty_where += " AND country_code = :country_code"
+        exporter_counterparty_where += " AND country_code = :country_code"
 
     categories_query = f"""
         WITH agg AS (
@@ -308,37 +284,21 @@ def get_company_dashboard(
 
     suppliers_query = f"""
         WITH {brand_lookup_cte}
-        country_agg AS (
+        agg AS (
             SELECT
                 counterparty_name AS company,
                 counterparty_country_code AS country_code,
                 COALESCE(SUM(sum_of_usd), 0) AS sum_of_usd,
                 COALESCE(SUM(trade_count), 0) AS trade_count
             FROM company_counterparty_trade_stats
-            WHERE company_name = :name AND role = 'importer'
+            WHERE {importer_counterparty_where}
             GROUP BY counterparty_name, counterparty_country_code
-        ),
-        agg AS (
-            SELECT
-                company,
-                COALESCE(SUM(sum_of_usd), 0) AS sum_of_usd,
-                COALESCE(SUM(trade_count), 0) AS trade_count
-            FROM country_agg
-            GROUP BY company
-        ),
-        country_pick AS (
-            SELECT DISTINCT ON (company)
-                company,
-                country_code
-            FROM country_agg
-            WHERE country_code IS NOT NULL
-            ORDER BY company, sum_of_usd DESC, trade_count DESC
         )
         SELECT
-            ROW_NUMBER() OVER (ORDER BY a.{order_metric} DESC, a.{secondary_metric} DESC, a.company) AS rank,
+            ROW_NUMBER() OVER (ORDER BY a.{order_metric} DESC, a.{secondary_metric} DESC, a.company, a.country_code) AS rank,
             a.company,
             bl.brand_name,
-            cp.country_code,
+            a.country_code,
             a.sum_of_usd,
             a.trade_count,
             CASE WHEN SUM(a.{order_metric}) OVER() = 0 THEN 0
@@ -346,44 +306,27 @@ def get_company_dashboard(
             END AS share_pct
         FROM agg a
         LEFT JOIN brand_lookup bl ON bl.name = a.company
-        LEFT JOIN country_pick cp ON cp.company = a.company
         ORDER BY rank
         LIMIT :limit
     """
 
     customers_query = f"""
         WITH {brand_lookup_cte}
-        country_agg AS (
+        agg AS (
             SELECT
                 counterparty_name AS company,
                 counterparty_country_code AS country_code,
                 COALESCE(SUM(sum_of_usd), 0) AS sum_of_usd,
                 COALESCE(SUM(trade_count), 0) AS trade_count
             FROM company_counterparty_trade_stats
-            WHERE company_name = :name AND role = 'exporter'
+            WHERE {exporter_counterparty_where}
             GROUP BY counterparty_name, counterparty_country_code
-        ),
-        agg AS (
-            SELECT
-                company,
-                COALESCE(SUM(sum_of_usd), 0) AS sum_of_usd,
-                COALESCE(SUM(trade_count), 0) AS trade_count
-            FROM country_agg
-            GROUP BY company
-        ),
-        country_pick AS (
-            SELECT DISTINCT ON (company)
-                company,
-                country_code
-            FROM country_agg
-            WHERE country_code IS NOT NULL
-            ORDER BY company, sum_of_usd DESC, trade_count DESC
         )
         SELECT
-            ROW_NUMBER() OVER (ORDER BY a.{order_metric} DESC, a.{secondary_metric} DESC, a.company) AS rank,
+            ROW_NUMBER() OVER (ORDER BY a.{order_metric} DESC, a.{secondary_metric} DESC, a.company, a.country_code) AS rank,
             a.company,
             bl.brand_name,
-            cp.country_code,
+            a.country_code,
             a.sum_of_usd,
             a.trade_count,
             CASE WHEN SUM(a.{order_metric}) OVER() = 0 THEN 0
@@ -391,7 +334,6 @@ def get_company_dashboard(
             END AS share_pct
         FROM agg a
         LEFT JOIN brand_lookup bl ON bl.name = a.company
-        LEFT JOIN country_pick cp ON cp.company = a.company
         ORDER BY rank
         LIMIT :limit
     """
@@ -409,9 +351,9 @@ def get_company_dashboard(
 
     result = _safe(db, categories_query, hs_params, fallback=[])
     categories = rows_to_dicts(result, result.fetchall()) if result != [] else []
-    result = _safe(db, suppliers_query, {"name": company_name, "limit": limit}, fallback=[])
+    result = _safe(db, suppliers_query, counterparty_params, fallback=[])
     suppliers = rows_to_dicts(result, result.fetchall()) if result != [] else []
-    result = _safe(db, customers_query, {"name": company_name, "limit": limit}, fallback=[])
+    result = _safe(db, customers_query, counterparty_params, fallback=[])
     customers = rows_to_dicts(result, result.fetchall()) if result != [] else []
     result = _safe(db, trends_query, params, fallback=[])
     trends = rows_to_dicts(result, result.fetchall()) if result != [] else []

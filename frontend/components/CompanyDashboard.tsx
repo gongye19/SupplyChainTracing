@@ -42,9 +42,9 @@ const roleLabel = (role: CompanyDashboardData['role']) => {
 };
 
 const SUGGESTED_COMPANIES = [
-  'INTEL PRODUCTS VIETNAM',
-  'NVIDIA SINGAPORE PTE LTD',
-  'QUALCOMM CDMA TECHNOLOGIES ASIA PACIFIC',
+  { name: 'INTEL PRODUCTS VIETNAM', countryCode: 'VNM' },
+  { name: 'NVIDIA SINGAPORE PTE LTD', countryCode: 'HKG' },
+  { name: 'QUALCOMM CDMA TECHNOLOGIES ASIA PACIFIC', countryCode: 'SGP' },
 ];
 
 const RESULTS_PER_PAGE = 10;
@@ -116,15 +116,16 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
     setControls((prev) => ({ ...prev, ...patch }));
   };
 
-  const getDashboardKey = (name: string) => [
+  const getDashboardKey = (name: string, countryCode?: string) => [
     name,
+    countryCode || 'all-countries',
     startDate,
     endDate,
     controls.selectedHsPrefix || 'all-hs',
     controls.rankMetric,
   ].join('|');
 
-  const loadCompany = async (name: string) => {
+  const loadCompany = async (name: string, countryCode?: string) => {
     const trimmed = name.trim();
     if (!trimmed) return;
     suppressSuggestionsRef.current = true;
@@ -136,13 +137,14 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
     try {
       const data = await companiesAPI.getDashboard({
         name: trimmed,
+        countryCode,
         startYearMonth: startDate,
         endYearMonth: endDate,
         hsCodePrefix: controls.selectedHsPrefix ? [controls.selectedHsPrefix] : undefined,
         metric: controls.rankMetric,
         limit: 10,
       });
-      lastDashboardKeyRef.current = getDashboardKey(data.name);
+      lastDashboardKeyRef.current = getDashboardKey(data.name, data.countryCode);
       setCompany(data);
       setSearchInput(data.name);
       setResults([]);
@@ -232,9 +234,10 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
 
   useEffect(() => {
     const selectedName = company?.name;
+    const selectedCountryCode = company?.countryCode;
     if (!selectedName) return;
 
-    const dashboardKey = getDashboardKey(selectedName);
+    const dashboardKey = getDashboardKey(selectedName, selectedCountryCode);
     if (lastDashboardKeyRef.current === dashboardKey) return;
 
     let active = true;
@@ -246,6 +249,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
 
     companiesAPI.getDashboard({
       name: selectedName,
+      countryCode: selectedCountryCode,
       startYearMonth: startDate,
       endYearMonth: endDate,
       hsCodePrefix: controls.selectedHsPrefix ? [controls.selectedHsPrefix] : undefined,
@@ -254,7 +258,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
     })
       .then((data) => {
         if (!active) return;
-        lastDashboardKeyRef.current = getDashboardKey(data.name);
+        lastDashboardKeyRef.current = getDashboardKey(data.name, data.countryCode);
         setCompany(data);
         setSearchInput(data.name);
         setResults([]);
@@ -270,7 +274,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
     return () => {
       active = false;
     };
-  }, [company?.name, controls.rankMetric, controls.selectedHsPrefix, endDate, startDate]);
+  }, [company?.countryCode, company?.name, controls.rankMetric, controls.selectedHsPrefix, endDate, startDate]);
 
   const trendData = useMemo(
     () => company?.trends || [],
@@ -384,7 +388,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
                     key={`${item.name}-${item.countryCode || 'NA'}-${item.role}`}
                     type="button"
                     onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => loadCompany(item.name)}
+                    onClick={() => loadCompany(item.name, item.countryCode)}
                     className="w-full px-4 py-3 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 text-left hover:bg-[#F5F5F7] border-b border-black/5 last:border-b-0"
                   >
                     <div className="min-w-0">
@@ -423,7 +427,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
             {pagedResults.map((result) => (
               <button
                 key={`${result.name}-${result.countryCode || 'NA'}-${result.role}`}
-                onClick={() => loadCompany(result.name)}
+                onClick={() => loadCompany(result.name, result.countryCode)}
                 className="w-full px-4 py-3 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 hover:bg-[#F5F5F7] border-b border-black/5 last:border-b-0 text-left"
               >
                 <div className="min-w-0">
@@ -475,14 +479,14 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
           <div className="w-full max-w-3xl">
             <p className="text-[11px] font-bold uppercase tracking-wider text-[#86868B] mb-3">Popular Searches</p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-              {SUGGESTED_COMPANIES.map((name) => (
+              {SUGGESTED_COMPANIES.map((item) => (
                 <button
-                  key={name}
-                  onClick={() => loadCompany(name)}
+                  key={`${item.name}-${item.countryCode}`}
+                  onClick={() => loadCompany(item.name, item.countryCode)}
                   className="min-w-0 truncate px-3.5 py-2.5 rounded-[10px] text-[12px] font-semibold bg-white border border-black/[0.08] text-[#1D1D1F] hover:border-[#007AFF]/30 hover:text-[#007AFF] hover:bg-[#F0F7FF] transition-colors shadow-sm"
-                  title={name}
+                  title={`${item.name} · ${item.countryCode}`}
                 >
-                  {name}
+                  {item.name} · {item.countryCode}
                 </button>
               ))}
             </div>
