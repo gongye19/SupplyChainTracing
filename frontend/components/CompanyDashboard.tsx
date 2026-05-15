@@ -696,11 +696,9 @@ const RankTable: React.FC<{
             </div>
             <div className="text-right shrink-0">
               <div className="text-[13px] font-bold text-[#1D1D1F]">
-                {rankMetric === 'trade_count' ? item.tradeCount.toLocaleString() : formatMoney(item.sumOfUsd)}
+                {rankMetric === 'trade_count' ? `${item.tradeCount.toLocaleString()} trades` : formatMoney(item.sumOfUsd)}
               </div>
-              <div className="text-[10px] text-[#86868B]">
-                {rankMetric === 'trade_count' ? formatMoney(item.sumOfUsd) : `${item.tradeCount.toLocaleString()} trades`} · {(item.sharePct * 100).toFixed(1)}%
-              </div>
+              <div className="text-[10px] text-[#86868B]">{(item.sharePct * 100).toFixed(1)}%</div>
             </div>
             <div className="w-14 h-1.5 bg-[#F5F5F7] rounded-full overflow-hidden shrink-0">
               <div className="h-full rounded-full" style={{ width: `${Math.min(item.sharePct * 100, 100)}%`, backgroundColor: accentColor, opacity: 0.7 }} />
