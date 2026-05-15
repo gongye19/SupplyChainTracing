@@ -438,12 +438,9 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
 
         {results.length > 0 && (
           <div className="mt-3 bg-white border border-black/5 rounded-[14px] shadow-sm overflow-hidden">
-            <div className="px-4 py-2.5 border-b border-black/5 flex items-center justify-between">
+            <div className="px-4 py-2.5 border-b border-black/5 flex items-center">
               <span className="text-[11px] font-bold uppercase tracking-wider text-[#86868B]">
                 {results.length.toLocaleString()} Companies
-              </span>
-              <span className="text-[11px] font-semibold text-[#86868B]">
-                Page {resultPage} / {totalResultPages}
               </span>
             </div>
             {pagedResults.map((result) => (
@@ -469,7 +466,10 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
               </button>
             ))}
             {totalResultPages > 1 && (
-              <div className="px-3 py-2.5 border-t border-black/5 flex items-center justify-end gap-2">
+              <div className="px-3 py-2.5 border-t border-black/5 flex items-center justify-end gap-3">
+                <span className="text-[11px] font-semibold text-[#86868B]">
+                  Page {resultPage} / {totalResultPages}
+                </span>
                 <button
                   onClick={() => setResultPage((page) => Math.max(1, page - 1))}
                   disabled={resultPage <= 1}
@@ -630,37 +630,124 @@ const BrandSelect: React.FC<{
   value: string;
   onChange: (value: string) => void;
   options: Array<{ value: string; label: string }>;
-}> = ({ label, value, onChange, options }) => (
-  <div className="rounded-[14px] border border-black/[0.08] bg-white p-3 min-w-0">
-    <div className="flex items-center justify-between gap-3 mb-2">
-      <span className="text-[10px] font-bold uppercase tracking-wider text-[#86868B]">{label}</span>
-      {value && (
-        <button
-          type="button"
-          onClick={() => onChange('')}
-          className="text-[10px] font-bold text-[#86868B] hover:text-[#1D1D1F] transition-colors"
-        >
-          Clear
-        </button>
+}> = ({ label, value, onChange, options }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const groupRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  const selectedLabel = options.find((option) => option.value === value)?.label || 'All Brands';
+  const groups = useMemo(() => {
+    const grouped = new Map<string, Array<{ value: string; label: string }>>();
+    options.forEach((option) => {
+      const first = option.label.trim().charAt(0).toUpperCase();
+      const letter = /^[A-Z]$/.test(first) ? first : '#';
+      grouped.set(letter, [...(grouped.get(letter) || []), option]);
+    });
+    return Array.from(grouped.entries()).map(([letter, items]) => ({ letter, items }));
+  }, [options]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setIsOpen(false);
+    };
+    document.addEventListener('mousedown', closeOnOutsideClick);
+    return () => document.removeEventListener('mousedown', closeOnOutsideClick);
+  }, [isOpen]);
+
+  const selectValue = (nextValue: string) => {
+    onChange(nextValue);
+    setIsOpen(false);
+  };
+
+  const jumpToLetter = (letter: string) => {
+    groupRefs.current[letter]?.scrollIntoView({ block: 'start' });
+  };
+
+  return (
+    <div ref={rootRef} className="relative rounded-[14px] border border-black/[0.08] bg-white p-3 min-w-0">
+      <div className="flex items-center justify-between gap-3 mb-2">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-[#86868B]">{label}</span>
+        {value && (
+          <button
+            type="button"
+            onClick={() => selectValue('')}
+            className="text-[10px] font-bold text-[#86868B] hover:text-[#1D1D1F] transition-colors"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+      <button
+        type="button"
+        onClick={() => setIsOpen((open) => !open)}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') setIsOpen(false);
+        }}
+        className="w-full rounded-[10px] bg-[#F5F5F7] border border-transparent px-3.5 py-2.5 text-left text-[12px] font-semibold text-[#1D1D1F] outline-none transition-colors hover:bg-black/[0.06] focus:bg-white focus:border-[#007AFF]/30 flex items-center justify-between gap-3"
+        aria-expanded={isOpen}
+      >
+        <span className="truncate">{selectedLabel}</span>
+        <ChevronDown className={`h-4 w-4 text-[#86868B] shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+      {isOpen && (
+        <div className="absolute left-3 right-3 top-[calc(100%-4px)] z-30 overflow-hidden rounded-[14px] border border-black/10 bg-white shadow-[0_16px_40px_rgba(0,0,0,0.14)]">
+          <div className="grid grid-cols-[38px_minmax(0,1fr)] max-h-[280px]">
+            <div className="bg-[#F5F5F7] border-r border-black/5 p-1.5 overflow-y-auto">
+              {groups.map((group) => (
+                <button
+                  key={group.letter}
+                  type="button"
+                  onClick={() => jumpToLetter(group.letter)}
+                  className="w-full h-6 rounded-[6px] text-[10px] font-black text-[#86868B] hover:bg-white hover:text-[#007AFF] transition-colors"
+                  title={`Jump to ${group.letter}`}
+                >
+                  {group.letter}
+                </button>
+              ))}
+            </div>
+            <div className="max-h-[280px] overflow-y-auto p-1.5">
+              <button
+                type="button"
+                onClick={() => selectValue('')}
+                className={`w-full px-3 py-2 rounded-[8px] text-left text-[12px] font-semibold transition-colors ${
+                  value === '' ? 'bg-[#007AFF] text-white' : 'text-[#1D1D1F] hover:bg-[#F5F5F7]'
+                }`}
+              >
+                All Brands
+              </button>
+              {groups.map((group) => (
+                <div
+                  key={group.letter}
+                  ref={(node) => {
+                    groupRefs.current[group.letter] = node;
+                  }}
+                >
+                  <div className="sticky top-0 bg-white/95 backdrop-blur px-3 py-1.5 text-[10px] font-black text-[#86868B]">
+                    {group.letter}
+                  </div>
+                  {group.items.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => selectValue(option.value)}
+                      className={`w-full px-3 py-2 rounded-[8px] text-left text-[12px] font-semibold transition-colors ${
+                        value === option.value ? 'bg-[#007AFF] text-white' : 'text-[#1D1D1F] hover:bg-[#F5F5F7]'
+                      }`}
+                      title={option.label}
+                    >
+                      <span className="block truncate">{option.label}</span>
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
     </div>
-    <div className="relative">
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="w-full appearance-none rounded-[10px] bg-[#F5F5F7] border border-transparent px-3.5 py-2.5 pr-10 text-[12px] font-semibold text-[#1D1D1F] outline-none transition-colors hover:bg-black/[0.06] focus:bg-white focus:border-[#007AFF]/30"
-      >
-        <option value="">All Brands</option>
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#86868B]" />
-    </div>
-  </div>
-);
+  );
+};
 
 const FilterChips: React.FC<{
   label: string;
