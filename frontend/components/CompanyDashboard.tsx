@@ -691,7 +691,7 @@ const RankTable: React.FC<{
             <div className="flex-1 min-w-0">
               <div className="text-[13px] font-semibold text-[#1D1D1F] truncate">{item.company}</div>
               <div className="text-[10px] text-[#86868B] truncate">
-                {[item.brandName, item.countryCode || 'N/A', `${item.tradeCount.toLocaleString()} trades`].filter(Boolean).join(' · ')}
+                {[item.brandName, item.countryCode || 'N/A'].filter(Boolean).join(' · ')}
               </div>
             </div>
             <div className="text-right shrink-0">
