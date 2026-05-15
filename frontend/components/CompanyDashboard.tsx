@@ -633,7 +633,6 @@ const BrandSelect: React.FC<{
 }> = ({ label, value, onChange, options }) => {
   const [isOpen, setIsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
-  const groupRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const selectedLabel = options.find((option) => option.value === value)?.label || 'All Brands';
   const groups = useMemo(() => {
@@ -658,10 +657,6 @@ const BrandSelect: React.FC<{
   const selectValue = (nextValue: string) => {
     onChange(nextValue);
     setIsOpen(false);
-  };
-
-  const jumpToLetter = (letter: string) => {
-    groupRefs.current[letter]?.scrollIntoView({ block: 'start' });
   };
 
   return (
@@ -692,21 +687,7 @@ const BrandSelect: React.FC<{
       </button>
       {isOpen && (
         <div className="absolute left-3 right-3 top-[calc(100%-4px)] z-30 overflow-hidden rounded-[14px] border border-black/10 bg-white shadow-[0_16px_40px_rgba(0,0,0,0.14)]">
-          <div className="grid grid-cols-[38px_minmax(0,1fr)] max-h-[280px]">
-            <div className="bg-[#F5F5F7] border-r border-black/5 p-1.5 overflow-y-auto">
-              {groups.map((group) => (
-                <button
-                  key={group.letter}
-                  type="button"
-                  onClick={() => jumpToLetter(group.letter)}
-                  className="w-full h-6 rounded-[6px] text-[10px] font-black text-[#86868B] hover:bg-white hover:text-[#007AFF] transition-colors"
-                  title={`Jump to ${group.letter}`}
-                >
-                  {group.letter}
-                </button>
-              ))}
-            </div>
-            <div className="max-h-[280px] overflow-y-auto p-1.5">
+          <div className="max-h-[280px] overflow-y-auto p-1.5">
               <button
                 type="button"
                 onClick={() => selectValue('')}
@@ -717,12 +698,7 @@ const BrandSelect: React.FC<{
                 All Brands
               </button>
               {groups.map((group) => (
-                <div
-                  key={group.letter}
-                  ref={(node) => {
-                    groupRefs.current[group.letter] = node;
-                  }}
-                >
+                <div key={group.letter}>
                   <div className="sticky top-0 bg-white/95 backdrop-blur px-3 py-1.5 text-[10px] font-black text-[#86868B]">
                     {group.letter}
                   </div>
@@ -741,7 +717,6 @@ const BrandSelect: React.FC<{
                   ))}
                 </div>
               ))}
-            </div>
           </div>
         </div>
       )}
