@@ -41,12 +41,6 @@ const roleLabel = (role: CompanyDashboardData['role']) => {
   return 'Company';
 };
 
-const SUGGESTED_COMPANIES = [
-  { name: 'INTEL PRODUCTS VIETNAM', countryCode: 'VNM' },
-  { name: 'NVIDIA SINGAPORE PTE LTD', countryCode: 'HKG' },
-  { name: 'QUALCOMM CDMA TECHNOLOGIES ASIA PACIFIC', countryCode: 'SGP' },
-];
-
 const RESULTS_PER_PAGE = 10;
 
 const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate, controls, setControls }) => {
@@ -60,6 +54,8 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [results, setResults] = useState<CompanySearchResult[]>([]);
   const [resultPage, setResultPage] = useState(1);
+  const [topByValue, setTopByValue] = useState<CompanySearchResult[]>([]);
+  const [topByCount, setTopByCount] = useState<CompanySearchResult[]>([]);
   const [company, setCompany] = useState<CompanyDashboardData | null>(null);
   const [loading, setLoading] = useState(false);
   const [searching, setSearching] = useState(false);
@@ -75,6 +71,27 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
       })
       .catch(() => {
         if (active) setFilterOptions({ brands: [], countries: [], hsCategories: [] });
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      companiesAPI.search({ metric: 'trade_value', limit: 3 }),
+      companiesAPI.search({ metric: 'trade_count', limit: 3 }),
+    ])
+      .then(([valueData, countData]) => {
+        if (!active) return;
+        setTopByValue(valueData);
+        setTopByCount(countData);
+      })
+      .catch(() => {
+        if (!active) return;
+        setTopByValue([]);
+        setTopByCount([]);
       });
     return () => {
       active = false;
@@ -438,10 +455,21 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
 
         {results.length > 0 && (
           <div className="mt-3 bg-white border border-black/5 rounded-[14px] shadow-sm overflow-hidden">
-            <div className="px-4 py-2.5 border-b border-black/5 flex items-center">
+            <div className="px-4 py-2.5 border-b border-black/5 flex items-center justify-between gap-3">
               <span className="text-[11px] font-bold uppercase tracking-wider text-[#86868B]">
                 {results.length.toLocaleString()} Companies
               </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setResults([]);
+                  setResultPage(1);
+                }}
+                className="inline-flex items-center gap-1.5 rounded-[8px] bg-[#F5F5F7] px-2.5 py-1.5 text-[11px] font-bold text-[#86868B] hover:bg-black/10 hover:text-[#1D1D1F] transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+                Clear
+              </button>
             </div>
             {pagedResults.map((result) => (
               <button
@@ -498,20 +526,19 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
             <p className="text-[18px] font-bold text-[#1D1D1F] mb-1">Company Dashboard</p>
             <p className="text-[14px] text-[#86868B] max-w-sm">Search a company to view categories, suppliers, customers, and monthly trend.</p>
           </div>
-          <div className="w-full max-w-3xl">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-[#86868B] mb-3">Popular Searches</p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-              {SUGGESTED_COMPANIES.map((item) => (
-                <button
-                  key={`${item.name}-${item.countryCode}`}
-                  onClick={() => loadCompany(item.name, item.countryCode)}
-                  className="min-w-0 truncate px-3.5 py-2.5 rounded-[10px] text-[12px] font-semibold bg-white border border-black/[0.08] text-[#1D1D1F] hover:border-[#007AFF]/30 hover:text-[#007AFF] hover:bg-[#F0F7FF] transition-colors shadow-sm"
-                  title={`${item.name} · ${item.countryCode}`}
-                >
-                  {item.name} · {item.countryCode}
-                </button>
-              ))}
-            </div>
+          <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-3 text-left">
+            <TopCompaniesPreview
+              title="Top 3 by Trade Value"
+              items={topByValue}
+              metric="trade_value"
+              onSelect={loadCompany}
+            />
+            <TopCompaniesPreview
+              title="Top 3 by Trade Count"
+              items={topByCount}
+              metric="trade_count"
+              onSelect={loadCompany}
+            />
           </div>
         </div>
       )}
@@ -622,6 +649,46 @@ const Metric: React.FC<{ label: string; value: string }> = ({ label, value }) =>
   <div className="text-right">
     <div className="text-[11px] text-[#86868B] font-bold uppercase tracking-wider mb-0.5">{label}</div>
     <div className="text-[18px] font-black text-[#1D1D1F] whitespace-nowrap">{value}</div>
+  </div>
+);
+
+const TopCompaniesPreview: React.FC<{
+  title: string;
+  items: CompanySearchResult[];
+  metric: CompanyRankMetric;
+  onSelect: (name: string, countryCode?: string) => void;
+}> = ({ title, items, metric, onSelect }) => (
+  <div className="bg-white rounded-[16px] border border-black/[0.08] shadow-sm overflow-hidden">
+    <div className="px-4 py-3 border-b border-black/5">
+      <p className="text-[11px] font-bold uppercase tracking-wider text-[#86868B]">{title}</p>
+    </div>
+    <div>
+      {items.length === 0 ? (
+        <div className="px-4 py-8 text-center text-[12px] font-semibold text-[#86868B]">No data</div>
+      ) : (
+        items.map((item, index) => (
+          <button
+            key={`${title}-${item.name}-${item.countryCode || 'NA'}-${item.role}`}
+            type="button"
+            onClick={() => onSelect(item.name, item.countryCode)}
+            className="w-full px-4 py-3 grid grid-cols-[24px_minmax(0,1fr)_auto] items-center gap-3 text-left border-b border-black/5 last:border-b-0 hover:bg-[#F5F5F7] transition-colors"
+          >
+            <span className="w-6 h-6 rounded-full bg-[#F5F5F7] flex items-center justify-center text-[11px] font-black text-[#86868B]">
+              {index + 1}
+            </span>
+            <span className="min-w-0">
+              <span className="block text-[12px] font-bold text-[#1D1D1F] truncate">{item.name}</span>
+              <span className="block text-[10px] font-semibold text-[#86868B] truncate">
+                {[item.brandName, item.countryCode || 'N/A', roleLabel(item.role)].filter(Boolean).join(' · ')}
+              </span>
+            </span>
+            <span className="text-[12px] font-bold text-[#1D1D1F] shrink-0">
+              {metric === 'trade_count' ? item.tradeCount.toLocaleString() : formatMoney(item.totalTradeValue)}
+            </span>
+          </button>
+        ))
+      )}
+    </div>
   </div>
 );
 
