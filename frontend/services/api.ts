@@ -101,25 +101,29 @@ export const shipmentsAPI = {
     const data = await fetchAPI<any[]>(`/api/shipments?${params.toString()}`, {
       signal: options?.signal,
     });
-    return data.map((item: any) => ({
-      year: item.year,
-      month: item.month,
-      hsCode: item.hs_code,
-      industry: item.industry,
-      originCountryCode: item.origin_country_code,
-      destinationCountryCode: item.destination_country_code,
-      weight: item.weight,
-      quantity: item.quantity,
-      totalValueUsd: item.total_value_usd,
-      weightAvgPrice: item.weight_avg_price,
-      quantityAvgPrice: item.quantity_avg_price,
-      tradeCount: item.trade_count || 0,
-      amountSharePct: item.amount_share_pct,
-      // 向后兼容字段
-      countryOfOrigin: item.country_of_origin || item.origin_country_code,
-      destinationCountry: item.destination_country || item.destination_country_code,
-      date: item.date || `${item.year}-${String(item.month).padStart(2, '0')}-01`,
-    }));
+    return data.map((item: any) => {
+      const totalValueUsd = Number(item.total_value_usd) || 0;
+      return {
+        year: item.year,
+        month: item.month,
+        hsCode: item.hs_code,
+        industry: item.industry,
+        originCountryCode: item.origin_country_code,
+        destinationCountryCode: item.destination_country_code,
+        weight: item.weight,
+        quantity: item.quantity,
+        totalValueUsd,
+        weightAvgPrice: item.weight_avg_price,
+        quantityAvgPrice: item.quantity_avg_price,
+        tradeCount: item.trade_count || 0,
+        amountSharePct: item.amount_share_pct,
+        // 向后兼容字段：旧地图组件的 value 单位是百万美元。
+        value: totalValueUsd / 1000000,
+        countryOfOrigin: item.country_of_origin || item.origin_country_code,
+        destinationCountry: item.destination_country || item.destination_country_code,
+        date: item.date || `${item.year}-${String(item.month).padStart(2, '0')}-01`,
+      };
+    });
   },
 };
 

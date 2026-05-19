@@ -46,6 +46,7 @@ const sameShipments = (a: Shipment[], b: Shipment[]) =>
       shipment.originId === next?.originId &&
       shipment.destinationId === next?.destinationId &&
       shipment.value === next?.value &&
+      shipment.totalValueUsd === next?.totalValueUsd &&
       shipment.tradeCount === next?.tradeCount &&
       shipment.weight === next?.weight &&
       shipment.quantity === next?.quantity
@@ -66,5 +67,4 @@ export const areSupplyMapPropsEqual = (prevProps: SupplyMapProps, nextProps: Sup
     sameFilters(prevProps.filters, nextProps.filters)
   );
 };
-
 
