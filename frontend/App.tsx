@@ -750,7 +750,12 @@ const App: React.FC = () => {
       
       const group = countryPairGroups.get(pairKey)!;
       group.shipments.push(shipment);
-      group.totalValue += shipment.totalValueUsd || 0;
+      const shipmentValueUsd = typeof shipment.totalValueUsd === 'number' && Number.isFinite(shipment.totalValueUsd)
+        ? shipment.totalValueUsd
+        : typeof shipment.value === 'number' && Number.isFinite(shipment.value)
+          ? shipment.value * 1000000
+          : 0;
+      group.totalValue += shipmentValueUsd;
       group.totalTradeCount += shipment.tradeCount || 0;
     });
     
@@ -767,6 +772,7 @@ const App: React.FC = () => {
         material: `HS2-${group.hs2}`,
         category: hsCodeCategoryNameMap.get(group.hs2) || `HS ${group.hs2}`,
         categoryColor,
+        totalValueUsd: group.totalValue,
         value: group.totalValue / 1000000, // 转换为百万美元
         status: 'completed',
         timestamp: group.shipments[0]?.date || `${group.shipments[0]?.year}-${String(group.shipments[0]?.month).padStart(2, '0')}-01`,

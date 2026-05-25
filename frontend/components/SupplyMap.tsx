@@ -59,11 +59,11 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
   }, [selectedCountries, countryCodeToName]);
 
   const getShipmentValueMillions = (shipment: Shipment) => {
-    if (typeof shipment.value === 'number' && Number.isFinite(shipment.value)) {
-      return shipment.value;
-    }
     if (typeof shipment.totalValueUsd === 'number' && Number.isFinite(shipment.totalValueUsd)) {
       return shipment.totalValueUsd / 1000000;
+    }
+    if (typeof shipment.value === 'number' && Number.isFinite(shipment.value)) {
+      return shipment.value;
     }
     return 0;
   };
@@ -303,15 +303,38 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
     // 只收集当前可见品类有贸易的国家，使点随品类筛选同步变化
     const visibleCategorySet = new Set(visibleCategories);
     const involvedCountryCodes = new Set<string>();
+    const countryActivity = new Map<string, number>();
     shipments.forEach((shipment) => {
       const category = shipment.category || (shipment.hsCode ? `HS ${shipment.hsCode.slice(0, 2)}` : 'Unknown');
       if (visibleCategorySet.size > 0 && !visibleCategorySet.has(category)) return;
       const originCountryCode = shipment.originId || shipment.originCountryCode;
       const destCountryCode = shipment.destinationId || shipment.destinationCountryCode;
-      if (originCountryCode) involvedCountryCodes.add(originCountryCode);
-      if (destCountryCode) involvedCountryCodes.add(destCountryCode);
+      const value = getShipmentValueMillions(shipment);
+      if (originCountryCode) {
+        involvedCountryCodes.add(originCountryCode);
+        countryActivity.set(originCountryCode, (countryActivity.get(originCountryCode) || 0) + value);
+      }
+      if (destCountryCode) {
+        involvedCountryCodes.add(destCountryCode);
+        countryActivity.set(destCountryCode, (countryActivity.get(destCountryCode) || 0) + value);
+      }
     });
-    const nodeKey = `${countries.length}|${selectedCountries.slice().sort().join(',')}|${visibleCategories.slice().sort().join(',')}|${Array.from(involvedCountryCodes).sort().join(',')}`;
+
+    const selectedCountrySet = new Set(selectedCountries || []);
+    const maxVisibleLabels = selectedCountrySet.size > 0 ? 8 : 10;
+    const labeledCountryCodes = new Set<string>();
+    selectedCountrySet.forEach((code) => {
+      if (involvedCountryCodes.has(code)) labeledCountryCodes.add(code);
+    });
+    Array.from(countryActivity.entries())
+      .sort((a, b) => b[1] - a[1])
+      .forEach(([code]) => {
+        if (labeledCountryCodes.size < maxVisibleLabels) {
+          labeledCountryCodes.add(code);
+        }
+      });
+
+    const nodeKey = `${countries.length}|${selectedCountries.slice().sort().join(',')}|${visibleCategories.slice().sort().join(',')}|${Array.from(involvedCountryCodes).sort().join(',')}|${Array.from(labeledCountryCodes).sort().join(',')}`;
     const shouldRebuildNodes = lastNodeKeyRef.current !== nodeKey;
 
     if (shouldRebuildNodes) {
@@ -349,44 +372,43 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
         .style('pointer-events', 'all')
         .style('cursor', 'pointer');
       
-      // 国家标签 - 使用独立的 label 组，通过反向 transform 保持固定大小
-      // 先创建标签，确保文字在最上方（图标在 y=0，标签在 y 负值区域）
-      const displayName = countryInfo.countryName;
-      const label = countryNode.append('g')
-        .attr('class', 'country-label');
-      
-      const baseFontSize = 10;
-      // 先创建文字，获取 bbox 后再调整位置
-      const text = label.append('text')
-        .attr('x', 0)
-        .attr('y', 0) // 临时位置，稍后调整
-        .attr('text-anchor', 'middle')
-        .attr('font-size', `${baseFontSize}px`)
-        .attr('font-weight', '600')
-        .attr('fill', '#000000') // 确保是黑色
-        .text(displayName);
-      
-      const textNode = text.node();
-      if (textNode) {
-        const bbox = textNode.getBBox();
-        const padding = 6;
-        const bgHeight = bbox.height + padding * 2;
-        const bgWidth = Math.max(40, bbox.width + padding * 2);
-        const iconOffset = 8; // 图标到标签的距离
+      // 默认只显示选中国家和当前交易额靠前的少量国家标签，避免名称互相遮挡。
+      const shouldShowLabel = labeledCountryCodes.has(countryCode);
+      if (shouldShowLabel) {
+        const displayName = countryInfo.countryName;
+        const label = countryNode.append('g')
+          .attr('class', 'country-label');
         
-        // 背景矩形（在文字下方，确保文字在上层）
-        const textBg = label.insert('rect', 'text')
-          .attr('x', -bgWidth / 2)
-          .attr('y', -iconOffset - bgHeight) // 在图标上方
-          .attr('width', bgWidth)
-          .attr('height', bgHeight)
-          .attr('rx', 4)
-          .attr('fill', 'rgba(255, 255, 255, 0.95)')
-          .attr('stroke', 'rgba(0, 0, 0, 0.15)')
-          .attr('stroke-width', 0.5);
+        const baseFontSize = 10;
+        const text = label.append('text')
+          .attr('x', 0)
+          .attr('y', 0)
+          .attr('text-anchor', 'middle')
+          .attr('font-size', `${baseFontSize}px`)
+          .attr('font-weight', '600')
+          .attr('fill', '#000000')
+          .text(displayName);
         
-        // 调整文字位置，使其在背景中央
-        text.attr('y', -iconOffset - bgHeight / 2 + bbox.height / 3); // 垂直居中
+        const textNode = text.node();
+        if (textNode) {
+          const bbox = textNode.getBBox();
+          const padding = 6;
+          const bgHeight = bbox.height + padding * 2;
+          const bgWidth = Math.max(40, bbox.width + padding * 2);
+          const iconOffset = 8;
+          
+          label.insert('rect', 'text')
+            .attr('x', -bgWidth / 2)
+            .attr('y', -iconOffset - bgHeight)
+            .attr('width', bgWidth)
+            .attr('height', bgHeight)
+            .attr('rx', 4)
+            .attr('fill', 'rgba(255, 255, 255, 0.95)')
+            .attr('stroke', 'rgba(0, 0, 0, 0.15)')
+            .attr('stroke-width', 0.5);
+          
+          text.attr('y', -iconOffset - bgHeight / 2 + bbox.height / 3);
+        }
       }
       
       // 国家图标（圆形图标）- 在标签下方
