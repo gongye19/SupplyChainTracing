@@ -708,6 +708,7 @@ export const companiesAPI = {
     query?: string;
     brands?: string[];
     countries?: string[];
+    hsCode?: string[];
     hsCodePrefix?: string[];
     role?: 'importer' | 'exporter' | 'both' | '';
     metric?: 'trade_value' | 'trade_count';
@@ -717,6 +718,7 @@ export const companiesAPI = {
     if (filters.query?.trim()) params.append('q', filters.query.trim());
     filters.brands?.forEach((brand) => params.append('brand', brand));
     filters.countries?.forEach((country) => params.append('country', country));
+    filters.hsCode?.forEach((code) => params.append('hs_code', code));
     filters.hsCodePrefix?.forEach((prefix) => params.append('hs_code_prefix', prefix));
     if (filters.role) params.append('role', filters.role);
     if (filters.metric) params.append('metric', filters.metric);

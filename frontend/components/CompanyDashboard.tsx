@@ -4,10 +4,13 @@ import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YA
 import { companiesAPI } from '../services/api';
 import { CompanyDashboardControls, CompanyDashboardData, CompanyRankItem, CompanyRankMetric, CompanySearchResult } from '../types';
 import {
+  COMPANY_CATEGORY_BY_HS_CODE,
+  COMPANY_CATEGORY_BY_ID,
+  COMPANY_CATEGORY_OPTIONS,
   CONTINENT_OPTIONS,
-  HS_CATEGORY_LABELS,
   ROLE_OPTIONS,
   getCompanyActiveCountries,
+  getCompanyCategoryHsCodes,
 } from '../utils/companyDashboardFilters';
 
 interface CompanyDashboardProps {
@@ -17,14 +20,10 @@ interface CompanyDashboardProps {
   setControls: React.Dispatch<React.SetStateAction<CompanyDashboardControls>>;
 }
 
-const HS2_COLOR_PALETTE: Record<string, string> = {
-  '85': '#007AFF',
-  '84': '#34C759',
-  '38': '#FF9500',
-  '90': '#AF52DE',
-};
-
-const getHsColor = (hsCode: string) => HS2_COLOR_PALETTE[hsCode.slice(0, 2)] || '#8E8E93';
+const getCompanyCategoryColor = (categoryIdOrHsCode: string) =>
+  COMPANY_CATEGORY_BY_ID[categoryIdOrHsCode as keyof typeof COMPANY_CATEGORY_BY_ID]?.color ||
+  COMPANY_CATEGORY_BY_HS_CODE[categoryIdOrHsCode]?.color ||
+  '#8E8E93';
 
 const formatMoney = (value: number) => {
   const abs = Math.abs(value);
@@ -118,6 +117,11 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
     [filterOptions.brands]
   );
 
+  const selectedCategoryHsCodes = useMemo(
+    () => getCompanyCategoryHsCodes(controls.selectedHsPrefix),
+    [controls.selectedHsPrefix]
+  );
+
   const activeCountries = useMemo(() => {
     return getCompanyActiveCountries(controls, availableCountryCodes);
   }, [availableCountryCodes, controls]);
@@ -169,7 +173,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
         countryCode,
         startYearMonth: startDate,
         endYearMonth: endDate,
-        hsCodePrefix: controls.selectedHsPrefix ? [controls.selectedHsPrefix] : undefined,
+        hsCode: selectedCategoryHsCodes.length ? selectedCategoryHsCodes : undefined,
         metric: controls.rankMetric,
         limit: 10,
       });
@@ -207,7 +211,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
           query: trimmed,
           brands: controls.selectedBrand ? [controls.selectedBrand] : undefined,
           countries: activeCountries,
-          hsCodePrefix: controls.selectedHsPrefix ? [controls.selectedHsPrefix] : undefined,
+          hsCode: selectedCategoryHsCodes.length ? selectedCategoryHsCodes : undefined,
           role: controls.selectedRole,
           metric: controls.rankMetric,
           limit: 10,
@@ -243,7 +247,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
         query: trimmed,
         brands: controls.selectedBrand ? [controls.selectedBrand] : undefined,
         countries: activeCountries,
-        hsCodePrefix: controls.selectedHsPrefix ? [controls.selectedHsPrefix] : undefined,
+        hsCode: selectedCategoryHsCodes.length ? selectedCategoryHsCodes : undefined,
         role: controls.selectedRole,
         metric: controls.rankMetric,
         limit: 100,
@@ -283,7 +287,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
       countryCode: selectedCountryCode,
       startYearMonth: startDate,
       endYearMonth: endDate,
-      hsCodePrefix: controls.selectedHsPrefix ? [controls.selectedHsPrefix] : undefined,
+      hsCode: selectedCategoryHsCodes.length ? selectedCategoryHsCodes : undefined,
       metric: controls.rankMetric,
       limit: 10,
     })
@@ -311,6 +315,53 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
     () => company?.trends || [],
     [company]
   );
+
+  const groupedCategories = useMemo(() => {
+    if (!company) return [];
+    const grouped = new Map<string, {
+      id: string;
+      label: string;
+      stage: string;
+      hsCodes: string[];
+      sumOfUsd: number;
+      tradeCount: number;
+    }>();
+
+    company.categories.forEach((category) => {
+      const definition = COMPANY_CATEGORY_BY_HS_CODE[category.hsCode];
+      if (!definition) return;
+      const current = grouped.get(definition.id) || {
+        id: definition.id,
+        label: `${definition.displayLabel} (${definition.label})`,
+        stage: definition.stage,
+        hsCodes: definition.hsCodes,
+        sumOfUsd: 0,
+        tradeCount: 0,
+      };
+      current.sumOfUsd += category.sumOfUsd;
+      current.tradeCount += category.tradeCount;
+      grouped.set(definition.id, current);
+    });
+
+    const denominator = Array.from(grouped.values()).reduce(
+      (sum, item) => sum + (controls.rankMetric === 'trade_count' ? item.tradeCount : item.sumOfUsd),
+      0
+    );
+
+    return Array.from(grouped.values())
+      .map((item) => {
+        const value = controls.rankMetric === 'trade_count' ? item.tradeCount : item.sumOfUsd;
+        return {
+          ...item,
+          sharePct: denominator > 0 ? value / denominator : 0,
+        };
+      })
+      .sort((a, b) => (
+        controls.rankMetric === 'trade_count'
+          ? b.tradeCount - a.tradeCount || b.sumOfUsd - a.sumOfUsd
+          : b.sumOfUsd - a.sumOfUsd || b.tradeCount - a.tradeCount
+      ));
+  }, [company, controls.rankMetric]);
 
   const totalResultPages = Math.max(1, Math.ceil(results.length / RESULTS_PER_PAGE));
   const pagedResults = useMemo(
@@ -354,9 +405,9 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
             label="Category"
             value={controls.selectedHsPrefix}
             onChange={(value) => updateControls({ selectedHsPrefix: value })}
-            options={filterOptions.hsCategories.map((item) => ({
-              value: item.hsPrefix,
-              label: HS_CATEGORY_LABELS[item.hsPrefix] || `HS ${item.hsPrefix}`,
+            options={COMPANY_CATEGORY_OPTIONS.map((item) => ({
+              value: item.id,
+              label: `${item.displayLabel} (${item.label}) · ${item.stage}`,
             }))}
           />
           <FilterChips
@@ -597,25 +648,28 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
             <div className="bg-white rounded-[20px] border border-black/5 shadow-sm p-6">
               <div className="flex items-center gap-2 mb-4">
                 <Package className="w-4 h-4 text-[#34C759]" />
-                <span className="text-[15px] font-bold text-[#1D1D1F]">HS Categories</span>
+                <span className="text-[15px] font-bold text-[#1D1D1F]">Category Breakdown</span>
               </div>
               <div className="space-y-3">
-                {company.categories.map((category) => (
-                  <div key={category.hsCode}>
+                {groupedCategories.map((category) => (
+                  <div key={category.id}>
                     <div className="flex items-center justify-between gap-3 mb-1.5">
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: getHsColor(category.hsCode) }} />
-                        <span className="text-[12px] font-semibold text-[#1D1D1F] truncate">{category.hsCode}</span>
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: getCompanyCategoryColor(category.id) }} />
+                        <span className="text-[12px] font-semibold text-[#1D1D1F] truncate">{category.label}</span>
                       </div>
                       <span className="text-[11px] font-bold text-[#86868B]">{(category.sharePct * 100).toFixed(1)}%</span>
                     </div>
                     <div className="h-1.5 bg-[#F5F5F7] rounded-full overflow-hidden">
-                      <div className="h-full rounded-full" style={{ width: `${Math.min(category.sharePct * 100, 100)}%`, backgroundColor: getHsColor(category.hsCode) }} />
+                      <div className="h-full rounded-full" style={{ width: `${Math.min(category.sharePct * 100, 100)}%`, backgroundColor: getCompanyCategoryColor(category.id) }} />
                     </div>
-                    <div className="text-[10px] text-[#86868B] mt-1">
-                      {controls.rankMetric === 'trade_count'
-                        ? `${category.tradeCount.toLocaleString()} trades`
-                        : formatMoney(category.sumOfUsd)}
+                    <div className="text-[10px] text-[#86868B] mt-1 flex items-center justify-between gap-2">
+                      <span>{category.stage} · {category.hsCodes.join(', ')}</span>
+                      <span className="font-semibold">
+                        {controls.rankMetric === 'trade_count'
+                          ? `${category.tradeCount.toLocaleString()} trades`
+                          : formatMoney(category.sumOfUsd)}
+                      </span>
                     </div>
                   </div>
                 ))}

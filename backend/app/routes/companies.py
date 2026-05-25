@@ -283,7 +283,6 @@ def get_company_dashboard(
             END AS share_pct
         FROM agg
         ORDER BY {order_metric} DESC, {secondary_metric} DESC
-        LIMIT :limit
     """
 
     brand_lookup_cte = """

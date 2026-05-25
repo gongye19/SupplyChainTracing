@@ -21,12 +21,47 @@ export const CONTINENT_OPTIONS = [
   { id: 'oceania', label: 'Oceania', countries: ['AUS', 'FJI', 'NZL'] },
 ];
 
-export const HS_CATEGORY_LABELS: Record<string, string> = {
-  '38': 'HS 38 Materials',
-  '84': 'HS 84 Equipment',
-  '85': 'HS 85 IC & Components',
-  '90': 'HS 90 Instruments',
-};
+export const COMPANY_CATEGORY_OPTIONS = [
+  {
+    id: 'materials_metrology',
+    label: 'Materials & Metrology',
+    displayLabel: '半导体材料与检测仪器',
+    stage: '上游',
+    hsCodes: ['903141', '903082', '381800'],
+    color: '#AF52DE',
+  },
+  {
+    id: 'equipment',
+    label: 'Equipment',
+    displayLabel: '半导体制造设备',
+    stage: '中游',
+    hsCodes: ['848610', '848620', '848630', '848640', '848690'],
+    color: '#34C759',
+  },
+  {
+    id: 'products',
+    label: 'Products',
+    displayLabel: '集成电路芯片',
+    stage: '下游',
+    hsCodes: ['854231', '854232', '854233', '854239'],
+    color: '#007AFF',
+  },
+] as const;
+
+export type CompanyCategoryId = typeof COMPANY_CATEGORY_OPTIONS[number]['id'];
+
+export const COMPANY_CATEGORY_BY_ID = Object.fromEntries(
+  COMPANY_CATEGORY_OPTIONS.map((category) => [category.id, category])
+) as Record<CompanyCategoryId, typeof COMPANY_CATEGORY_OPTIONS[number]>;
+
+export const COMPANY_CATEGORY_BY_HS_CODE = Object.fromEntries(
+  COMPANY_CATEGORY_OPTIONS.flatMap((category) =>
+    category.hsCodes.map((hsCode) => [hsCode, category])
+  )
+) as Record<string, typeof COMPANY_CATEGORY_OPTIONS[number]>;
+
+export const getCompanyCategoryHsCodes = (categoryId: string) =>
+  COMPANY_CATEGORY_OPTIONS.find((category) => category.id === categoryId)?.hsCodes || [];
 
 export const DEFAULT_COMPANY_CONTROLS: CompanyDashboardControls = {
   selectedBrand: '',
