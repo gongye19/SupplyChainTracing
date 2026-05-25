@@ -58,6 +58,25 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
     return selectedCountries.map((code) => countryCodeToName.get(code) || code);
   }, [selectedCountries, countryCodeToName]);
 
+  const getShipmentValueMillions = (shipment: Shipment) => {
+    if (typeof shipment.value === 'number' && Number.isFinite(shipment.value)) {
+      return shipment.value;
+    }
+    if (typeof shipment.totalValueUsd === 'number' && Number.isFinite(shipment.totalValueUsd)) {
+      return shipment.totalValueUsd / 1000000;
+    }
+    return 0;
+  };
+
+  const formatFlowValue = (valueMillions: number) => {
+    if (!Number.isFinite(valueMillions) || valueMillions <= 0) return '$0';
+    if (valueMillions >= 1000) return `$${(valueMillions / 1000).toFixed(2)}B`;
+    if (valueMillions >= 1) return `$${valueMillions.toFixed(1)}M`;
+    const valueThousands = valueMillions * 1000;
+    if (valueThousands >= 1) return `$${valueThousands.toFixed(1)}K`;
+    return `$${(valueMillions * 1000000).toFixed(0)}`;
+  };
+
   const selectedCountryCategoryLegend = useMemo(() => {
     const selectedSet = new Set(selectedCountries || []);
     const legendMap = new Map<string, { color: string; totalValue: number }>();
@@ -75,7 +94,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
       const prev = legendMap.get(categoryLabel);
       legendMap.set(categoryLabel, {
         color: prev?.color || categoryColor,
-        totalValue: (prev?.totalValue || 0) + (shipment.value || (shipment.totalValueUsd || 0) / 1000000),
+        totalValue: (prev?.totalValue || 0) + getShipmentValueMillions(shipment),
       });
     });
 
@@ -470,8 +489,8 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
           originCountry,
           destinationCountry,
           shipments: [shipment],
-          count: shipment.tradeCount || 1, // 交易次数
-          totalValue: shipment.value || (shipment.totalValueUsd ? shipment.totalValueUsd / 1000000 : 0),
+          count: shipment.tradeCount || 0,
+          totalValue: getShipmentValueMillions(shipment),
           mainCategory: shipment.category,
           mainColor: (shipment as any).categoryColor || '#8E8E93',
           flowType,
@@ -663,29 +682,30 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
           flow();
         }
 
-          arc.on('mouseover', function(event) {
+        const showRouteTooltip = (event: MouseEvent) => {
           const svgNode = svgRef.current;
           const currentScale = svgNode ? d3.zoomTransform(svgNode)?.k || 1 : 1;
-            const baseStrokeWidth = parseFloat(d3.select(this).attr('data-base-stroke-width') || thickness.toString());
-            const scaledThickness = Math.max(0.2, baseStrokeWidth / currentScale);
-            d3.select(this)
-              .attr('opacity', 0.95)
-              .attr('stroke-width', scaledThickness + 1.2 / currentScale);
+          const baseStrokeWidth = parseFloat(arc.attr('data-base-stroke-width') || thickness.toString());
+          const scaledThickness = Math.max(0.2, baseStrokeWidth / currentScale);
+          arc
+            .attr('opacity', 0.95)
+            .attr('stroke-width', scaledThickness + 1.2 / currentScale);
           
           if (tooltipRef.current) {
             // 获取所有物料（去重）
-            const uniqueMaterials = Array.from(new Set(routeGroup.shipments.map(s => s.material)));
+            const uniqueMaterials = Array.from(new Set(routeGroup.shipments.map(s => s.material).filter((value): value is string => Boolean(value))));
             // 翻译物料名称
             const translatedMaterials = translateMaterials(uniqueMaterials);
-            const materialsText = translatedMaterials.length > 3 
-              ? `${translatedMaterials.slice(0, 3).join('、')}，...`
-              : translatedMaterials.join('、');
+            const materialsText = translatedMaterials.length === 0
+              ? (routeGroup.mainCategory || 'Unknown')
+              : translatedMaterials.length > 3
+                ? `${translatedMaterials.slice(0, 3).join('、')}，...`
+                : translatedMaterials.join('、');
             
             // 获取品类显示名称
-            const categoryDisplayName = routeGroup.mainCategory;
+            const categoryDisplayName = routeGroup.mainCategory || 'Unknown';
             
-            // 计算实际交易数量（从原始shipments数据中统计）
-            const actualTransactionCount = routeGroup.shipments.length;
+            const actualTransactionCount = routeGroup.count || 0;
             
             tooltipRef.current.html(`
               <div class="space-y-3">
@@ -713,7 +733,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
                 </div>
                 <div class="flex justify-between items-center">
                   <span class="text-[#86868B] text-[10px] font-bold uppercase">${totalValueLabel}</span>
-                  <span class="text-[#1D1D1F] font-bold">$${routeGroup.totalValue.toFixed(1)}M</span>
+                  <span class="text-[#1D1D1F] font-bold">${formatFlowValue(routeGroup.totalValue)}</span>
                 </div>
               </div>
             `)
@@ -721,22 +741,42 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
             .style('top', (event.pageY - 10) + 'px')
             .style('left', (event.pageX + 20) + 'px');
           }
-          })
-          .on('mousemove', (event) => {
+        };
+
+        const moveRouteTooltip = (event: MouseEvent) => {
           if (tooltipRef.current) {
             tooltipRef.current.style('top', (event.pageY - 10) + 'px').style('left', (event.pageX + 20) + 'px');
           }
-          })
-          .on('mouseout', function() {
+        };
+
+        const hideRouteTooltip = () => {
           const svgNode = svgRef.current;
           const currentScale = svgNode ? d3.zoomTransform(svgNode)?.k || 1 : 1;
-            const baseStrokeWidth = parseFloat(d3.select(this).attr('data-base-stroke-width') || thickness.toString());
-            const scaledThickness = Math.max(0.2, baseStrokeWidth / currentScale);
-            d3.select(this).attr('opacity', baseArcOpacity).attr('stroke-width', scaledThickness);
+          const baseStrokeWidth = parseFloat(arc.attr('data-base-stroke-width') || thickness.toString());
+          const scaledThickness = Math.max(0.2, baseStrokeWidth / currentScale);
+          arc.attr('opacity', baseArcOpacity).attr('stroke-width', scaledThickness);
           if (tooltipRef.current) {
             tooltipRef.current.style('visibility', 'hidden');
           }
-        });
+        };
+
+        arc
+          .style('pointer-events', 'stroke')
+          .on('mouseover', showRouteTooltip)
+          .on('mousemove', moveRouteTooltip)
+          .on('mouseout', hideRouteTooltip);
+
+        gFlows.append('path')
+          .attr('d', lineData)
+          .attr('fill', 'none')
+          .attr('stroke', 'transparent')
+          .attr('stroke-width', Math.max(12, thickness + 8))
+          .attr('stroke-linecap', 'round')
+          .attr('class', 'shipment-hit-area')
+          .style('pointer-events', 'stroke')
+          .on('mouseover', showRouteTooltip)
+          .on('mousemove', moveRouteTooltip)
+          .on('mouseout', hideRouteTooltip);
 
       });
       }
