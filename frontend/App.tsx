@@ -32,6 +32,16 @@ const getHs2Color = (hs2: string): string => {
   return HS2_COLOR_PALETTE[numeric % HS2_COLOR_PALETTE.length];
 };
 
+const getShipmentValueUsd = (shipment: Shipment) => {
+  if (typeof shipment.totalValueUsd === 'number' && Number.isFinite(shipment.totalValueUsd)) {
+    return shipment.totalValueUsd;
+  }
+  if (typeof shipment.value === 'number' && Number.isFinite(shipment.value)) {
+    return shipment.value * 1000000;
+  }
+  return 0;
+};
+
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const MAX_CACHE_ENTRIES = 24;
 
@@ -750,12 +760,7 @@ const App: React.FC = () => {
       
       const group = countryPairGroups.get(pairKey)!;
       group.shipments.push(shipment);
-      const shipmentValueUsd = typeof shipment.totalValueUsd === 'number' && Number.isFinite(shipment.totalValueUsd)
-        ? shipment.totalValueUsd
-        : typeof shipment.value === 'number' && Number.isFinite(shipment.value)
-          ? shipment.value * 1000000
-          : 0;
-      group.totalValue += shipmentValueUsd;
+      group.totalValue += getShipmentValueUsd(shipment);
       group.totalTradeCount += shipment.tradeCount || 0;
     });
     
@@ -927,7 +932,7 @@ const App: React.FC = () => {
         if (!countryCode) return;
         const prev = aggregate.get(countryCode) || { tradeValue: 0, tradeCount: 0 };
         aggregate.set(countryCode, {
-          tradeValue: prev.tradeValue + (shipment.totalValueUsd || 0),
+          tradeValue: prev.tradeValue + getShipmentValueUsd(shipment),
           tradeCount: prev.tradeCount + (shipment.tradeCount || 0),
         });
       });

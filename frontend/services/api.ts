@@ -21,6 +21,14 @@ import { logger } from '../utils/logger';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
 
+const readNumber = (...values: unknown[]) => {
+  for (const value of values) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return 0;
+};
+
 async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
   logger.debug('[API] Fetching', url);
@@ -102,7 +110,14 @@ export const shipmentsAPI = {
       signal: options?.signal,
     });
     return data.map((item: any) => {
-      const totalValueUsd = Number(item.total_value_usd) || 0;
+      const totalValueUsd = readNumber(
+        item.total_value_usd,
+        item.totalValueUsd,
+        item.sum_of_usd,
+        item.sumOfUsd,
+        item.total_trade_value,
+        item.totalTradeValue
+      );
       return {
         year: item.year,
         month: item.month,
@@ -115,8 +130,8 @@ export const shipmentsAPI = {
         totalValueUsd,
         weightAvgPrice: item.weight_avg_price,
         quantityAvgPrice: item.quantity_avg_price,
-        tradeCount: item.trade_count || 0,
-        amountSharePct: item.amount_share_pct,
+        tradeCount: readNumber(item.trade_count, item.tradeCount),
+        amountSharePct: readNumber(item.amount_share_pct, item.amountSharePct),
         // 向后兼容字段：旧地图组件的 value 单位是百万美元。
         value: totalValueUsd / 1000000,
         countryOfOrigin: item.country_of_origin || item.origin_country_code,
