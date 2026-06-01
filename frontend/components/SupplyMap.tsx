@@ -69,7 +69,9 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
   };
 
   const formatFlowValue = (valueMillions: number) => {
-    if (!Number.isFinite(valueMillions) || valueMillions <= 0) return '$0';
+    if (!Number.isFinite(valueMillions) || valueMillions <= 0) {
+      return language === 'zh' ? '未报告金额' : 'Value not reported';
+    }
     if (valueMillions >= 1000) return `$${(valueMillions / 1000).toFixed(2)}B`;
     if (valueMillions >= 1) return `$${valueMillions.toFixed(1)}M`;
     const valueThousands = valueMillions * 1000;
@@ -321,7 +323,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
     });
 
     const selectedCountrySet = new Set(selectedCountries || []);
-    const maxVisibleLabels = selectedCountrySet.size > 0 ? 8 : 10;
+    const maxVisibleLabels = selectedCountrySet.size > 0 ? 14 : 16;
     const labeledCountryCodes = new Set<string>();
     selectedCountrySet.forEach((code) => {
       if (involvedCountryCodes.has(code)) labeledCountryCodes.add(code);
@@ -412,8 +414,8 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
       }
       
       // 国家图标（圆形图标）- 在标签下方
-      const iconSize = 6; // 图标基础大小（国家节点稍大）
-      const baseStrokeWidth = 1.2;
+      const iconSize = 8; // 图标基础大小（参与国家节点默认可见）
+      const baseStrokeWidth = 1.8;
       const scaledSize = Math.max(0.5, iconSize / currentScale);
       const scaledStrokeWidth = Math.max(0.3, baseStrokeWidth / currentScale);
       
@@ -428,10 +430,11 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
       iconGroup.append('circle')
         .attr('cx', 0)
         .attr('cy', 0)
-        .attr('r', isSelectedCountry ? scaledSize * 1.25 : scaledSize)
+        .attr('r', isSelectedCountry ? scaledSize * 1.35 : scaledSize)
         .attr('fill', isSelectedCountry ? '#FF9500' : '#007AFF')
         .attr('stroke', '#FFFFFF')
-        .attr('stroke-width', isSelectedCountry ? scaledStrokeWidth * 1.25 : scaledStrokeWidth);
+        .attr('stroke-width', isSelectedCountry ? scaledStrokeWidth * 1.35 : scaledStrokeWidth)
+        .attr('opacity', isSelectedCountry ? 1 : 0.98);
       
       // 添加阴影效果
       iconGroup.style('filter', 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25))');

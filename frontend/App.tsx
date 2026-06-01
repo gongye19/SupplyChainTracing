@@ -42,6 +42,14 @@ const getShipmentValueUsd = (shipment: Shipment) => {
   return 0;
 };
 
+const formatTradeValue = (value: number) => {
+  const abs = Math.abs(value);
+  if (abs >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(2)}B`;
+  if (abs >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`;
+  if (abs >= 1_000) return `$${(value / 1_000).toFixed(1)}K`;
+  return `$${value.toFixed(0)}`;
+};
+
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const MAX_CACHE_ENTRIES = 24;
 
@@ -1392,7 +1400,7 @@ const App: React.FC = () => {
                             <TopCountriesHorizontalBar
                               title="Selected Trade Value Ranking"
                               data={topCountriesByCountryMapValue}
-                              valueFormatter={(value) => `$${(value / 1000000000).toFixed(2)}B`}
+                              valueFormatter={formatTradeValue}
                               barColor="#007AFF"
                               metaLines={[
                                 `Time: ${mapCountryFilters.startDate} ~ ${mapCountryFilters.endDate}`,
@@ -1419,7 +1427,7 @@ const App: React.FC = () => {
                             <TopCountriesHorizontalBar
                               title="Overall Top 10 Trade Value Ranking"
                               data={topCountriesByCountryOverallValue}
-                              valueFormatter={(value) => `$${(value / 1000000000).toFixed(2)}B`}
+                              valueFormatter={formatTradeValue}
                               barColor="#5856D6"
                               headerActions={
                                 <div className="flex items-center gap-2">
@@ -1620,7 +1628,7 @@ const App: React.FC = () => {
                           <TopCountriesHorizontalBar
                             title="Overall Top 10 Categories by Trade Value"
                             data={topCategoriesByHSCodeOverallValue}
-                            valueFormatter={(value) => `$${(value / 1000000000).toFixed(2)}B`}
+                            valueFormatter={formatTradeValue}
                             barColor="#FF9500"
                             headerActions={
                               <div className="flex items-center gap-2">
