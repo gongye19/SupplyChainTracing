@@ -354,9 +354,10 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
         .style('cursor', 'pointer');
       
       const displayName = countryInfo.countryName;
+      const isSelectedCountry = selectedCountries.includes(countryCode);
       const label = countryNode.append('g')
         .attr('class', 'country-label')
-        .style('opacity', 0)
+        .style('opacity', isSelectedCountry ? 1 : 0)
         .style('pointer-events', 'none');
       
       const baseFontSize = 10;
@@ -403,7 +404,6 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
         .attr('data-stroke-width', baseStrokeWidth);
       
       // 国家节点图标：圆形
-      const isSelectedCountry = selectedCountries.includes(countryCode);
       iconGroup.append('circle')
         .attr('cx', 0)
         .attr('cy', 0)
@@ -453,7 +453,9 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
           iconGroup.transition().duration(200)
             .attr('transform', `scale(${scaledSize / iconSize})`);
         }
-        d3.select(this).select('.country-label').style('opacity', 0);
+        d3.select(this)
+          .select('.country-label')
+          .style('opacity', isSelectedCountry ? 1 : 0);
         if (tooltipRef.current) {
           tooltipRef.current.style('visibility', 'hidden');
         }
@@ -690,7 +692,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
             if (!code) return;
             gNodes
               .select(`.country-node[data-country-code="${code}"] .country-label`)
-              .style('opacity', visible ? 1 : 0);
+              .style('opacity', visible || selectedCountries.includes(code) ? 1 : 0);
           });
         };
 
