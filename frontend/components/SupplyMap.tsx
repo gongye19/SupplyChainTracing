@@ -305,38 +305,16 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
     // 只收集当前可见品类有贸易的国家，使点随品类筛选同步变化
     const visibleCategorySet = new Set(visibleCategories);
     const involvedCountryCodes = new Set<string>();
-    const countryActivity = new Map<string, number>();
     shipments.forEach((shipment) => {
       const category = shipment.category || (shipment.hsCode ? `HS ${shipment.hsCode.slice(0, 2)}` : 'Unknown');
       if (visibleCategorySet.size > 0 && !visibleCategorySet.has(category)) return;
       const originCountryCode = shipment.originId || shipment.originCountryCode;
       const destCountryCode = shipment.destinationId || shipment.destinationCountryCode;
-      const value = getShipmentValueMillions(shipment);
-      if (originCountryCode) {
-        involvedCountryCodes.add(originCountryCode);
-        countryActivity.set(originCountryCode, (countryActivity.get(originCountryCode) || 0) + value);
-      }
-      if (destCountryCode) {
-        involvedCountryCodes.add(destCountryCode);
-        countryActivity.set(destCountryCode, (countryActivity.get(destCountryCode) || 0) + value);
-      }
+      if (originCountryCode) involvedCountryCodes.add(originCountryCode);
+      if (destCountryCode) involvedCountryCodes.add(destCountryCode);
     });
 
-    const selectedCountrySet = new Set(selectedCountries || []);
-    const maxVisibleLabels = selectedCountrySet.size > 0 ? 14 : 16;
-    const labeledCountryCodes = new Set<string>();
-    selectedCountrySet.forEach((code) => {
-      if (involvedCountryCodes.has(code)) labeledCountryCodes.add(code);
-    });
-    Array.from(countryActivity.entries())
-      .sort((a, b) => b[1] - a[1])
-      .forEach(([code]) => {
-        if (labeledCountryCodes.size < maxVisibleLabels) {
-          labeledCountryCodes.add(code);
-        }
-      });
-
-    const nodeKey = `${countries.length}|${selectedCountries.slice().sort().join(',')}|${visibleCategories.slice().sort().join(',')}|${Array.from(involvedCountryCodes).sort().join(',')}|${Array.from(labeledCountryCodes).sort().join(',')}`;
+    const nodeKey = `${countries.length}|${selectedCountries.slice().sort().join(',')}|${visibleCategories.slice().sort().join(',')}|${Array.from(involvedCountryCodes).sort().join(',')}`;
     const shouldRebuildNodes = lastNodeKeyRef.current !== nodeKey;
 
     if (shouldRebuildNodes) {
@@ -360,7 +338,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
         countryNodePositionsRef.current.set(countryCode, pos);
       });
 
-      // 显示国家节点（带标签和图标）
+      // 显示国家节点；国家标签默认隐藏，仅在 hover 节点或相关流向线时显示。
       // 获取当前缩放级别
       const svgNode = svgRef.current;
       const currentScale = svgNode ? d3.zoomTransform(svgNode)?.k || 1 : 1;
@@ -370,52 +348,51 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
       countryPositionsMapRef.current.forEach((countryInfo, countryCode) => {
       const countryNode = gNodes.append('g')
         .attr('class', 'country-node')
+        .attr('data-country-code', countryCode)
         .attr('transform', `translate(${countryInfo.pos[0]}, ${countryInfo.pos[1]})`)
         .style('pointer-events', 'all')
         .style('cursor', 'pointer');
       
-      // 默认只显示选中国家和当前交易额靠前的少量国家标签，避免名称互相遮挡。
-      const shouldShowLabel = labeledCountryCodes.has(countryCode);
-      if (shouldShowLabel) {
-        const displayName = countryInfo.countryName;
-        const label = countryNode.append('g')
-          .attr('class', 'country-label');
+      const displayName = countryInfo.countryName;
+      const label = countryNode.append('g')
+        .attr('class', 'country-label')
+        .style('opacity', 0)
+        .style('pointer-events', 'none');
+      
+      const baseFontSize = 10;
+      const text = label.append('text')
+        .attr('x', 0)
+        .attr('y', 0)
+        .attr('text-anchor', 'middle')
+        .attr('font-size', `${baseFontSize}px`)
+        .attr('font-weight', '600')
+        .attr('fill', '#000000')
+        .text(displayName);
+      
+      const textNode = text.node();
+      if (textNode) {
+        const bbox = textNode.getBBox();
+        const padding = 6;
+        const bgHeight = bbox.height + padding * 2;
+        const bgWidth = Math.max(40, bbox.width + padding * 2);
+        const iconOffset = 8;
         
-        const baseFontSize = 10;
-        const text = label.append('text')
-          .attr('x', 0)
-          .attr('y', 0)
-          .attr('text-anchor', 'middle')
-          .attr('font-size', `${baseFontSize}px`)
-          .attr('font-weight', '600')
-          .attr('fill', '#000000')
-          .text(displayName);
+        label.insert('rect', 'text')
+          .attr('x', -bgWidth / 2)
+          .attr('y', -iconOffset - bgHeight)
+          .attr('width', bgWidth)
+          .attr('height', bgHeight)
+          .attr('rx', 4)
+          .attr('fill', 'rgba(255, 255, 255, 0.95)')
+          .attr('stroke', 'rgba(0, 0, 0, 0.15)')
+          .attr('stroke-width', 0.5);
         
-        const textNode = text.node();
-        if (textNode) {
-          const bbox = textNode.getBBox();
-          const padding = 6;
-          const bgHeight = bbox.height + padding * 2;
-          const bgWidth = Math.max(40, bbox.width + padding * 2);
-          const iconOffset = 8;
-          
-          label.insert('rect', 'text')
-            .attr('x', -bgWidth / 2)
-            .attr('y', -iconOffset - bgHeight)
-            .attr('width', bgWidth)
-            .attr('height', bgHeight)
-            .attr('rx', 4)
-            .attr('fill', 'rgba(255, 255, 255, 0.95)')
-            .attr('stroke', 'rgba(0, 0, 0, 0.15)')
-            .attr('stroke-width', 0.5);
-          
-          text.attr('y', -iconOffset - bgHeight / 2 + bbox.height / 3);
-        }
+        text.attr('y', -iconOffset - bgHeight / 2 + bbox.height / 3);
       }
       
       // 国家图标（圆形图标）- 在标签下方
-      const iconSize = 8; // 图标基础大小（参与国家节点默认可见）
-      const baseStrokeWidth = 1.8;
+      const iconSize = 6; // 图标基础大小
+      const baseStrokeWidth = 1.2;
       const scaledSize = Math.max(0.5, iconSize / currentScale);
       const scaledStrokeWidth = Math.max(0.3, baseStrokeWidth / currentScale);
       
@@ -430,11 +407,10 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
       iconGroup.append('circle')
         .attr('cx', 0)
         .attr('cy', 0)
-        .attr('r', isSelectedCountry ? scaledSize * 1.35 : scaledSize)
+        .attr('r', isSelectedCountry ? scaledSize * 1.25 : scaledSize)
         .attr('fill', isSelectedCountry ? '#FF9500' : '#007AFF')
         .attr('stroke', '#FFFFFF')
-        .attr('stroke-width', isSelectedCountry ? scaledStrokeWidth * 1.35 : scaledStrokeWidth)
-        .attr('opacity', isSelectedCountry ? 1 : 0.98);
+        .attr('stroke-width', isSelectedCountry ? scaledStrokeWidth * 1.25 : scaledStrokeWidth);
       
       // 添加阴影效果
       iconGroup.style('filter', 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25))');
@@ -453,6 +429,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
           iconGroup.transition().duration(200)
             .attr('transform', `scale(${(scaledSize * 1.5) / iconSize})`);
         }
+        d3.select(this).select('.country-label').style('opacity', 1);
         
         if (tooltipRef.current) {
           const tooltipHTML = `
@@ -476,6 +453,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
           iconGroup.transition().duration(200)
             .attr('transform', `scale(${scaledSize / iconSize})`);
         }
+        d3.select(this).select('.country-label').style('opacity', 0);
         if (tooltipRef.current) {
           tooltipRef.current.style('visibility', 'hidden');
         }
@@ -707,6 +685,15 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
           flow();
         }
 
+        const setEndpointLabelsVisible = (visible: boolean) => {
+          [originCountryCode, destCountryCode].forEach((code) => {
+            if (!code) return;
+            gNodes
+              .select(`.country-node[data-country-code="${code}"] .country-label`)
+              .style('opacity', visible ? 1 : 0);
+          });
+        };
+
         const showRouteTooltip = (event: MouseEvent) => {
           const svgNode = svgRef.current;
           const currentScale = svgNode ? d3.zoomTransform(svgNode)?.k || 1 : 1;
@@ -715,6 +702,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
           arc
             .attr('opacity', 0.95)
             .attr('stroke-width', scaledThickness + 1.2 / currentScale);
+          setEndpointLabelsVisible(true);
           
           if (tooltipRef.current) {
             // 获取所有物料（去重）
@@ -780,6 +768,7 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
           const baseStrokeWidth = parseFloat(arc.attr('data-base-stroke-width') || thickness.toString());
           const scaledThickness = Math.max(0.2, baseStrokeWidth / currentScale);
           arc.attr('opacity', baseArcOpacity).attr('stroke-width', scaledThickness);
+          setEndpointLabelsVisible(false);
           if (tooltipRef.current) {
             tooltipRef.current.style('visibility', 'hidden');
           }
