@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
 
@@ -279,6 +279,7 @@ class CompanySearchResult(BaseModel):
     country_code: Optional[str] = None
     country_count: int = 0
     role: str
+    category_labels: List[str] = Field(default_factory=list)
     total_trade_value: float
     trade_count: int
 
@@ -313,6 +314,7 @@ class CompanyDashboardResponse(BaseModel):
     country_code: Optional[str] = None
     country_count: int = 0
     role: str
+    category_labels: List[str] = Field(default_factory=list)
     total_trade_value: float
     total_trade_count: int
     import_trade_value: float

@@ -745,6 +745,7 @@ export const companiesAPI = {
       countryCode: item.country_code || undefined,
       countryCount: parseInt(item.country_count) || 0,
       role: item.role || 'unknown',
+      categoryLabels: Array.isArray(item.category_labels) ? item.category_labels.filter(Boolean) : [],
       totalTradeValue: parseFloat(item.total_trade_value) || 0,
       tradeCount: parseInt(item.trade_count) || 0,
     }));
@@ -796,6 +797,7 @@ export const companiesAPI = {
       countryCode: item.country_code || undefined,
       countryCount: parseInt(item.country_count) || 0,
       role: item.role || 'unknown',
+      categoryLabels: Array.isArray(item.category_labels) ? item.category_labels.filter(Boolean) : [],
       totalTradeValue: parseFloat(item.total_trade_value) || 0,
       totalTradeCount: parseInt(item.total_trade_count) || 0,
       importTradeValue: parseFloat(item.import_trade_value) || 0,

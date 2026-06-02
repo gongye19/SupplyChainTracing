@@ -70,6 +70,31 @@ def _has_column(db: Session, table_name: str, column_name: str) -> bool:
     return bool(result.scalar())
 
 
+def _category_labels_sql(alias: str = "h") -> str:
+    return f"""
+        ARRAY_REMOVE(ARRAY[
+            CASE WHEN COUNT(*) FILTER (WHERE {alias}.hs_code IN ('903141', '903082', '381800')) > 0
+                THEN 'Materials & Metrology' END,
+            CASE WHEN COUNT(*) FILTER (WHERE {alias}.hs_code IN ('848610', '848620', '848630', '848640', '848690')) > 0
+                THEN 'Equipment' END,
+            CASE WHEN COUNT(*) FILTER (WHERE {alias}.hs_code IN ('854231', '854232', '854233', '854239')) > 0
+                THEN 'Products' END
+        ], NULL)
+    """
+
+
+def _category_labels_from_hs_codes(hs_codes: list[str]) -> list[str]:
+    labels = []
+    hs_set = set(hs_codes)
+    if hs_set.intersection({"903141", "903082", "381800"}):
+        labels.append("Materials & Metrology")
+    if hs_set.intersection({"848610", "848620", "848630", "848640", "848690"}):
+        labels.append("Equipment")
+    if hs_set.intersection({"854231", "854232", "854233", "854239"}):
+        labels.append("Products")
+    return labels
+
+
 @router.get("/search", response_model=List[CompanySearchResult])
 def search_companies(
     q: Optional[str] = Query(None),
@@ -128,9 +153,16 @@ def search_companies(
             s.country_code,
             CASE WHEN s.country_code IS NULL THEN 0 ELSE 1 END AS country_count,
             s.role,
+            COALESCE(c.category_labels, ARRAY[]::text[]) AS category_labels,
             COALESCE(s.total_trade_value, 0) AS total_trade_value,
             COALESCE(s.trade_count, 0) AS trade_count
         FROM company_search_stats s
+        LEFT JOIN LATERAL (
+            SELECT {_category_labels_sql("h")} AS category_labels
+            FROM company_hs_trade_stats h
+            WHERE h.company_name = s.name
+              AND h.country_code IS NOT DISTINCT FROM s.country_code
+        ) c ON TRUE
         {where}
         ORDER BY s.{order_col} DESC, s.{secondary_col} DESC, s.name, s.country_code
         LIMIT :limit
@@ -367,6 +399,7 @@ def get_company_dashboard(
 
     result = _safe(db, categories_query, hs_params, fallback=[])
     categories = rows_to_dicts(result, result.fetchall()) if result != [] else []
+    category_labels = _category_labels_from_hs_codes([str(item.get("hs_code") or "") for item in categories])
     result = _safe(db, suppliers_query, counterparty_params, fallback=[])
     suppliers = rows_to_dicts(result, result.fetchall()) if result != [] else []
     result = _safe(db, customers_query, counterparty_params, fallback=[])
@@ -380,6 +413,7 @@ def get_company_dashboard(
         "country_code": summary.get("country_code"),
         "country_count": int(summary.get("country_count") or 0),
         "role": summary.get("role") or "unknown",
+        "category_labels": category_labels,
         "total_trade_value": float(summary.get("total_trade_value") or 0),
         "total_trade_count": int(summary.get("total_trade_count") or 0),
         "import_trade_value": float(summary.get("import_trade_value") or 0),

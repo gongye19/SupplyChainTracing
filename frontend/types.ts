@@ -217,6 +217,7 @@ export interface CompanySearchResult {
   countryCode?: string;
   countryCount: number;
   role: 'importer' | 'exporter' | 'both' | 'unknown';
+  categoryLabels: string[];
   totalTradeValue: number;
   tradeCount: number;
 }
@@ -273,6 +274,7 @@ export interface CompanyDashboardData {
   countryCode?: string;
   countryCount: number;
   role: 'importer' | 'exporter' | 'both' | 'unknown';
+  categoryLabels: string[];
   totalTradeValue: number;
   totalTradeCount: number;
   importTradeValue: number;

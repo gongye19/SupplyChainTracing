@@ -135,14 +135,28 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
     if (countryCount > 1) return `${countryCode} +${countryCount - 1}`;
     return countryCode;
   };
+  const categorySummary = (categoryLabels?: string[]) => (
+    categoryLabels && categoryLabels.length > 0 ? categoryLabels.join(' / ') : undefined
+  );
 
   const rankMetricLabel = controls.rankMetric === 'trade_count' ? 'Trade Count' : 'Trade Value';
   const trendMetricKey = controls.rankMetric === 'trade_count' ? 'tradeCount' : 'sumOfUsd';
   const formatTrendMetric = (value: number) => (
     controls.rankMetric === 'trade_count' ? value.toLocaleString() : formatMoney(value)
   );
-  const metaText = (brandName?: string, countryCode?: string, countryCount = 0, role?: CompanyDashboardData['role']) => (
-    [brandName, countrySummary(countryCode, countryCount), role ? roleLabel(role) : undefined].filter(Boolean).join(' · ')
+  const metaText = (
+    brandName?: string,
+    countryCode?: string,
+    countryCount = 0,
+    role?: CompanyDashboardData['role'],
+    categoryLabels?: string[]
+  ) => (
+    [
+      brandName,
+      countrySummary(countryCode, countryCount),
+      role ? roleLabel(role) : undefined,
+      categorySummary(categoryLabels),
+    ].filter(Boolean).join(' · ')
   );
 
   const updateControls = (patch: Partial<CompanyDashboardControls>) => {
@@ -482,7 +496,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
                     <div className="min-w-0">
                       <div className="text-[13px] font-bold text-[#1D1D1F] truncate">{item.name}</div>
                       <div className="text-[11px] text-[#86868B] truncate">
-                        {metaText(item.brandName, item.countryCode, item.countryCount, item.role)}
+                        {metaText(item.brandName, item.countryCode, item.countryCount, item.role, item.categoryLabels)}
                       </div>
                     </div>
                     <div className="text-[11px] font-bold text-[#86868B] shrink-0">
@@ -529,7 +543,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
                 <div className="min-w-0">
                   <div className="text-[13px] font-bold text-[#1D1D1F] truncate">{result.name}</div>
                   <div className="text-[11px] text-[#86868B] truncate">
-                    {metaText(result.brandName, result.countryCode, result.countryCount, result.role)}
+                    {metaText(result.brandName, result.countryCode, result.countryCount, result.role, result.categoryLabels)}
                   </div>
                 </div>
                 <div className="text-right shrink-0">
@@ -602,7 +616,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
               <div className="min-w-0">
                 <h2 className="text-[18px] font-bold text-[#1D1D1F] truncate">{company.name}</h2>
                 <div className="text-[12px] text-[#86868B] font-medium mt-0.5">
-                  {metaText(company.brandName, company.countryCode, company.countryCount, company.role)}
+                  {metaText(company.brandName, company.countryCode, company.countryCount, company.role, company.categoryLabels)}
                 </div>
               </div>
             </div>
@@ -731,7 +745,7 @@ const TopCompaniesPreview: React.FC<{
             <span className="min-w-0">
               <span className="block text-[12px] font-bold text-[#1D1D1F] truncate">{item.name}</span>
               <span className="block text-[10px] font-semibold text-[#86868B] truncate">
-                {[item.brandName, item.countryCode || 'N/A', roleLabel(item.role)].filter(Boolean).join(' · ')}
+                {[item.brandName, item.countryCode || 'N/A', roleLabel(item.role), categorySummary(item.categoryLabels)].filter(Boolean).join(' · ')}
               </span>
             </span>
             <span className="text-[12px] font-bold text-[#1D1D1F] shrink-0">
