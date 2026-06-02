@@ -321,7 +321,6 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
     const grouped = new Map<string, {
       id: string;
       label: string;
-      stage: string;
       hsCodes: string[];
       sumOfUsd: number;
       tradeCount: number;
@@ -332,8 +331,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
       if (!definition) return;
       const current = grouped.get(definition.id) || {
         id: definition.id,
-        label: `${definition.displayLabel} (${definition.label})`,
-        stage: definition.stage,
+        label: definition.label,
         hsCodes: definition.hsCodes,
         sumOfUsd: 0,
         tradeCount: 0,
@@ -407,7 +405,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
             onChange={(value) => updateControls({ selectedHsPrefix: value })}
             options={COMPANY_CATEGORY_OPTIONS.map((item) => ({
               value: item.id,
-              label: `${item.displayLabel} (${item.label}) · ${item.stage}`,
+              label: item.label,
             }))}
           />
           <FilterChips
@@ -664,7 +662,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
                       <div className="h-full rounded-full" style={{ width: `${Math.min(category.sharePct * 100, 100)}%`, backgroundColor: getCompanyCategoryColor(category.id) }} />
                     </div>
                     <div className="text-[10px] text-[#86868B] mt-1 flex items-center justify-between gap-2">
-                      <span>{category.stage} · {category.hsCodes.join(', ')}</span>
+                      <span>{category.hsCodes.join(', ')}</span>
                       <span className="font-semibold">
                         {controls.rankMetric === 'trade_count'
                           ? `${category.tradeCount.toLocaleString()} trades`
