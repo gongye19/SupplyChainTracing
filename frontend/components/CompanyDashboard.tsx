@@ -40,6 +40,16 @@ const roleLabel = (role: CompanyDashboardData['role']) => {
   return 'Company';
 };
 
+const countrySummary = (countryCode?: string, countryCount = 0) => {
+  if (!countryCode) return 'N/A';
+  if (countryCount > 1) return `${countryCode} +${countryCount - 1}`;
+  return countryCode;
+};
+
+const categorySummary = (categoryLabels?: string[]) => (
+  categoryLabels && categoryLabels.length > 0 ? categoryLabels.join(' / ') : undefined
+);
+
 const RESULTS_PER_PAGE = 10;
 
 const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate, controls, setControls }) => {
@@ -129,15 +139,6 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
   useEffect(() => {
     setResultPage(1);
   }, [searchInput, controls]);
-
-  const countrySummary = (countryCode?: string, countryCount = 0) => {
-    if (!countryCode) return 'N/A';
-    if (countryCount > 1) return `${countryCode} +${countryCount - 1}`;
-    return countryCode;
-  };
-  const categorySummary = (categoryLabels?: string[]) => (
-    categoryLabels && categoryLabels.length > 0 ? categoryLabels.join(' / ') : undefined
-  );
 
   const rankMetricLabel = controls.rankMetric === 'trade_count' ? 'Trade Count' : 'Trade Value';
   const trendMetricKey = controls.rankMetric === 'trade_count' ? 'tradeCount' : 'sumOfUsd';
