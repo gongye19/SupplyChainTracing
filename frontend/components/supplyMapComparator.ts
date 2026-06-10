@@ -1,19 +1,13 @@
 import {
   Filters,
   Shipment,
-  Transaction,
   CountryLocation,
-  CompanyWithLocation,
-  Category,
 } from '../types';
 
 type SupplyMapProps = {
   shipments: Shipment[];
-  transactions: Transaction[];
   selectedCountries: string[];
   countries: CountryLocation[];
-  companies: CompanyWithLocation[];
-  categories: Category[];
   filters?: Filters;
   isPreview?: boolean;
 };
@@ -56,15 +50,9 @@ const sameShipments = (a: Shipment[], b: Shipment[]) =>
 export const areSupplyMapPropsEqual = (prevProps: SupplyMapProps, nextProps: SupplyMapProps) => {
   return (
     sameShipments(prevProps.shipments, nextProps.shipments) &&
-    prevProps.transactions.length === nextProps.transactions.length &&
-    prevProps.transactions.every((t, i) => t.id === nextProps.transactions[i]?.id) &&
     sameStringArray(prevProps.selectedCountries, nextProps.selectedCountries) &&
     prevProps.countries.length === nextProps.countries.length &&
-    prevProps.companies.length === nextProps.companies.length &&
-    prevProps.companies.every((c, i) => c.id === nextProps.companies[i]?.id) &&
-    prevProps.categories.length === nextProps.categories.length &&
     prevProps.isPreview === nextProps.isPreview &&
     sameFilters(prevProps.filters, nextProps.filters)
   );
 };
-

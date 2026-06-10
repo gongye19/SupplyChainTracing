@@ -43,11 +43,6 @@ export default defineConfig({
     plugins: [
       react()
     ],
-    define: {
-      // 直接使用 process.env，Vite 会自动处理环境变量
-      'process.env.API_KEY': JSON.stringify(process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || ''),
-      'process.env.GEMINI_API_KEY': JSON.stringify(process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || '')
-    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

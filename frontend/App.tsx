@@ -1,13 +1,12 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense } from 'react';
-import StatsPanel from './components/StatsPanel';
 import SidebarFilters from './components/SidebarFilters';
 import CountryTradeSidebar from './components/CountryTradeSidebar';
 import CompanyDashboardSidebar from './components/CompanyDashboardSidebar';
 import type { TopCountriesDatum } from './components/TopCountriesHorizontalBar';
 import { CompanyDashboardControls, Filters, HSCodeCategory, CountryLocation, Location, Shipment, CountryMonthlyTradeStat, CountryTradeStatSummary, CountryTradeTrend, TopCountry, CountryTradeFilters, CountryQuarterTop, CountryAggregate, CountryQuarterAggregate, HSAggregate, HSQuarterAggregate } from './types';
 import { shipmentsAPI, hsCodeCategoriesAPI, countryLocationsAPI, chatAPI, ChatMessage, countryTradeStatsAPI } from './services/api';
-import { Globe, Map as MapIcon, Package, TrendingUp, Users, ChevronRight, Filter, Building2 } from 'lucide-react';
+import { Globe, Map as MapIcon, Package, TrendingUp, Users, ChevronRight, Filter, Building2, MessageCircle } from 'lucide-react';
 import { useLanguage } from './contexts/LanguageContext';
 import { getCountriesFromCodes } from './utils/countryCoordinates';
 import { logger } from './utils/logger';
@@ -105,6 +104,7 @@ const App: React.FC = () => {
   const [countries, setCountries] = useState<CountryLocation[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
   const [filterLoading, setFilterLoading] = useState(false);
+  const [assistantLoaded, setAssistantLoaded] = useState(false);
   const [isInteracting, setIsInteracting] = useState(false); // 是否正在交互(拖动/快速点击)
   const [stats, setStats] = useState({
     transactions: 0,
@@ -222,18 +222,12 @@ const App: React.FC = () => {
     const loadInitialData = async () => {
       try {
         setInitialLoading(true);
-        const [hsCodeCatsData, locationsData, hsCodesData, countryAggregateData] = await Promise.all([
+        const [hsCodeCatsData, locationsData, hsCodesData] = await Promise.all([
           hsCodeCategoriesAPI.getAll(),
           countryLocationsAPI.getAll(),
           countryTradeStatsAPI.getAvailableHSCodes(),
-          countryTradeStatsAPI.getCountryAggregate({
-            tradeDirection: 'all',
-            startYearMonth: startDate,
-            endYearMonth: endDate,
-            limit: 300,
-          }),
         ]);
-        logger.debug('[Init] HS categories:', hsCodeCatsData.length, 'countries:', locationsData.length, 'country aggregate:', countryAggregateData.length);
+        logger.debug('[Init] HS categories:', hsCodeCatsData.length, 'countries:', locationsData.length);
         
         // 处理 HS Code Categories
         let finalHsCodeCats = hsCodeCatsData;
@@ -252,7 +246,20 @@ const App: React.FC = () => {
             region: loc.region,
             continent: loc.continent
           }));
-        } else if (countryAggregateData.length > 0) {
+        } else {
+          const countryAggregateData = await countryTradeStatsAPI.getCountryAggregate({
+            tradeDirection: 'all',
+            startYearMonth: startDate,
+            endYearMonth: endDate,
+            limit: 300,
+          });
+
+          if (countryAggregateData.length === 0) {
+            setCountries([]);
+            logger.debug('[Init] No country aggregate fallback data available');
+            return;
+          }
+
           // 使用国家坐标映射表生成 countries
           const countryCoords = getCountriesFromCodes(countryAggregateData.map((item) => item.countryCode));
           finalCountries = countryCoords.map(coord => ({
@@ -1381,11 +1388,8 @@ const App: React.FC = () => {
                         <div className="h-[540px]">
                           <SupplyMap 
                             shipments={shipmentsForMap}
-                            transactions={[]}
                             selectedCountries={currentMapFilters.selectedCountries}
                             countries={countries}
-                            companies={[]}
-                            categories={[]}
                             filters={currentMapFilters}
                             isPreview={isInteracting}
                           />
@@ -1753,21 +1757,7 @@ const App: React.FC = () => {
               controls={companyDashboardControls}
               setControls={setCompanyDashboardControls}
             />
-          ) : (
-            <div className="pr-4">
-              <div className="mb-10">
-                <h2 className="text-[32px] font-bold tracking-tight text-[#1D1D1F]">{t('app.networkInsights')}</h2>
-                <p className="text-[#86868B] text-[16px] font-medium mt-1">{t('app.realTimeMetrics')}</p>
-              </div>
-              {initialLoading ? (
-                <div className="flex items-center justify-center h-full">
-                  <div className="text-[#86868B]">{t('app.loading')}</div>
-                </div>
-              ) : (
-                <StatsPanel transactions={[]} />
-              )}
-            </div>
-          )}
+          ) : null}
           </Suspense>
 
         </section>
@@ -1779,20 +1769,31 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* AI 助手 */}
-      <Suspense fallback={null}>
-        <AIAssistant 
-          onSendMessage={async (
-            message: string,
-            history: ChatMessage[],
-            onChunk: (chunk: string) => void,
-            onComplete: () => void,
-            onError: (error: string) => void
-          ) => {
-            await chatAPI.sendMessage(message, history, onChunk, onComplete, onError);
-          }}
-        />
-      </Suspense>
+      {assistantLoaded ? (
+        <Suspense fallback={null}>
+          <AIAssistant
+            initialOpen
+            onSendMessage={async (
+              message: string,
+              history: ChatMessage[],
+              onChunk: (chunk: string) => void,
+              onComplete: () => void,
+              onError: (error: string) => void
+            ) => {
+              await chatAPI.sendMessage(message, history, onChunk, onComplete, onError);
+            }}
+          />
+        </Suspense>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setAssistantLoaded(true)}
+          className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-br from-[#007AFF] to-[#5856D6] rounded-full shadow-lg hover:shadow-xl transition-all flex items-center justify-center hover:scale-110 z-50"
+          aria-label={t('ai.assistant')}
+        >
+          <MessageCircle className="w-6 h-6 text-white" />
+        </button>
+      )}
     </div>
   );
 };

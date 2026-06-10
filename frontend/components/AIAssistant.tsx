@@ -11,6 +11,7 @@ interface Message {
 }
 
 interface AIAssistantProps {
+  initialOpen?: boolean;
   // 后端 API 接口（流式）
   onSendMessage?: (
     message: string,
@@ -21,9 +22,9 @@ interface AIAssistantProps {
   ) => Promise<void>;
 }
 
-const AIAssistant: React.FC<AIAssistantProps> = ({ onSendMessage }) => {
+const AIAssistant: React.FC<AIAssistantProps> = ({ initialOpen = false, onSendMessage }) => {
   const { t, language } = useLanguage();
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(initialOpen);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -362,4 +363,3 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onSendMessage }) => {
 };
 
 export default AIAssistant;
-

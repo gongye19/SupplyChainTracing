@@ -1,32 +1,25 @@
 
 import React, { useEffect, useRef, useMemo, useState } from 'react';
 import * as d3 from 'd3';
-import { Shipment, CountryLocation, Category, Transaction, CompanyWithLocation, Filters } from '../types';
+import { Shipment, CountryLocation, Filters } from '../types';
 import { translateMaterials } from '../utils/materialTranslations';
 import { useLanguage } from '../contexts/LanguageContext';
-import { getPortLocation } from '../utils/portLocations';
 import { loadWorldGeoJson } from '../utils/worldGeoJson';
 import { areSupplyMapPropsEqual } from './supplyMapComparator';
 import { logger } from '../utils/logger';
 
 interface SupplyMapProps {
   shipments: Shipment[];
-  transactions: Transaction[];
   selectedCountries: string[];
   countries: CountryLocation[];
-  companies: CompanyWithLocation[];
-  categories: Category[];
-  filters?: Filters; // 添加 filters 属性
+  filters?: Filters;
   isPreview?: boolean;
 }
 
 const SupplyMap: React.FC<SupplyMapProps> = React.memo(({ 
   shipments, 
-  transactions, 
   selectedCountries, 
   countries, 
-  companies, 
-  categories,
   filters,
   isPreview = false 
 }) => {

@@ -46,7 +46,7 @@ const TopCountriesHorizontalBar: React.FC<TopCountriesHorizontalBarProps> = ({
       )}
       <div className="h-[320px]">
         {data.length > 0 ? (
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
             <BarChart data={data} layout="vertical" margin={{ top: 4, right: 12, bottom: 4, left: 12 }}>
               <XAxis
                 type="number"
@@ -90,5 +90,4 @@ const TopCountriesHorizontalBar: React.FC<TopCountriesHorizontalBarProps> = ({
 };
 
 export default TopCountriesHorizontalBar;
-
 
