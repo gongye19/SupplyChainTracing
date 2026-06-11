@@ -6,6 +6,7 @@ from typing import List
 from ..database import get_db
 from ..schemas import CountryLocation
 from ..utils.db_helpers import is_missing_table_error, rows_to_dicts
+from ..utils.country_coordinates import locations_for_codes
 
 router = APIRouter()
 
@@ -29,6 +30,13 @@ def get_country_locations(db: Session = Depends(get_db)):
         return rows_to_dicts(result, result.fetchall())
     except Exception as e:
         if is_missing_table_error(e):
-            return []
+            db.rollback()
+            codes_query = """
+                SELECT origin_country_code AS country_code FROM country_origin_trade_stats
+                UNION
+                SELECT destination_country_code AS country_code FROM country_origin_trade_stats
+            """
+            result = db.execute(text(codes_query))
+            codes = [row.country_code for row in result.fetchall() if row.country_code]
+            return locations_for_codes(codes)
         raise HTTPException(status_code=500, detail=f"数据库查询错误: {str(e)}")
-

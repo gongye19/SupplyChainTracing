@@ -46,19 +46,21 @@ TABLE_SPECS = [
     ),
     TableSpec(
         name="company_monthly_trade_stats",
-        columns=["company_name", "country_code", "role", "year", "month", "sum_of_usd", "trade_count"],
+        columns=["company_name", "country_code", "role", "year", "month", "hs_code", "sum_of_usd", "trade_count"],
         create_sql="""
             company_name TEXT NOT NULL,
             country_code VARCHAR(3),
             role VARCHAR(10) NOT NULL,
             year INTEGER NOT NULL,
             month INTEGER NOT NULL,
+            hs_code VARCHAR(6) NOT NULL,
             sum_of_usd NUMERIC(24,2),
             trade_count INTEGER
         """,
         indexes=[
             ("idx_cmts_company_ym", "(company_name, year, month)"),
             ("idx_cmts_company_role_ym", "(company_name, role, year, month)"),
+            ("idx_cmts_company_hs_ym", "(company_name, hs_code, year, month)"),
         ],
     ),
     TableSpec(
@@ -67,6 +69,8 @@ TABLE_SPECS = [
             "company_name",
             "country_code",
             "role",
+            "year",
+            "month",
             "hs_code",
             "product_desc_zh",
             "product_desc_en",
@@ -77,6 +81,8 @@ TABLE_SPECS = [
             company_name TEXT NOT NULL,
             country_code VARCHAR(3),
             role VARCHAR(10) NOT NULL,
+            year INTEGER NOT NULL,
+            month INTEGER NOT NULL,
             hs_code VARCHAR(6) NOT NULL,
             product_desc_zh TEXT,
             product_desc_en TEXT,
@@ -86,6 +92,7 @@ TABLE_SPECS = [
         indexes=[
             ("idx_chts_company_hs", "(company_name, hs_code)"),
             ("idx_chts_hs_company", "(hs_code, company_name)"),
+            ("idx_chts_company_hs_ym", "(company_name, hs_code, year, month)"),
         ],
     ),
     TableSpec(
@@ -94,6 +101,9 @@ TABLE_SPECS = [
             "company_name",
             "country_code",
             "role",
+            "year",
+            "month",
+            "hs_code",
             "counterparty_name",
             "counterparty_country_code",
             "sum_of_usd",
@@ -103,6 +113,9 @@ TABLE_SPECS = [
             company_name TEXT NOT NULL,
             country_code VARCHAR(3),
             role VARCHAR(10) NOT NULL,
+            year INTEGER NOT NULL,
+            month INTEGER NOT NULL,
+            hs_code VARCHAR(6) NOT NULL,
             counterparty_name TEXT NOT NULL,
             counterparty_country_code VARCHAR(3),
             sum_of_usd NUMERIC(24,2),
@@ -110,6 +123,8 @@ TABLE_SPECS = [
         """,
         indexes=[
             ("idx_ccts_company_role", "(company_name, role)"),
+            ("idx_ccts_company_role_ym", "(company_name, role, year, month)"),
+            ("idx_ccts_company_hs_role", "(company_name, hs_code, role)"),
             ("idx_ccts_company_value", "(company_name, role, sum_of_usd DESC)"),
         ],
     ),

@@ -110,7 +110,13 @@ def normalize_hs(raw: object) -> str:
 
 
 def empty_amount_bucket() -> dict[str, Any]:
-    return {"sum_of_usd": Decimal("0"), "trade_count": 0, "product_desc_zh": None, "product_desc_en": None}
+    return {
+        "sum_of_usd": Decimal("0"),
+        "trade_count": 0,
+        "row_count": 0,
+        "product_desc_zh": None,
+        "product_desc_en": None,
+    }
 
 
 def add_amount(
@@ -122,6 +128,7 @@ def add_amount(
 ) -> None:
     bucket["sum_of_usd"] += amount
     bucket["trade_count"] += trade_count
+    bucket["row_count"] += 1
     if desc_zh and not bucket.get("product_desc_zh"):
         bucket["product_desc_zh"] = desc_zh
     if desc_en and not bucket.get("product_desc_en"):

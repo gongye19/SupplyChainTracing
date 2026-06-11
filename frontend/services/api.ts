@@ -64,6 +64,60 @@ async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> 
 }
 
 export const shipmentsAPI = {
+  getFlows: async (
+    filters?: Partial<Filters>,
+    options?: { signal?: AbortSignal; limit?: number }
+  ): Promise<Shipment[]> => {
+    const params = new URLSearchParams();
+
+    if (filters?.startDate) {
+      if (filters.startDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        params.append('start_year_month', filters.startDate.substring(0, 7));
+      } else if (filters.startDate.match(/^\d{4}-\d{2}$/)) {
+        params.append('start_year_month', filters.startDate);
+      }
+    }
+    if (filters?.endDate) {
+      if (filters.endDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        params.append('end_year_month', filters.endDate.substring(0, 7));
+      } else if (filters.endDate.match(/^\d{4}-\d{2}$/)) {
+        params.append('end_year_month', filters.endDate);
+      }
+    }
+
+    filters?.selectedCountries?.forEach(code => params.append('country', code));
+    if (filters?.tradeDirection) params.append('trade_direction', filters.tradeDirection);
+    filters?.selectedHSCodeCategories?.forEach(prefix => params.append('hs_code_prefix', prefix));
+    params.append('limit', String(options?.limit ?? 20000));
+
+    const data = await fetchAPI<any[]>(`/api/shipments/flows?${params.toString()}`, {
+      signal: options?.signal,
+    });
+    return data.map((item: any) => {
+      const totalValueUsd = readNumber(
+        item.total_value_usd,
+        item.totalValueUsd,
+        item.sum_of_usd,
+        item.sumOfUsd,
+        item.total_trade_value,
+        item.totalTradeValue
+      );
+      return {
+        year: item.year,
+        month: item.month,
+        hsCode: item.hs_code,
+        originCountryCode: item.origin_country_code,
+        destinationCountryCode: item.destination_country_code,
+        totalValueUsd,
+        tradeCount: readNumber(item.trade_count, item.tradeCount),
+        value: totalValueUsd / 1000000,
+        countryOfOrigin: item.country_of_origin || item.origin_country_code,
+        destinationCountry: item.destination_country || item.destination_country_code,
+        date: item.date || undefined,
+      };
+    });
+  },
+
   getAll: async (
     filters?: Partial<Filters>,
     options?: { signal?: AbortSignal; limit?: number }
@@ -103,9 +157,6 @@ export const shipmentsAPI = {
       filters.selectedHSCodeCategories.forEach(prefix => params.append('hs_code_prefix', prefix));
     }
     
-    // 行业筛选（可选）
-    // params.append('industry', 'SemiConductor');
-    
     // 限制返回数量
     params.append('limit', String(options?.limit ?? 50000));
 
@@ -125,7 +176,6 @@ export const shipmentsAPI = {
         year: item.year,
         month: item.month,
         hsCode: item.hs_code,
-        industry: item.industry,
         originCountryCode: item.origin_country_code,
         destinationCountryCode: item.destination_country_code,
         weight: item.weight,
@@ -377,9 +427,6 @@ export const countryTradeStatsAPI = {
     if (filters?.country?.length) {
       filters.country.forEach(c => params.append('country', c));
     }
-    if (filters?.industry) {
-      params.append('industry', filters.industry);
-    }
     if (filters?.tradeDirection) {
       params.append('trade_direction', filters.tradeDirection);
     }
@@ -398,7 +445,6 @@ export const countryTradeStatsAPI = {
       year: item.year,
       month: item.month,
       countryCode: item.country_code,
-      industry: item.industry,
       weight: item.weight ? parseFloat(item.weight) : undefined,
       quantity: item.quantity ? parseFloat(item.quantity) : undefined,
       sumOfUsd: parseFloat(item.sum_of_usd) || 0,
@@ -422,9 +468,6 @@ export const countryTradeStatsAPI = {
     }
     if (filters?.country?.length) {
       filters.country.forEach(c => params.append('country', c));
-    }
-    if (filters?.industry) {
-      params.append('industry', filters.industry);
     }
     if (filters?.tradeDirection) {
       params.append('trade_direction', filters.tradeDirection);
@@ -450,7 +493,6 @@ export const countryTradeStatsAPI = {
   getTrends: async (filters?: {
     hsCode?: string;
     country?: string;
-    industry?: string;
     tradeDirection?: 'import' | 'export' | 'all';
     startYearMonth?: string;
     endYearMonth?: string;
@@ -461,9 +503,6 @@ export const countryTradeStatsAPI = {
     }
     if (filters?.country) {
       params.append('country', filters.country);
-    }
-    if (filters?.industry) {
-      params.append('industry', filters.industry);
     }
     if (filters?.tradeDirection) {
       params.append('trade_direction', filters.tradeDirection);
@@ -491,7 +530,6 @@ export const countryTradeStatsAPI = {
       year?: number;
       month?: number;
       country?: string[];
-      industry?: string;
       tradeDirection?: 'import' | 'export' | 'all';
       metric?: 'trade_value' | 'trade_count';
       startYearMonth?: string;
@@ -511,9 +549,6 @@ export const countryTradeStatsAPI = {
     }
     if (filters?.country?.length) {
       filters.country.forEach(c => params.append('country', c));
-    }
-    if (filters?.industry) {
-      params.append('industry', filters.industry);
     }
     if (filters?.tradeDirection) {
       params.append('trade_direction', filters.tradeDirection);

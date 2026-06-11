@@ -143,27 +143,27 @@ def build_aggregates(source: Path) -> tuple[dict[str, int], dict[str, dict]]:
             )
 
             if importer_name:
-                add_amount(monthly[(importer_name, importer_country, "importer", year, month)], amount, trade_count)
-                add_amount(hs_stats[(importer_name, importer_country, "importer", hs_code)], amount, trade_count, desc_zh, desc_en)
+                add_amount(monthly[(importer_name, importer_country, "importer", year, month, hs_code)], amount, trade_count)
+                add_amount(hs_stats[(importer_name, importer_country, "importer", year, month, hs_code)], amount, trade_count, desc_zh, desc_en)
                 if importer_brand:
                     branded_companies.add(importer_name)
                     brand_by_company.setdefault(importer_name, importer_brand)
                 if exporter_name:
                     add_amount(
-                        counterparty[(importer_name, importer_country, "importer", exporter_name, export_side_country)],
+                        counterparty[(importer_name, importer_country, "importer", year, month, hs_code, exporter_name, export_side_country)],
                         amount,
                         trade_count,
                     )
 
             if exporter_name:
-                add_amount(monthly[(exporter_name, export_side_country, "exporter", year, month)], amount, trade_count)
-                add_amount(hs_stats[(exporter_name, export_side_country, "exporter", hs_code)], amount, trade_count, desc_zh, desc_en)
+                add_amount(monthly[(exporter_name, export_side_country, "exporter", year, month, hs_code)], amount, trade_count)
+                add_amount(hs_stats[(exporter_name, export_side_country, "exporter", year, month, hs_code)], amount, trade_count, desc_zh, desc_en)
                 if exporter_brand:
                     branded_companies.add(exporter_name)
                     brand_by_company.setdefault(exporter_name, exporter_brand)
                 if importer_name:
                     add_amount(
-                        counterparty[(exporter_name, export_side_country, "exporter", importer_name, importer_country)],
+                        counterparty[(exporter_name, export_side_country, "exporter", year, month, hs_code, importer_name, importer_country)],
                         amount,
                         trade_count,
                     )

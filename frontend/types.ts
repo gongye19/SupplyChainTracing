@@ -251,7 +251,6 @@ export interface CountryTradeFilters {
   year?: number;
   month?: number;
   country?: string[];
-  industry?: string;
   startYearMonth?: string; // YYYY-MM
   endYearMonth?: string; // YYYY-MM
   limit?: number;

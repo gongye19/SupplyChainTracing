@@ -238,6 +238,7 @@ def get_company_dashboard(
     if company_country:
         monthly_where += " AND country_code = :country_code"
     monthly_where, params = _date_filter(monthly_where, params, start_year_month, end_year_month)
+    monthly_where, params = _hs_filter(monthly_where, params, hs_code, hs_code_prefix)
 
     summary_query = f"""
         WITH base AS (
@@ -250,6 +251,7 @@ def get_company_dashboard(
             COALESCE(SUM(trade_count), 0) AS total_trade_count,
             COALESCE(SUM(CASE WHEN role = 'importer' THEN sum_of_usd ELSE 0 END), 0) AS import_trade_value,
             COALESCE(SUM(CASE WHEN role = 'exporter' THEN sum_of_usd ELSE 0 END), 0) AS export_trade_value,
+            COUNT(*) AS records_count,
             CASE
                 WHEN COUNT(DISTINCT role) > 1 THEN 'both'
                 ELSE COALESCE(MIN(role), 'unknown')
@@ -269,7 +271,7 @@ def get_company_dashboard(
     if result is None:
         raise HTTPException(status_code=404, detail="公司数据不可用")
     row = result.fetchone()
-    if not row or (row.total_trade_count or 0) == 0:
+    if not row or (row.records_count or 0) == 0:
         raise HTTPException(status_code=404, detail="未找到公司")
     summary = dict(row._mapping)
     brand_params = {"name": company_name}
@@ -284,15 +286,40 @@ def get_company_dashboard(
     if company_country:
         hs_params["country_code"] = company_country
         hs_where += " AND country_code = :country_code"
+    hs_where, hs_params = _date_filter(hs_where, hs_params, start_year_month, end_year_month)
     hs_where, hs_params = _hs_filter(hs_where, hs_params, hs_code, hs_code_prefix)
     order_metric, secondary_metric, share_denominator = _ranking_sql(metric)
     counterparty_params = {"name": company_name, "limit": limit}
-    importer_counterparty_where = "company_name = :name AND role = 'importer'"
-    exporter_counterparty_where = "company_name = :name AND role = 'exporter'"
+    importer_counterparty_where = " WHERE company_name = :name AND role = 'importer'"
+    exporter_counterparty_where = " WHERE company_name = :name AND role = 'exporter'"
     if company_country:
         counterparty_params["country_code"] = company_country
         importer_counterparty_where += " AND country_code = :country_code"
         exporter_counterparty_where += " AND country_code = :country_code"
+    importer_counterparty_where, counterparty_params = _date_filter(
+        importer_counterparty_where,
+        counterparty_params,
+        start_year_month,
+        end_year_month,
+    )
+    exporter_counterparty_where, counterparty_params = _date_filter(
+        exporter_counterparty_where,
+        counterparty_params,
+        start_year_month,
+        end_year_month,
+    )
+    importer_counterparty_where, counterparty_params = _hs_filter(
+        importer_counterparty_where,
+        counterparty_params,
+        hs_code,
+        hs_code_prefix,
+    )
+    exporter_counterparty_where, counterparty_params = _hs_filter(
+        exporter_counterparty_where,
+        counterparty_params,
+        hs_code,
+        hs_code_prefix,
+    )
 
     categories_query = f"""
         WITH agg AS (
@@ -339,7 +366,7 @@ def get_company_dashboard(
                 COALESCE(SUM(sum_of_usd), 0) AS sum_of_usd,
                 COALESCE(SUM(trade_count), 0) AS trade_count
             FROM company_counterparty_trade_stats
-            WHERE {importer_counterparty_where}
+            {importer_counterparty_where}
             GROUP BY counterparty_name, counterparty_country_code
         )
         SELECT
@@ -367,7 +394,7 @@ def get_company_dashboard(
                 COALESCE(SUM(sum_of_usd), 0) AS sum_of_usd,
                 COALESCE(SUM(trade_count), 0) AS trade_count
             FROM company_counterparty_trade_stats
-            WHERE {exporter_counterparty_where}
+            {exporter_counterparty_where}
             GROUP BY counterparty_name, counterparty_country_code
         )
         SELECT

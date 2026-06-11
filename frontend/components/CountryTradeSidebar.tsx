@@ -21,7 +21,6 @@ const CountryTradeSidebar: React.FC<CountryTradeSidebarProps> = ({
     setFilters({
       hsCode: [],
       tradeDirection: 'import',
-      industry: 'SemiConductor',
       startYearMonth: '2021-01',
       endYearMonth: currentMonth,
     });
@@ -88,4 +87,3 @@ const CountryTradeSidebar: React.FC<CountryTradeSidebarProps> = ({
 };
 
 export default CountryTradeSidebar;
-

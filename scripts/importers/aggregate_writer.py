@@ -24,7 +24,7 @@ def write_csvs(
     }
 
     name_totals: dict[str, Decimal] = defaultdict(lambda: Decimal("0"))
-    for (company, _country, _role, _year, _month), bucket in aggregates["monthly"].items():
+    for (company, _country, _role, _year, _month, _hs_code), bucket in aggregates["monthly"].items():
         name_totals[company] += bucket["sum_of_usd"]
 
     top_company_names = set()
@@ -52,15 +52,19 @@ def write_csvs(
 
     with paths["company_monthly_trade_stats"].open("w", newline="", encoding="utf-8") as fh:
         writer = csv.writer(fh)
-        for (company, country, role, year, month), bucket in aggregates["monthly"].items():
+        for (company, country, role, year, month, hs_code), bucket in aggregates["monthly"].items():
             if company not in included_company_names:
                 continue
-            writer.writerow([company, country, role, year, month, bucket["sum_of_usd"], bucket["trade_count"]])
+            writer.writerow([company, country, role, year, month, hs_code, bucket["sum_of_usd"], bucket["trade_count"]])
             totals = role_totals[(company, country)]
             if role == "importer":
                 totals["import"] = totals["import"] + bucket["sum_of_usd"]
+                totals["import_count"] = int(totals.get("import_count", 0)) + bucket["trade_count"]
+                totals["import_rows"] = int(totals.get("import_rows", 0)) + bucket.get("row_count", 1)
             else:
                 totals["export"] = totals["export"] + bucket["sum_of_usd"]
+                totals["export_count"] = int(totals.get("export_count", 0)) + bucket["trade_count"]
+                totals["export_rows"] = int(totals.get("export_rows", 0)) + bucket.get("row_count", 1)
             totals["trade_count"] = int(totals["trade_count"]) + bucket["trade_count"]
 
     with paths["company_search_stats"].open("w", newline="", encoding="utf-8") as fh:
@@ -68,7 +72,9 @@ def write_csvs(
         for (company, country), totals in role_totals.items():
             import_value = totals["import"]
             export_value = totals["export"]
-            role = "both" if import_value and export_value else "importer" if import_value else "exporter"
+            import_rows = int(totals.get("import_rows", 0))
+            export_rows = int(totals.get("export_rows", 0))
+            role = "both" if import_rows and export_rows else "importer" if import_rows else "exporter"
             writer.writerow([
                 company,
                 company_brands.get(company, ""),
@@ -82,13 +88,15 @@ def write_csvs(
 
     with paths["company_hs_trade_stats"].open("w", newline="", encoding="utf-8") as fh:
         writer = csv.writer(fh)
-        for (company, country, role, hs_code), bucket in aggregates["hs"].items():
+        for (company, country, role, year, month, hs_code), bucket in aggregates["hs"].items():
             if company not in included_company_names:
                 continue
             writer.writerow([
                 company,
                 country,
                 role,
+                year,
+                month,
                 hs_code,
                 bucket["product_desc_zh"],
                 bucket["product_desc_en"],
@@ -100,15 +108,48 @@ def write_csvs(
         writer = csv.writer(fh)
         grouped_counterparties: dict[tuple, list[tuple[tuple, dict]]] = defaultdict(list)
         for key, bucket in aggregates["counterparty"].items():
-            company, country, role, _counterparty_name, _counterparty_country = key
+            company, country, role, _year, _month, _hs_code, counterparty_name, counterparty_country = key
             if company not in included_company_names:
                 continue
-            grouped_counterparties[(company, country, role)].append((key, bucket))
+            grouped_counterparties[(company, country, role, counterparty_name, counterparty_country)].append((key, bucket))
 
-        for rows in grouped_counterparties.values():
-            rows.sort(key=lambda item: (item[1]["sum_of_usd"], item[1]["trade_count"]), reverse=True)
-            for (company, country, role, counterparty_name, counterparty_country), bucket in rows[:top_counterparties_per_company_role]:
-                writer.writerow([company, country, role, counterparty_name, counterparty_country, bucket["sum_of_usd"], bucket["trade_count"]])
+        selected_pairs: set[tuple] | None = None
+        if top_counterparties_per_company_role > 0:
+            pair_totals: dict[tuple, dict[str, Decimal | int]] = defaultdict(
+                lambda: {"sum_of_usd": Decimal("0"), "trade_count": 0}
+            )
+            for pair_key, rows in grouped_counterparties.items():
+                for _key, bucket in rows:
+                    pair_totals[pair_key]["sum_of_usd"] = pair_totals[pair_key]["sum_of_usd"] + bucket["sum_of_usd"]
+                    pair_totals[pair_key]["trade_count"] = int(pair_totals[pair_key]["trade_count"]) + bucket["trade_count"]
+
+            by_company_role: dict[tuple, list[tuple[tuple, dict[str, Decimal | int]]]] = defaultdict(list)
+            for pair_key, totals in pair_totals.items():
+                company, country, role, _counterparty_name, _counterparty_country = pair_key
+                by_company_role[(company, country, role)].append((pair_key, totals))
+
+            selected_pairs = set()
+            for rows in by_company_role.values():
+                rows.sort(key=lambda item: (item[1]["sum_of_usd"], item[1]["trade_count"]), reverse=True)
+                selected_pairs.update(pair_key for pair_key, _totals in rows[:top_counterparties_per_company_role])
+
+        for pair_key, rows in grouped_counterparties.items():
+            if selected_pairs is not None and pair_key not in selected_pairs:
+                continue
+            rows.sort(key=lambda item: (item[0][3], item[0][4], item[0][5], item[1]["sum_of_usd"]), reverse=False)
+            for (company, country, role, year, month, hs_code, counterparty_name, counterparty_country), bucket in rows:
+                writer.writerow([
+                    company,
+                    country,
+                    role,
+                    year,
+                    month,
+                    hs_code,
+                    counterparty_name,
+                    counterparty_country,
+                    bucket["sum_of_usd"],
+                    bucket["trade_count"],
+                ])
 
     with paths["country_origin_trade_stats"].open("w", newline="", encoding="utf-8") as fh:
         writer = csv.writer(fh)

@@ -125,7 +125,6 @@ const App: React.FC = () => {
   const [countryTradeFilters, setCountryTradeFilters] = useState<CountryTradeFilters>({
     hsCode: [],
     tradeDirection: 'import',
-    industry: 'SemiConductor',
     startYearMonth: '2021-01',
     endYearMonth: endDate,
   });
@@ -300,7 +299,6 @@ const App: React.FC = () => {
         hsCodes,
         requestFilters.tradeDirection || 'all',
         countriesFilter,
-        requestFilters.industry || '',
         requestFilters.year || '',
         requestFilters.month || '',
         requestFilters.startYearMonth || '',
@@ -341,7 +339,6 @@ const App: React.FC = () => {
           countryTradeStatsAPI.getSummary(requestFilters),
           countryTradeStatsAPI.getTrends({
             hsCode: requestFilters.hsCode?.[0],
-            industry: requestFilters.industry,
             tradeDirection: requestFilters.tradeDirection,
             startYearMonth: requestFilters.startYearMonth,
             endYearMonth: requestFilters.endYearMonth,
@@ -349,7 +346,6 @@ const App: React.FC = () => {
           countryTradeStatsAPI.getTopCountries({
             hsCode: requestFilters.hsCode,
             country: requestFilters.country,
-            industry: requestFilters.industry,
             tradeDirection: requestFilters.tradeDirection,
             startYearMonth: requestFilters.startYearMonth,
             endYearMonth: requestFilters.endYearMonth,
@@ -594,9 +590,9 @@ const App: React.FC = () => {
 
       logger.debug(`[Shipments] Loading (${mode})`, filtersToUse);
       const startTime = performance.now();
-      const data = await shipmentsAPI.getAll(filtersToUse, {
+      const data = await shipmentsAPI.getFlows(filtersToUse, {
         signal: controller.signal,
-        limit: mode === 'preview' ? 1200 : 5000,
+        limit: mode === 'preview' ? 1200 : 20000,
       });
       const duration = performance.now() - startTime;
 
