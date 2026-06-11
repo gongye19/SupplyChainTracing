@@ -1,15 +1,12 @@
-from fastapi import FastAPI, Depends, Request, status
+from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from starlette.middleware.base import BaseHTTPMiddleware
-from sqlalchemy.orm import Session
 import os
 import re
 
-from .routes import chat, hs_code_categories, country_locations as port_locations_route, country_locations_compat, shipments, country_trade_stats, companies
-from .database import get_db
+from .routes import chat, hs_code_categories, country_locations as port_locations_route, country_locations_compat, shipments, country_trade_stats, companies, insights_agent
 from .utils.logger import get_logger
 
 app = FastAPI(title="Supply Chain API", version="1.0.0")
@@ -135,20 +132,6 @@ async def general_exception_handler(request: Request, exc: Exception):
     
     return response
 
-# CORS 调试中间件（可选，用于调试）
-class CORSDebugMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        origin = request.headers.get("origin")
-        if origin:
-            is_allowed = origin in cors_origins or (re.match(vercel_origin_regex, origin) if vercel_origin_regex else False)
-            logger.debug("[CORS Debug] Origin=%s Allowed=%s", origin, is_allowed)
-        
-        response = await call_next(request)
-        return response
-
-# 添加 CORS 调试中间件（仅在需要时启用）
-# app.add_middleware(CORSDebugMiddleware)
-
 # 注册路由（仅保留当前数据链路使用的接口）
 app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 app.include_router(shipments.router, prefix="/api/shipments", tags=["shipments"])
@@ -158,6 +141,7 @@ app.include_router(port_locations_route.router, prefix="/api/port-locations", ta
 app.include_router(country_locations_compat.router, prefix="/api/country-locations", tags=["country-locations"])
 app.include_router(country_trade_stats.router, prefix="/api/country-trade-stats", tags=["country-trade-stats"])
 app.include_router(companies.router, prefix="/api/companies", tags=["companies"])
+app.include_router(insights_agent.router, prefix="/api/insights-agent", tags=["insights-agent"])
 
 @app.get("/")
 def root():
@@ -166,58 +150,3 @@ def root():
 @app.get("/api/health")
 def health():
     return {"status": "healthy"}
-
-@app.get("/api/debug/cors")
-def debug_cors(request: Request):
-    """调试端点：查看 CORS 配置"""
-    origin = request.headers.get("origin", "无")
-    is_allowed = False
-    match_type = None
-    
-    if origin != "无":
-        if origin in cors_origins:
-            is_allowed = True
-            match_type = "精确匹配"
-        elif re.match(vercel_origin_regex, origin):
-            is_allowed = True
-            match_type = "正则匹配"
-    
-    return {
-        "cors_origins": cors_origins,
-        "vercel_origin_regex": vercel_origin_regex,
-        "cors_origins_env": os.getenv("CORS_ORIGINS", "未设置"),
-        "current_origin": origin,
-        "is_allowed": is_allowed,
-        "match_type": match_type
-    }
-
-@app.get("/api/debug/db")
-def debug_db(db: Session = Depends(get_db)):
-    """调试端点：测试数据库连接和表是否存在"""
-    from sqlalchemy import text
-    try:
-        # 检查表是否存在
-        result = db.execute(text("""
-            SELECT table_name 
-            FROM information_schema.tables 
-            WHERE table_schema = 'public' 
-            AND table_name IN (
-                'company_search_stats',
-                'company_monthly_trade_stats',
-                'company_hs_trade_stats',
-                'company_counterparty_trade_stats',
-                'country_origin_trade_stats'
-            )
-            ORDER BY table_name
-        """))
-        tables = [row[0] for row in result.fetchall()]
-        
-        return {
-            "status": "connected",
-            "tables_found": tables,
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "error": str(e)
-        }

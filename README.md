@@ -8,12 +8,12 @@
 supplychain/
 ├── docker-compose.yml          # 顶层Docker Compose配置
 ├── data/                       # 数据文件目录
-│   └── synthetic_data.csv     # 交易数据CSV
+│   └── pure_company_pair_usd_count.zip # 公司对贸易数据（不入库）
 ├── backend/                    # 后端服务
 │   ├── app/                    # FastAPI应用
 │   └── Dockerfile
 ├── scripts/                    # 项目脚本
-│   └── upload_pure_country_pair.py # 唯一数据上传脚本
+│   └── upload_company_trade_flows.py # 数据上传脚本
 ├── frontend/                   # 前端应用
 │   ├── components/            # React组件
 │   ├── services/              # API服务
@@ -48,14 +48,14 @@ cd ..
 运行导入脚本：
 
 ```bash
-python scripts/upload_pure_country_pair.py
+python scripts/upload_company_trade_flows.py --clear
 ```
 
 或者指定CSV路径：
 
 ```bash
 DATABASE_URL=postgresql://postgres:123456@localhost:5433/supplychain \
-python scripts/upload_pure_country_pair.py
+python scripts/upload_company_trade_flows.py --clear
 ```
 
 #### 3. 启动所有服务
@@ -113,7 +113,7 @@ docker-compose restart frontend
 docker-compose stop backend frontend
 
 # 重新导入（会先清理旧表再导入）
-python scripts/upload_pure_country_pair.py --clear
+python scripts/upload_company_trade_flows.py --clear
 ```
 
 ### 查看数据库
@@ -168,7 +168,7 @@ docker-compose ps db
 docker-compose exec db pg_isready -U postgres
 ```
 
-检查 `data/pure_country_pair_usd_count` 路径是否正确。
+检查 `data/pure_company_pair_usd_count.zip` 路径是否正确。
 
 ### 前端无法连接后端
 
@@ -185,4 +185,3 @@ curl http://localhost:8001/api/health
 - **前端**: React 19 + TypeScript + Vite + D3.js + Recharts
 - **后端**: FastAPI + SQLAlchemy + PostgreSQL
 - **部署**: Docker + Docker Compose
-

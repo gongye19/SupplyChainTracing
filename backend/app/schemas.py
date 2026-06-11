@@ -1,170 +1,5 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List
-from datetime import datetime
-
-# ── 旧版 Schema（保留，但不再有对应数据表） ──
-
-class CategoryBase(BaseModel):
-    id: str
-    name: str
-    display_name: str
-    color: str
-    icon: Optional[str] = None
-    description: Optional[str] = None
-    sort_order: int = 0
-    is_active: bool = True
-
-class Category(CategoryBase):
-    created_at: datetime
-    updated_at: datetime
-    class Config:
-        from_attributes = True
-
-class CompanyBase(BaseModel):
-    id: str
-    name: str
-    country_code: str
-    country_name: str
-    city: str
-    type: str
-    industry: Optional[str] = None
-    website: Optional[str] = None
-
-class Company(CompanyBase):
-    created_at: datetime
-    updated_at: datetime
-    class Config:
-        from_attributes = True
-
-class LocationBase(BaseModel):
-    id: str
-    type: str
-    country_code: str
-    country_name: str
-    city: Optional[str] = None
-    latitude: float
-    longitude: float
-    region: Optional[str] = None
-    continent: Optional[str] = None
-    address: Optional[str] = None
-
-class Location(LocationBase):
-    created_at: datetime
-    updated_at: datetime
-    class Config:
-        from_attributes = True
-
-class CompanyWithLocation(BaseModel):
-    id: str
-    name: str
-    country_code: str
-    country_name: str
-    city: str
-    type: str
-    industry: Optional[str] = None
-    website: Optional[str] = None
-    latitude: float
-    longitude: float
-    region: Optional[str] = None
-    continent: Optional[str] = None
-    class Config:
-        from_attributes = True
-
-class TransactionBase(BaseModel):
-    id: str
-    exporter_company_id: Optional[str] = None
-    importer_company_id: Optional[str] = None
-    origin_country_code: str
-    origin_country_name: str
-    destination_country_code: str
-    destination_country_name: str
-    material: str
-    category_id: str
-    quantity: float
-    unit: Optional[str] = None
-    price: float
-    total_value: float
-    transaction_date: datetime
-    status: str = "completed"
-    notes: Optional[str] = None
-
-class Transaction(TransactionBase):
-    created_at: datetime
-    updated_at: datetime
-    class Config:
-        from_attributes = True
-
-class TransactionResponse(BaseModel):
-    id: str
-    exporter_company_id: Optional[str] = None
-    exporter_company_name: Optional[str] = None
-    exporter_country_code: str
-    exporter_country_name: str
-    importer_company_id: Optional[str] = None
-    importer_company_name: Optional[str] = None
-    importer_country_code: str
-    importer_country_name: str
-    material: str
-    category_id: str
-    category_name: str
-    category_color: str
-    quantity: float
-    unit: Optional[str] = None
-    price: float
-    total_value: float
-    transaction_date: datetime
-    status: str
-    notes: Optional[str] = None
-    class Config:
-        from_attributes = True
-
-class PaginationInfo(BaseModel):
-    total: int
-    page: int
-    limit: int
-    total_pages: int
-
-class TransactionListResponse(BaseModel):
-    transactions: List[TransactionResponse]
-    pagination: PaginationInfo
-
-class CategoryBreakdown(BaseModel):
-    category_id: str
-    category_name: str
-    count: int
-    total_value: float
-
-class TopRoute(BaseModel):
-    origin_country: str
-    destination_country: str
-    transaction_count: int
-    total_value: float
-
-class StatsResponse(BaseModel):
-    total_transactions: int
-    total_value: float
-    active_countries: int
-    active_companies: int
-    category_breakdown: List[CategoryBreakdown]
-    top_routes: List[TopRoute]
-
-class MonthlyCompanyFlow(BaseModel):
-    year_month: str
-    exporter_name: str
-    importer_name: str
-    origin_country: str
-    destination_country: str
-    hs_codes: Optional[str] = None
-    transport_mode: Optional[str] = None
-    trade_term: Optional[str] = None
-    transaction_count: int
-    total_value_usd: float
-    total_weight_kg: Optional[float] = None
-    total_quantity: Optional[float] = None
-    first_transaction_date: Optional[str] = None
-    last_transaction_date: Optional[str] = None
-    class Config:
-        from_attributes = True
 
 class HSCodeCategory(BaseModel):
     hs_code: str
@@ -323,3 +158,26 @@ class CompanyDashboardResponse(BaseModel):
     top_suppliers: List[CompanyRankItem]
     top_customers: List[CompanyRankItem]
     trends: List[CompanyTrendPoint]
+
+
+# ── Future insight agent extension point ───────────────────────────────
+
+class InsightAgentStatus(BaseModel):
+    enabled: bool
+    name: str
+    supported_sources: List[str]
+    message: str
+
+
+class InsightAgentPreviewRequest(BaseModel):
+    brands: List[str] = Field(default_factory=list)
+    start_year_month: Optional[str] = None
+    end_year_month: Optional[str] = None
+    include_news: bool = True
+    include_trade: bool = True
+
+
+class InsightAgentPreviewResponse(BaseModel):
+    enabled: bool
+    message: str
+    requested_brands: List[str] = Field(default_factory=list)

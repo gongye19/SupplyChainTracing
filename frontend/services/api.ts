@@ -15,6 +15,9 @@ import {
   CompanyDashboardData,
   CompanyFilterOptions,
   CompanySearchResult,
+  InsightAgentPreviewRequest,
+  InsightAgentPreviewResponse,
+  InsightAgentStatus,
   Location,
 } from '../types';
 import { logger } from '../utils/logger';
@@ -322,6 +325,36 @@ export const chatAPI = {
       logger.error('[Chat] Error in sendMessage:', error);
       onError(error instanceof Error ? error.message : 'Unknown error');
     }
+  },
+};
+
+export const insightsAgentAPI = {
+  getStatus: async (): Promise<InsightAgentStatus> => {
+    const data = await fetchAPI<any>('/api/insights-agent/status');
+    return {
+      enabled: Boolean(data.enabled),
+      name: data.name,
+      supportedSources: data.supported_sources || [],
+      message: data.message,
+    };
+  },
+
+  preview: async (request: InsightAgentPreviewRequest = {}): Promise<InsightAgentPreviewResponse> => {
+    const data = await fetchAPI<any>('/api/insights-agent/preview', {
+      method: 'POST',
+      body: JSON.stringify({
+        brands: request.brands || [],
+        start_year_month: request.startYearMonth,
+        end_year_month: request.endYearMonth,
+        include_news: request.includeNews ?? true,
+        include_trade: request.includeTrade ?? true,
+      }),
+    });
+    return {
+      enabled: Boolean(data.enabled),
+      message: data.message,
+      requestedBrands: data.requested_brands || [],
+    };
   },
 };
 

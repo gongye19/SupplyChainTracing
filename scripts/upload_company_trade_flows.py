@@ -3,8 +3,8 @@
 Upload company-level trade data as compact dashboard aggregates.
 
 Source:
-  data/pure_company_pair_usd_count.zip (preferred, CSV)
-  data/hkust_文件汇总/*.xlsx (legacy fallback)
+  data/pure_company_pair_usd_count.zip (CSV, preferred)
+  or a CSV file/directory with the same schema
 
 Targets:
   company_search_stats
@@ -33,7 +33,6 @@ from sqlalchemy import create_engine, text
 
 from importers.aggregate_writer import write_csvs
 from importers.company_pair_csv import build_aggregates as build_company_pair_aggregates
-from importers.hkust_company import build_aggregates as build_hkust_aggregates
 from importers.schema import TABLE_COLUMNS, create_indexes, create_tables, drop_tables, swap_staging_tables
 
 
@@ -197,10 +196,7 @@ def validate_loaded_tables(engine, table_suffix: str) -> dict[str, int]:
 
 
 def pick_default_source(project_root: Path) -> Path:
-    zip_source = project_root / "data" / "pure_company_pair_usd_count.zip"
-    if zip_source.exists():
-        return zip_source
-    return project_root / "data" / "hkust_文件汇总"
+    return project_root / "data" / "pure_company_pair_usd_count.zip"
 
 
 def load_brand_company_map(path: Path) -> dict[str, str]:
@@ -226,15 +222,13 @@ def load_brand_company_map(path: Path) -> dict[str, str]:
 
 
 def build_source_aggregates(source: Path) -> tuple[dict[str, int], dict[str, dict]]:
-    if source.is_file() and source.suffix.lower() in {".zip", ".csv"}:
-        return build_company_pair_aggregates(source)
-    return build_hkust_aggregates(source)
+    return build_company_pair_aggregates(source)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Upload company-level trade data as compact aggregates.")
-    parser.add_argument("--source", default=None, help="Source zip/csv file or legacy HKUST XLSX directory")
-    parser.add_argument("--data-dir", default=None, help="Directory containing HKUST XLSX files")
+    parser.add_argument("--source", default=None, help="Source zip/csv file or CSV directory")
+    parser.add_argument("--data-dir", default=None, help="Backward compatible alias for --source")
     parser.add_argument("--brand-list", default=None, help="Optional Excel brand company list; defaults to 215-brand workbook when present")
     parser.add_argument("--database-url", default=None, help="PostgreSQL connection URL")
     parser.add_argument("--clear", action="store_true", help="Backward compatible no-op; imports always rebuild via staging")

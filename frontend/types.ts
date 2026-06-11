@@ -1,61 +1,4 @@
-
-// 品类信息
-export interface Category {
-  id: string;
-  name: string;
-  displayName: string;
-  color: string;
-  icon?: string;
-  description?: string;
-  sortOrder: number;
-  isActive: boolean;
-}
-
-// 公司信息
-export interface Company {
-  id: string;
-  name: string;
-  countryCode: string;
-  countryName: string;
-  city: string;
-  type: 'importer' | 'exporter' | 'both';
-  industry?: string;
-  website?: string;
-}
-
-// 公司信息（带位置）
-export interface CompanyWithLocation extends Company {
-  latitude: number;
-  longitude: number;
-  region?: string;
-  continent?: string;
-}
-
-// 交易记录
-export interface Transaction {
-  id: string;
-  exporterCompanyId?: string;
-  exporterCompanyName?: string;
-  exporterCountryCode: string;
-  exporterCountryName: string;
-  importerCompanyId?: string;
-  importerCompanyName?: string;
-  importerCountryCode: string;
-  importerCountryName: string;
-  material: string;
-  categoryId: string;
-  categoryName: string;
-  categoryColor: string;
-  quantity: number;
-  unit?: string;
-  price: number;
-  totalValue: number;
-  transactionDate: string;
-  status: 'completed' | 'in-transit' | 'pending' | 'cancelled';
-  notes?: string;
-}
-
-// 位置信息
+// 国家位置信息 API 原始响应
 export interface Location {
   id: string;
   type: 'country' | 'city';
@@ -105,24 +48,6 @@ export interface Shipment {
   value?: number;
   status?: string;
   timestamp?: string;
-}
-
-// 月度公司流量（聚合表）
-export interface MonthlyCompanyFlow {
-  yearMonth: string;
-  exporterName: string;
-  importerName: string;
-  originCountry: string;
-  destinationCountry: string;
-  hsCodes: string; // 逗号分隔的HS Code列表
-  transportMode: string;
-  tradeTerm: string;
-  transactionCount: number;
-  totalValueUsd: number;
-  totalWeightKg: number;
-  totalQuantity: number;
-  firstTransactionDate: string;
-  lastTransactionDate: string;
 }
 
 // HS Code 品类
@@ -295,6 +220,27 @@ export interface CompanyDashboardControls {
   selectedHsPrefix: string;
   selectedRole: CompanyRoleFilter;
   rankMetric: CompanyRankMetric;
+}
+
+export interface InsightAgentStatus {
+  enabled: boolean;
+  name: string;
+  supportedSources: string[];
+  message: string;
+}
+
+export interface InsightAgentPreviewRequest {
+  brands?: string[];
+  startYearMonth?: string;
+  endYearMonth?: string;
+  includeNews?: boolean;
+  includeTrade?: boolean;
+}
+
+export interface InsightAgentPreviewResponse {
+  enabled: boolean;
+  message: string;
+  requestedBrands: string[];
 }
 
 // 国家贸易统计筛选条件
