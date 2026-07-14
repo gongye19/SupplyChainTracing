@@ -1,187 +1,80 @@
 # Supply Chain Intelligence Platform
 
-全球供应链智能可视化平台，专注于半导体行业的供应链数据可视化与分析。
+Public dashboard and API for semiconductor supply-chain trade intelligence.
 
-## 项目结构
+This repository owns the user-facing application only. Raw datasets, cleaning, aggregation, and production data publication live in the private `supplychain-data-pipeline` repository. Long-running Codex analysis lives in the private `insight-factory` repository.
 
-```
+## Repository layout
+
+```text
 supplychain/
-├── docker-compose.yml          # 顶层Docker Compose配置
-├── data/                       # 数据文件目录
-│   └── pure_company_pair_usd_count.zip # 公司对贸易数据（不入库）
-├── backend/                    # 后端服务
-│   ├── app/                    # FastAPI应用
-│   └── Dockerfile
-├── scripts/                    # 项目脚本
-│   └── upload_company_trade_flows.py # 数据上传脚本
-├── frontend/                   # 前端应用
-│   ├── components/            # React组件
-│   ├── services/              # API服务
-│   └── Dockerfile
-└── database/                   # 数据库数据目录
-    ├── data/                  # PostgreSQL数据
-    └── pgadmin/               # PgAdmin数据
+├── frontend/       React 19 + TypeScript + Vite dashboard
+├── backend/app/    FastAPI query and Insight job API
+├── docs/           Application and deployment documentation
+├── docker-compose.yml
+├── railway.json
+└── README.md
 ```
 
-## 快速开始
+No source datasets or database runtime files belong in this repository.
 
-### 方式一：手动启动（推荐）
+## Local development
 
-#### 1. 启动数据库（仅启动数据库服务）
+Start PostgreSQL:
 
 ```bash
-docker-compose up -d db
+docker compose up -d db
 ```
 
-等待数据库完全启动（健康检查通过，约10-30秒）。
-
-#### 2. 导入数据（在宿主机运行）
-
-确保已安装Python依赖：
+Start the backend:
 
 ```bash
 cd backend
+python3.11 -m venv .venv
+. .venv/bin/activate
 pip install -r requirements.txt
-cd ..
+cp .env.example .env
+uvicorn app.main:app --port 8001 --reload
 ```
 
-运行导入脚本：
+Start the frontend in another terminal:
 
 ```bash
-python scripts/upload_company_trade_flows.py --clear
+cd frontend
+npm install
+npm run dev
 ```
 
-或者指定CSV路径：
+Local endpoints:
 
-```bash
-DATABASE_URL=postgresql://postgres:123456@localhost:5433/supplychain \
-python scripts/upload_company_trade_flows.py --clear
-```
+- Frontend: `http://localhost:3000`
+- API: `http://localhost:8001`
+- API documentation: `http://localhost:8001/docs`
+- PostgreSQL: `localhost:5433`
 
-#### 3. 启动所有服务
+The local database is intentionally empty on first start. Publish synthetic/sample aggregates with `supplychain-data-pipeline`; do not copy raw production data into this repository.
 
-```bash
-docker-compose up -d
-```
+## Production
 
-这将启动：
-- PostgreSQL 数据库 (端口 5433)
-- FastAPI 后端服务 (端口 8000)
-- React 前端服务 (端口 3000)
-- PgAdmin (端口 5051)
+- `frontend/` deploys to Vercel.
+- `backend/` deploys to Railway.
+- Railway PostgreSQL stores dashboard aggregates, Insight job state, and final report content.
+- The laboratory server runs Data Pipeline and Insight Factory workers.
+- The server reaches Railway through outbound HTTPS; no model port is public.
 
-### 4. 访问服务
+## Insight job flow
 
-- **前端应用**: http://localhost:3001
-- **API文档**: http://localhost:8001/docs
-- **PgAdmin**: http://localhost:5051
-  - Email: `admin@example.com`
-  - Password: `admin`
+1. The frontend submits a research question to `POST /api/insight-jobs`.
+2. The Railway API records a queued job.
+3. The server worker claims it through authenticated `/api/internal/insight-jobs/*` endpoints.
+4. Insight Factory analyzes the declared dataset version with the server's Codex model.
+5. The worker uploads reviewed Markdown and HTML.
+6. The frontend polls job status and displays the completed report.
 
-## 开发模式
+Job submission is disabled by default. Set `INSIGHT_JOBS_ENABLED=true`, `DEFAULT_DATASET_VERSION`, and a strong `INSIGHT_WORKER_TOKEN` in Railway only after the server worker is deployed.
 
-### 后端开发
+## Data ownership
 
-后端代码通过volume挂载，修改代码后会自动重载。
+Serving aggregate tables are produced atomically by `supplychain-data-pipeline`. The API treats them as read-only. Application tables such as `insight_jobs` and `insight_reports` are owned by this backend.
 
-```bash
-# 查看后端日志
-docker-compose logs -f backend
-
-# 重启后端服务
-docker-compose restart backend
-```
-
-### 前端开发
-
-前端代码通过volume挂载，修改代码后会自动重载。
-
-```bash
-# 查看前端日志
-docker-compose logs -f frontend
-
-# 重启前端服务
-docker-compose restart frontend
-```
-
-## 数据管理
-
-### 重新导入数据
-
-```bash
-# 停止服务（可选，仅停止数据库即可）
-docker-compose stop backend frontend
-
-# 重新导入（会先清理旧表再导入）
-python scripts/upload_company_trade_flows.py --clear
-```
-
-### 查看数据库
-
-```bash
-# 使用psql
-docker-compose exec db psql -U postgres -d supplychain
-
-# 或使用PgAdmin Web界面
-# http://localhost:5051
-```
-
-## 环境变量
-
-### 后端
-
-在 `docker-compose.yml` 中配置：
-- `DATABASE_URL`: 数据库连接字符串
-- `CORS_ORIGINS`: 允许的CORS源
-
-### 前端
-
-在 `docker-compose.yml` 中配置：
-- `VITE_API_URL`: 后端API地址（默认: http://localhost:8000）
-
-## 停止服务
-
-```bash
-# 停止所有服务
-docker-compose down
-
-# 停止并删除数据卷（谨慎使用）
-docker-compose down -v
-```
-
-## 故障排除
-
-### 数据库连接失败
-
-确保数据库已完全启动：
-
-```bash
-docker-compose ps db
-# 应该显示 "healthy"
-```
-
-### 导入数据失败
-
-检查数据库是否可访问：
-
-```bash
-docker-compose exec db pg_isready -U postgres
-```
-
-检查 `data/pure_company_pair_usd_count.zip` 路径是否正确。
-
-### 前端无法连接后端
-
-检查后端服务是否运行：
-
-```bash
-curl http://localhost:8001/api/health
-```
-
-检查CORS配置是否正确。
-
-## 技术栈
-
-- **前端**: React 19 + TypeScript + Vite + D3.js + Recharts
-- **后端**: FastAPI + SQLAlchemy + PostgreSQL
-- **部署**: Docker + Docker Compose
+Every report records both `dataset_version` and `factory_version` for reproducibility.

@@ -1,15 +1,18 @@
-from pydantic import BaseModel, Field
-from typing import Optional, List
+from pydantic import BaseModel, ConfigDict, Field
+from datetime import datetime
+from typing import Literal, Optional, List
 
 class HSCodeCategory(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     hs_code: str
     chapter_name: str
-    class Config:
-        from_attributes = True
 
 # ── 核心 Schema：国家贸易配对数据 ──────────────────────────────────
 
 class Shipment(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     year: int
     month: int
     hs_code: str
@@ -21,10 +24,10 @@ class Shipment(BaseModel):
     country_of_origin: Optional[str] = None
     destination_country: Optional[str] = None
     date: Optional[str] = None
-    class Config:
-        from_attributes = True
 
 class PortLocation(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     port_name: str
     country_code: str
     country_name: str
@@ -32,30 +35,28 @@ class PortLocation(BaseModel):
     longitude: float
     region: Optional[str] = None
     continent: Optional[str] = None
-    class Config:
-        from_attributes = True
 
 class CountryLocation(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     country_code: str
     country_name: str
     latitude: float
     longitude: float
     region: Optional[str] = None
     continent: Optional[str] = None
-    class Config:
-        from_attributes = True
 
 # ── 国家贸易统计（从 pair 表聚合后的结果） ──────────────────────
 
 class CountryMonthlyTradeStat(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     hs_code: str
     year: int
     month: int
     country_code: str
     sum_of_usd: float
     trade_count: int
-    class Config:
-        from_attributes = True
 
 class CountryTradeStatSummary(BaseModel):
     total_countries: int
@@ -160,24 +161,72 @@ class CompanyDashboardResponse(BaseModel):
     trends: List[CompanyTrendPoint]
 
 
-# ── Future insight agent extension point ───────────────────────────────
+# ── Insight Factory job protocol ──────────────────────────────────────
 
-class InsightAgentStatus(BaseModel):
+InsightJobStatus = Literal["queued", "running", "completed", "failed", "cancelled"]
+
+
+class InsightJobSystemStatus(BaseModel):
     enabled: bool
-    name: str
-    supported_sources: List[str]
+    default_dataset_version: Optional[str] = None
     message: str
 
 
-class InsightAgentPreviewRequest(BaseModel):
-    brands: List[str] = Field(default_factory=list)
-    start_year_month: Optional[str] = None
-    end_year_month: Optional[str] = None
-    include_news: bool = True
-    include_trade: bool = True
+class InsightJobCreate(BaseModel):
+    research_question: str = Field(min_length=10, max_length=4000)
+    dataset_version: Optional[str] = Field(default=None, min_length=1, max_length=128, pattern=r"^[A-Za-z0-9._-]+$")
+    target_step: Literal[5] = 5
+    stream_count: int = Field(default=2, ge=1, le=6)
+    requested_by: Optional[str] = Field(default=None, max_length=255)
 
 
-class InsightAgentPreviewResponse(BaseModel):
-    enabled: bool
-    message: str
-    requested_brands: List[str] = Field(default_factory=list)
+class InsightJobResponse(BaseModel):
+    job_id: str
+    status: InsightJobStatus
+    research_question: str
+    dataset_version: str
+    target_step: int
+    stream_count: int
+    requested_by: Optional[str] = None
+    worker_id: Optional[str] = None
+    lease_expires_at: Optional[datetime] = None
+    heartbeat_at: Optional[datetime] = None
+    current_step: int = 0
+    cancel_requested: bool = False
+    error_message: Optional[str] = None
+    created_at: datetime
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    updated_at: datetime
+
+
+class InsightReportResponse(BaseModel):
+    job_id: str
+    dataset_version: str
+    factory_version: str
+    executive_summary: Optional[str] = None
+    report_markdown: str
+    report_html: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class InsightJobClaimRequest(BaseModel):
+    worker_id: str = Field(min_length=1, max_length=255)
+
+
+class InsightJobHeartbeatRequest(InsightJobClaimRequest):
+    current_step: int = Field(default=0, ge=0, le=5)
+
+
+class InsightJobCompleteRequest(InsightJobClaimRequest):
+    dataset_version: str = Field(min_length=1, max_length=128)
+    factory_version: str = Field(min_length=1, max_length=128)
+    report_markdown: str = Field(min_length=1, max_length=5_000_000)
+    executive_summary: str = Field(default="", max_length=500_000)
+    report_html: str = Field(min_length=1, max_length=5_000_000)
+
+
+class InsightJobFailureRequest(InsightJobClaimRequest):
+    error_message: Optional[str] = Field(default=None, max_length=8000)
+    message: Optional[str] = Field(default=None, max_length=8000)

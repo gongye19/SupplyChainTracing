@@ -41,9 +41,7 @@ const sameShipments = (a: Shipment[], b: Shipment[]) =>
       shipment.destinationId === next?.destinationId &&
       shipment.value === next?.value &&
       shipment.totalValueUsd === next?.totalValueUsd &&
-      shipment.tradeCount === next?.tradeCount &&
-      shipment.weight === next?.weight &&
-      shipment.quantity === next?.quantity
+      shipment.tradeCount === next?.tradeCount
     );
   });
 

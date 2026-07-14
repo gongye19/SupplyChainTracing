@@ -15,9 +15,10 @@ import {
   CompanyDashboardData,
   CompanyFilterOptions,
   CompanySearchResult,
-  InsightAgentPreviewRequest,
-  InsightAgentPreviewResponse,
-  InsightAgentStatus,
+  InsightJob,
+  InsightJobCreate,
+  InsightJobSystemStatus,
+  InsightReport,
   Location,
 } from '../types';
 import { logger } from '../utils/logger';
@@ -378,32 +379,65 @@ export const chatAPI = {
   },
 };
 
-export const insightsAgentAPI = {
-  getStatus: async (): Promise<InsightAgentStatus> => {
-    const data = await fetchAPI<any>('/api/insights-agent/status');
+const mapInsightJob = (data: any): InsightJob => ({
+  jobId: data.job_id,
+  status: data.status,
+  researchQuestion: data.research_question,
+  datasetVersion: data.dataset_version,
+  targetStep: data.target_step,
+  streamCount: data.stream_count,
+  currentStep: data.current_step,
+  cancelRequested: Boolean(data.cancel_requested),
+  errorMessage: data.error_message || undefined,
+  createdAt: data.created_at,
+  startedAt: data.started_at || undefined,
+  completedAt: data.completed_at || undefined,
+});
+
+export const insightJobsAPI = {
+  getStatus: async (): Promise<InsightJobSystemStatus> => {
+    const data = await fetchAPI<any>('/api/insight-jobs/status');
     return {
       enabled: Boolean(data.enabled),
-      name: data.name,
-      supportedSources: data.supported_sources || [],
+      defaultDatasetVersion: data.default_dataset_version || undefined,
       message: data.message,
     };
   },
 
-  preview: async (request: InsightAgentPreviewRequest = {}): Promise<InsightAgentPreviewResponse> => {
-    const data = await fetchAPI<any>('/api/insights-agent/preview', {
+  create: async (request: InsightJobCreate): Promise<InsightJob> => {
+    const data = await fetchAPI<any>('/api/insight-jobs', {
       method: 'POST',
       body: JSON.stringify({
-        brands: request.brands || [],
-        start_year_month: request.startYearMonth,
-        end_year_month: request.endYearMonth,
-        include_news: request.includeNews ?? true,
-        include_trade: request.includeTrade ?? true,
+        research_question: request.researchQuestion,
+        dataset_version: request.datasetVersion,
+        stream_count: request.streamCount ?? 2,
+        requested_by: request.requestedBy,
       }),
     });
+    return mapInsightJob(data);
+  },
+
+  get: async (jobId: string): Promise<InsightJob> => {
+    const data = await fetchAPI<any>(`/api/insight-jobs/${encodeURIComponent(jobId)}`);
+    return mapInsightJob(data);
+  },
+
+  cancel: async (jobId: string): Promise<InsightJob> => {
+    const data = await fetchAPI<any>(`/api/insight-jobs/${encodeURIComponent(jobId)}/cancel`, { method: 'POST' });
+    return mapInsightJob(data);
+  },
+
+  getReport: async (jobId: string): Promise<InsightReport> => {
+    const data = await fetchAPI<any>(`/api/insight-jobs/${encodeURIComponent(jobId)}/report`);
     return {
-      enabled: Boolean(data.enabled),
-      message: data.message,
-      requestedBrands: data.requested_brands || [],
+      jobId: data.job_id,
+      datasetVersion: data.dataset_version,
+      factoryVersion: data.factory_version,
+      executiveSummary: data.executive_summary || undefined,
+      reportMarkdown: data.report_markdown,
+      reportHtml: data.report_html,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
     };
   },
 };
@@ -483,8 +517,6 @@ export const countryTradeStatsAPI = {
     return {
       totalCountries: parseInt(data.total_countries) || 0,
       totalTradeValue: parseFloat(data.total_trade_value) || 0,
-      totalWeight: data.total_weight ? parseFloat(data.total_weight) : undefined,
-      totalQuantity: data.total_quantity ? parseFloat(data.total_quantity) : undefined,
       totalTradeCount: parseInt(data.total_trade_count) || 0,
       avgSharePct: parseFloat(data.avg_share_pct) || 0,
     };

@@ -10,7 +10,7 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - ./database/data:/var/lib/postgresql/data
+      - supplychain-postgres-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -34,6 +34,9 @@ services:
       MODEL_NAME: ${MODEL_NAME:-gpt-4o-2024-08-06}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      INSIGHT_JOBS_ENABLED: ${INSIGHT_JOBS_ENABLED:-false}
+      DEFAULT_DATASET_VERSION: ${DEFAULT_DATASET_VERSION:-}
+      INSIGHT_WORKER_TOKEN: ${INSIGHT_WORKER_TOKEN:-}
     depends_on:
       db:
         condition: service_healthy
@@ -70,7 +73,7 @@ services:
       PGADMIN_DEFAULT_EMAIL: admin@example.com
       PGADMIN_DEFAULT_PASSWORD: admin
     volumes:
-      - ./database/pgadmin:/var/lib/pgadmin
+      - supplychain-pgadmin-data:/var/lib/pgadmin
     networks:
       - supplychain-network
 
@@ -78,3 +81,6 @@ networks:
   supplychain-network:
     driver: bridge
 
+volumes:
+  supplychain-postgres-data:
+  supplychain-pgadmin-data:

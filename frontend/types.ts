@@ -222,25 +222,45 @@ export interface CompanyDashboardControls {
   rankMetric: CompanyRankMetric;
 }
 
-export interface InsightAgentStatus {
+export type InsightJobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+
+export interface InsightJobSystemStatus {
   enabled: boolean;
-  name: string;
-  supportedSources: string[];
+  defaultDatasetVersion?: string;
   message: string;
 }
 
-export interface InsightAgentPreviewRequest {
-  brands?: string[];
-  startYearMonth?: string;
-  endYearMonth?: string;
-  includeNews?: boolean;
-  includeTrade?: boolean;
+export interface InsightJobCreate {
+  researchQuestion: string;
+  datasetVersion?: string;
+  streamCount?: number;
+  requestedBy?: string;
 }
 
-export interface InsightAgentPreviewResponse {
-  enabled: boolean;
-  message: string;
-  requestedBrands: string[];
+export interface InsightJob {
+  jobId: string;
+  status: InsightJobStatus;
+  researchQuestion: string;
+  datasetVersion: string;
+  targetStep: number;
+  streamCount: number;
+  currentStep: number;
+  cancelRequested: boolean;
+  errorMessage?: string;
+  createdAt: string;
+  startedAt?: string;
+  completedAt?: string;
+}
+
+export interface InsightReport {
+  jobId: string;
+  datasetVersion: string;
+  factoryVersion: string;
+  executiveSummary?: string;
+  reportMarkdown: string;
+  reportHtml: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // 国家贸易统计筛选条件

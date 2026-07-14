@@ -734,7 +734,7 @@ const App: React.FC = () => {
   }, [shipments, currentMapFilters, activeView]);
 
   // 将聚合统计数据按国家对聚合，转换为地图组件格式
-  const shipmentsForMap = useMemo(() => {
+  const shipmentsForMap = useMemo<Shipment[]>(() => {
     // 按国家对聚合所有交易
     const countryPairGroups = new Map<string, {
       originCountryCode: string;
@@ -780,6 +780,10 @@ const App: React.FC = () => {
       const categoryColor = getHs2Color(group.hs2);
       
       return {
+        year: group.shipments[0]?.year ?? 0,
+        month: group.shipments[0]?.month ?? 0,
+        originCountryCode: group.originCountryCode,
+        destinationCountryCode: group.destinationCountryCode,
         id: `country-pair-${index}-${group.originCountryCode}-${group.destinationCountryCode}`,
         originId: group.originCountryCode,
         destinationId: group.destinationCountryCode,

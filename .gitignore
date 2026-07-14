@@ -89,6 +89,7 @@ data/**/*.xlsx
 *.rar
 processed_tables/
 gdelt_test/
+local_research/
 check_db_data.py
 
 # Frontend build

@@ -6,7 +6,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 import os
 import re
 
-from .routes import chat, hs_code_categories, country_locations as port_locations_route, country_locations_compat, shipments, country_trade_stats, companies, insights_agent
+from .routes import chat, hs_code_categories, country_locations as port_locations_route, country_locations_compat, shipments, country_trade_stats, companies, insight_jobs
 from .utils.logger import get_logger
 
 app = FastAPI(title="Supply Chain API", version="1.0.0")
@@ -116,12 +116,11 @@ async def general_exception_handler(request: Request, exc: Exception):
         elif re.match(vercel_origin_regex, origin):
             is_allowed = True
     
-    error_detail = str(exc)
-    logger.exception("[ERROR] 未处理的异常: %s", error_detail)
+    logger.exception("[ERROR] 未处理的异常")
     
     response = JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={"detail": "内部服务器错误", "error": error_detail}
+        content={"detail": "内部服务器错误"}
     )
     
     if is_allowed and origin:
@@ -141,7 +140,8 @@ app.include_router(port_locations_route.router, prefix="/api/port-locations", ta
 app.include_router(country_locations_compat.router, prefix="/api/country-locations", tags=["country-locations"])
 app.include_router(country_trade_stats.router, prefix="/api/country-trade-stats", tags=["country-trade-stats"])
 app.include_router(companies.router, prefix="/api/companies", tags=["companies"])
-app.include_router(insights_agent.router, prefix="/api/insights-agent", tags=["insights-agent"])
+app.include_router(insight_jobs.router, prefix="/api/insight-jobs", tags=["insight-jobs"])
+app.include_router(insight_jobs.internal_router, prefix="/api/internal/insight-jobs", tags=["internal-insight-jobs"])
 
 @app.get("/")
 def root():
