@@ -27,10 +27,12 @@ The recommended Mac development layout keeps code repositories and the shared da
 ├── supplychain/                Git repository: dashboard application
 ├── supplychain-data-pipeline/  Git repository: cleaning and publication
 ├── insight_factory/            Git repository: Codex analysis worker
-└── supplychain-data/           Not Git: versioned raw/cleaned/derived data
+└── supplychain-data/           Not Git: latest dated trade/news source data
 ```
 
 Both Data Pipeline and Insight Factory use `SUPPLYCHAIN_DATA_ROOT=/Users/han/Desktop/code/supplychain-data`. This gives them one physical data source without putting data inside an application repository.
+
+The shared data root is intentionally minimal: `YYYY-MM-DD/trade/*.csv` plus `YYYY-MM-DD/news/news_events.json`. Only the latest date directory is retained.
 
 ## Local development
 
