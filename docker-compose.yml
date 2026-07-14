@@ -30,10 +30,8 @@ services:
     environment:
       DATABASE_URL: postgresql://postgres:123456@db:5432/supplychain
       CORS_ORIGINS: http://localhost:3001
-      # LLM 配置（从环境变量读取，本地开发时可以从 .env 文件加载）
-      MODEL_NAME: ${MODEL_NAME:-gpt-4o-2024-08-06}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      CHAT_JOBS_ENABLED: ${CHAT_JOBS_ENABLED:-false}
+      CHAT_WORKER_TOKEN: ${CHAT_WORKER_TOKEN:-}
       INSIGHT_JOBS_ENABLED: ${INSIGHT_JOBS_ENABLED:-false}
       DEFAULT_DATASET_VERSION: ${DEFAULT_DATASET_VERSION:-}
       INSIGHT_WORKER_TOKEN: ${INSIGHT_WORKER_TOKEN:-}

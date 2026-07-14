@@ -4,6 +4,8 @@ Public dashboard and API for semiconductor supply-chain trade intelligence.
 
 This repository owns the user-facing application only. Raw datasets, cleaning, aggregation, and production data publication live in the private `supplychain-data-pipeline` repository. Long-running Codex analysis lives in the private `insight-factory` repository.
 
+Lightweight question answering is executed by the separate `supplychain-chat-worker` repository. This application owns only the Railway-backed chat queue and browser polling interface.
+
 ## Repository layout
 
 ```text
@@ -27,6 +29,7 @@ The recommended Mac development layout keeps code repositories and the shared da
 ├── supplychain/                Git repository: dashboard application
 ├── supplychain-data-pipeline/  Git repository: cleaning and publication
 ├── insight_factory/            Git repository: Codex analysis worker
+├── supplychain-chat-worker/    Git repository: lightweight Codex chat worker
 └── supplychain-data/           Not Git: latest dated trade/news source data
 ```
 
@@ -89,10 +92,14 @@ The local database is intentionally empty on first start. Publish synthetic/samp
 
 The frontend deliberately exposes two separate AI experiences:
 
-- The floating assistant in the lower-right corner is the existing lightweight question-and-answer interface backed by `/api/chat`.
+- The floating assistant in the lower-right corner creates short-lived `/api/chat-jobs`; the outbound server `supplychain-chat-worker` invokes Codex and returns the answer.
 - **Insight Reports** is a full dashboard for long-running Insight Factory jobs, progress, history, and generated reports backed by `/api/insight-jobs`.
 
 Job submission is disabled by default. Set `INSIGHT_JOBS_ENABLED=true`, `DEFAULT_DATASET_VERSION`, and a strong `INSIGHT_WORKER_TOKEN` in Railway only after the server worker is deployed.
+
+Lightweight chat is also disabled by default. Set `CHAT_JOBS_ENABLED=true` and a distinct `CHAT_WORKER_TOKEN` only after the chat worker passes a one-job deployment test.
+
+Completed lightweight chat jobs are retained in Railway for seven days and then removed when the next chat job is created.
 
 ## Data ownership
 

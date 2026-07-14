@@ -240,6 +240,18 @@ export interface ChatResponse {
   response: string;
 }
 
+type ChatJobStatus = 'queued' | 'running' | 'completed' | 'failed';
+
+interface ChatJobPayload {
+  job_id: string;
+  status: ChatJobStatus;
+  answer?: string | null;
+  error_message?: string | null;
+}
+
+const CHAT_POLL_INTERVAL_MS = 1_000;
+const CHAT_TIMEOUT_MS = 120_000;
+
 export const chatAPI = {
   sendMessage: async (
     message: string,
@@ -252,129 +264,36 @@ export const chatAPI = {
       message,
       history: history || []
     };
-    
-    const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
-    const url = `${API_BASE_URL}/api/chat`;
-    
-    logger.debug('[Chat] Sending request to:', url);
-    
+
     try {
-      const response = await fetch(url, {
+      const created = await fetchAPI<ChatJobPayload>('/api/chat-jobs', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(request)
+        body: JSON.stringify(request),
       });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        logger.error('[Chat] API error:', response.status, errorText);
-        onError(`HTTP error! status: ${response.status}`);
-        return;
-      }
-      
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-      
-      if (!reader) {
-        logger.error('[Chat] Response body is not readable');
-        onError('Response body is not readable');
-        return;
-      }
-      
-      let buffer = '';
-      let hasReceivedContent = false;
-      
-      logger.debug('[Chat] Start reading stream');
-      
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          
-          if (done) {
-            logger.debug('[Chat] Stream done');
-            // 处理剩余的 buffer
-            if (buffer.trim()) {
-              const lines = buffer.split('\n');
-              for (const line of lines) {
-                if (line.trim() && line.startsWith('data: ')) {
-                  try {
-                    const data = JSON.parse(line.slice(6));
-                    if (data.error) {
-                      logger.error('[Chat] Server error:', data.error);
-                      onError(data.error);
-                      return;
-                    }
-                    
-                    if (data.done) {
-                      if (!hasReceivedContent) {
-                        logger.warn('[Chat] Stream completed without content');
-                      }
-                      onComplete();
-                      return;
-                    }
-                    
-                    if (data.content) {
-                      hasReceivedContent = true;
-                      onChunk(data.content);
-                    }
-                  } catch (e) {
-                    logger.warn('[Chat] Failed to parse SSE data:', e, line);
-                  }
-                }
-              }
-            }
-            break;
+      logger.debug('[Chat] Queued job:', created.job_id);
+
+      const deadline = Date.now() + CHAT_TIMEOUT_MS;
+      while (Date.now() < deadline) {
+        await new Promise((resolve) => window.setTimeout(resolve, CHAT_POLL_INTERVAL_MS));
+        const job = await fetchAPI<ChatJobPayload>(`/api/chat-jobs/${encodeURIComponent(created.job_id)}`);
+        if (job.status === 'completed') {
+          if (!job.answer) {
+            onError('Chat worker completed without an answer');
+            return;
           }
-          
-          const chunk = decoder.decode(value, { stream: true });
-          buffer += chunk;
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || ''; // 保留最后一个不完整的行
-          
-          for (const line of lines) {
-            if (line.trim() && line.startsWith('data: ')) {
-              try {
-                const data = JSON.parse(line.slice(6));
-                
-                if (data.error) {
-                  logger.error('[Chat] Server error:', data.error);
-                  onError(data.error);
-                  return;
-                }
-                
-                if (data.done) {
-                  if (!hasReceivedContent) {
-                    logger.warn('[Chat] Stream completed without content');
-                  }
-                  onComplete();
-                  return;
-                }
-                
-                if (data.content) {
-                  hasReceivedContent = true;
-                  onChunk(data.content);
-                }
-              } catch (e) {
-                logger.warn('[Chat] Failed to parse SSE data:', e, line);
-              }
-            }
-          }
+          onChunk(job.answer);
+          onComplete();
+          return;
         }
-        
-        // 如果流结束但没有收到 done 标记，也调用 onComplete
-        logger.debug('[Chat] Stream ended. hasReceivedContent=', hasReceivedContent);
-        if (!hasReceivedContent) {
-          logger.warn('[Chat] Stream ended without content or done marker');
+        if (job.status === 'failed') {
+          onError(job.error_message || 'Chat worker failed');
+          return;
         }
-        onComplete();
-      } catch (error) {
-        logger.error('[Chat] Error reading stream:', error);
-        onError(error instanceof Error ? error.message : 'Unknown error while reading stream');
       }
+
+      onError('Chat request timed out while waiting for the server worker');
     } catch (error) {
-      logger.error('[Chat] Error in sendMessage:', error);
+      logger.error('[Chat] Job error:', error);
       onError(error instanceof Error ? error.message : 'Unknown error');
     }
   },

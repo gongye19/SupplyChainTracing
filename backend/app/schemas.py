@@ -161,6 +161,53 @@ class CompanyDashboardResponse(BaseModel):
     trends: List[CompanyTrendPoint]
 
 
+# ── Lightweight chat worker protocol ─────────────────────────────────
+
+ChatJobStatus = Literal["queued", "running", "completed", "failed"]
+
+
+class ChatMessagePayload(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=20_000)
+
+
+class ChatJobCreate(BaseModel):
+    message: str = Field(min_length=1, max_length=10_000)
+    history: List[ChatMessagePayload] = Field(default_factory=list, max_length=20)
+
+
+class ChatJobResponse(BaseModel):
+    job_id: str
+    status: ChatJobStatus
+    message: str
+    history: List[ChatMessagePayload] = Field(default_factory=list)
+    answer: Optional[str] = None
+    error_message: Optional[str] = None
+    worker_id: Optional[str] = None
+    lease_expires_at: Optional[datetime] = None
+    created_at: datetime
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    updated_at: datetime
+
+
+class ChatJobSystemStatus(BaseModel):
+    enabled: bool
+    message: str
+
+
+class ChatJobClaimRequest(BaseModel):
+    worker_id: str = Field(min_length=1, max_length=255)
+
+
+class ChatJobCompleteRequest(ChatJobClaimRequest):
+    answer: str = Field(min_length=1, max_length=100_000)
+
+
+class ChatJobFailureRequest(ChatJobClaimRequest):
+    error_message: str = Field(min_length=1, max_length=8_000)
+
+
 # ── Insight Factory job protocol ──────────────────────────────────────
 
 InsightJobStatus = Literal["queued", "running", "completed", "failed", "cancelled"]

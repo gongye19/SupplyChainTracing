@@ -7,6 +7,7 @@
 | `supplychain` | Public React UI, FastAPI, dashboard queries, Insight job state and reports | Vercel + Railway |
 | `supplychain-data-pipeline` | Source validation, cleaning, aggregation, and serving-table publication | Laboratory server |
 | `insight-factory` | Codex analysis runner, prompts, Railway polling worker, report generation | Laboratory server |
+| `supplychain-chat-worker` | Short question queue consumer and non-interactive Codex execution | Laboratory server |
 
 GitHub is the source of truth for code. Production directories are deployments of known commits and are not edited in place.
 
@@ -37,7 +38,9 @@ Only the latest date directory is kept. Cleaning outputs and reports live in Dat
 6. The worker uploads final Markdown and HTML with the Insight Factory Git revision.
 7. The browser reads the completed report from Railway.
 
-Insight Factory reports have their own **Insight Reports** dashboard. The floating Agent remains a separate, lightweight `/api/chat` question-and-answer experience and does not own or render long-running reports.
+Insight Factory reports have their own **Insight Reports** dashboard. The floating Agent remains a separate, lightweight question-and-answer experience and does not own or render long-running reports.
+
+The floating Agent now uses `/api/chat-jobs`: Railway queues the question, the independent chat worker claims it over outbound HTTPS, Codex generates one short answer with the server's configured model, and the browser polls Railway for completion. It does not use the Insight Factory workflow.
 
 The server requires no public inbound application or model port. Administrative access remains through the private network/SSH.
 

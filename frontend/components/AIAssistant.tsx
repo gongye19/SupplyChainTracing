@@ -12,7 +12,7 @@ interface Message {
 
 interface AIAssistantProps {
   initialOpen?: boolean;
-  // 后端 API 接口（流式）
+  // 后端异步任务接口；保留 chunk 回调以兼容未来的分块结果。
   onSendMessage?: (
     message: string,
     history: Array<{ role: 'user' | 'assistant'; content: string }>,
@@ -60,7 +60,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ initialOpen = false, onSendMe
     }
   }, [messages, isOpen]);
 
-  // 发送消息（流式）
+  // 发送消息并等待服务器 chat-worker 返回结果。
   const handleSend = async () => {
     if (!inputValue.trim() || isLoading) return;
 
@@ -90,7 +90,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ initialOpen = false, onSendMe
         }));
 
       if (onSendMessage) {
-        // 使用流式 API
+        // chat-worker 第一版一次性返回完整答案。
         let accumulatedContent = '';
         
         await onSendMessage(

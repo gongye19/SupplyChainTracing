@@ -11,6 +11,8 @@ This repository contains the public dashboard application only.
 
 Raw datasets, news cleaning, trade aggregation, and database publication belong in the separate private `supplychain-data-pipeline` repository. Codex analysis and report generation belong in the separate private `insight-factory` repository. Do not reintroduce those responsibilities here.
 
+The lightweight Codex process belongs in `supplychain-chat-worker`. This repository owns only the `chat_jobs` Railway protocol and frontend polling client; it must never invoke Codex or a private model directly.
+
 ## Local development
 
 ```bash
