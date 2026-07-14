@@ -17,6 +17,7 @@ import {
   CompanySearchResult,
   InsightJob,
   InsightJobCreate,
+  InsightJobStatus,
   InsightJobSystemStatus,
   InsightReport,
   Location,
@@ -402,6 +403,15 @@ export const insightJobsAPI = {
       defaultDatasetVersion: data.default_dataset_version || undefined,
       message: data.message,
     };
+  },
+
+  list: async (options?: { status?: InsightJobStatus; limit?: number }): Promise<InsightJob[]> => {
+    const params = new URLSearchParams();
+    if (options?.status) params.set('status', options.status);
+    if (options?.limit) params.set('limit', String(options.limit));
+    const query = params.toString();
+    const data = await fetchAPI<any[]>(`/api/insight-jobs${query ? `?${query}` : ''}`);
+    return data.map(mapInsightJob);
   },
 
   create: async (request: InsightJobCreate): Promise<InsightJob> => {

@@ -6,7 +6,7 @@ import CompanyDashboardSidebar from './components/CompanyDashboardSidebar';
 import type { TopCountriesDatum } from './components/TopCountriesHorizontalBar';
 import { CompanyDashboardControls, Filters, HSCodeCategory, CountryLocation, Location, Shipment, CountryMonthlyTradeStat, CountryTradeStatSummary, CountryTradeTrend, TopCountry, CountryTradeFilters, CountryQuarterTop, CountryAggregate, CountryQuarterAggregate, HSAggregate, HSQuarterAggregate } from './types';
 import { shipmentsAPI, hsCodeCategoriesAPI, countryLocationsAPI, chatAPI, ChatMessage, countryTradeStatsAPI } from './services/api';
-import { Globe, Map as MapIcon, Package, TrendingUp, Users, ChevronRight, Filter, Building2, MessageCircle } from 'lucide-react';
+import { Globe, Map as MapIcon, Package, TrendingUp, Users, ChevronRight, Filter, Building2, MessageCircle, FileText } from 'lucide-react';
 import { useLanguage } from './contexts/LanguageContext';
 import { getCountriesFromCodes } from './utils/countryCoordinates';
 import { logger } from './utils/logger';
@@ -18,6 +18,7 @@ const CountryTradeMap = lazy(() => import('./components/CountryTradeMap'));
 const CountryTradeStatsPanel = lazy(() => import('./components/CountryTradeStatsPanel'));
 const TopCountriesHorizontalBar = lazy(() => import('./components/TopCountriesHorizontalBar'));
 const CompanyDashboard = lazy(() => import('./components/CompanyDashboard'));
+const InsightsDashboard = lazy(() => import('./components/InsightsDashboard').then((module) => ({ default: module.InsightsDashboard })));
 
 const HS2_COLOR_PALETTE = [
   '#007AFF', '#34C759', '#FF9500', '#AF52DE', '#FF2D55', '#30B0C7',
@@ -59,7 +60,7 @@ type CacheEntry<T> = {
 
 const App: React.FC = () => {
   const { language, setLanguage, t } = useLanguage();
-  const [activeView, setActiveView] = useState<'map-country' | 'map-hscode' | 'global-stats' | 'company-dashboard'>('global-stats');
+  const [activeView, setActiveView] = useState<'map-country' | 'map-hscode' | 'global-stats' | 'company-dashboard' | 'insight-reports'>('global-stats');
   
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -1295,6 +1296,16 @@ const App: React.FC = () => {
                </div>
                {activeView === 'company-dashboard' && <ChevronRight className="w-3.5 h-3.5" />}
              </button>
+             <button
+               onClick={() => setActiveView('insight-reports')}
+               className={`flex items-center justify-between px-4 py-3 rounded-[12px] transition-all text-[14px] font-semibold ${activeView === 'insight-reports' ? 'bg-[#007AFF] text-white shadow-lg shadow-blue-500/20' : 'text-[#86868B] hover:bg-black/5'}`}
+             >
+               <div className="flex items-center gap-3 min-w-0">
+                 <FileText className="w-4 h-4" />
+                 <span className="whitespace-nowrap">Insight Reports</span>
+               </div>
+               {activeView === 'insight-reports' && <ChevronRight className="w-3.5 h-3.5" />}
+             </button>
            </div>
 
           <div className="h-[0.5px] bg-black/5"></div>
@@ -1323,13 +1334,23 @@ const App: React.FC = () => {
               shipments={shipments}
               mode="hscode"
             />
-          ) : (
+          ) : activeView === 'company-dashboard' ? (
             <CompanyDashboardSidebar
               filters={companyDashboardFilters}
               setFilters={setCompanyDashboardFilters}
               controls={companyDashboardControls}
               setControls={setCompanyDashboardControls}
             />
+          ) : (
+            <div className="rounded-[20px] border border-black/5 bg-[#F5F5F7] p-4">
+              <div className="flex items-center gap-2 text-[#1D1D1F]">
+                <FileText className="h-4 w-4 text-[#007AFF]" />
+                <span className="text-sm font-bold">Insight Factory</span>
+              </div>
+              <p className="mt-2 text-xs leading-5 text-[#86868B]">
+                深度分析报告与右下角的即时问答 Agent 相互独立。
+              </p>
+            </div>
           )}
           
           {activeView === 'map-country' && (
@@ -1757,6 +1778,8 @@ const App: React.FC = () => {
               controls={companyDashboardControls}
               setControls={setCompanyDashboardControls}
             />
+          ) : activeView === 'insight-reports' ? (
+            <InsightsDashboard />
           ) : null}
           </Suspense>
 

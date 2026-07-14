@@ -14,6 +14,8 @@ GitHub is the source of truth for code. Production directories are deployments o
 
 The persistent server dataset release is the authoritative raw-data source. Railway contains derived dashboard aggregates and application state, not a second manually maintained raw dataset.
 
+During Mac development, the shared root is `/Users/han/Desktop/code/supplychain-data`. It is adjacent to the three code repositories and is never itself committed to Git. A production server may mount the same layout elsewhere by changing `SUPPLYCHAIN_DATA_ROOT`; no code path depends on the Mac absolute path.
+
 ```text
 $SUPPLYCHAIN_DATA_ROOT/
 ├── releases/<dataset-version>/
@@ -35,6 +37,8 @@ A release is immutable after activation. Pipeline publication uses staging table
 5. Insight Factory runs against the declared server dataset release and the server's configured Codex model.
 6. The worker uploads final Markdown and HTML with the Insight Factory Git revision.
 7. The browser reads the completed report from Railway.
+
+Insight Factory reports have their own **Insight Reports** dashboard. The floating Agent remains a separate, lightweight `/api/chat` question-and-answer experience and does not own or render long-running reports.
 
 The server requires no public inbound application or model port. Administrative access remains through the private network/SSH.
 

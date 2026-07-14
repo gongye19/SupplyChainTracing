@@ -114,6 +114,27 @@ def get_job(db: Session, job_id: str) -> dict[str, Any] | None:
     return _mapping(db.execute(text("SELECT * FROM insight_jobs WHERE job_id = :job_id"), {"job_id": job_id}).fetchone())
 
 
+def list_jobs(db: Session, *, job_status: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
+    ensure_schema(db)
+    where_clause = "WHERE status = :job_status" if job_status else ""
+    params: dict[str, Any] = {"limit": limit}
+    if job_status:
+        params["job_status"] = job_status
+    rows = db.execute(
+        text(
+            f"""
+            SELECT *
+            FROM insight_jobs
+            {where_clause}
+            ORDER BY created_at DESC
+            LIMIT :limit
+            """
+        ),
+        params,
+    ).fetchall()
+    return [dict(row._mapping) for row in rows]
+
+
 def get_report(db: Session, job_id: str) -> dict[str, Any] | None:
     ensure_schema(db)
     return _mapping(

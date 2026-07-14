@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import os
 import secrets
+from typing import Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Response, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -14,6 +15,7 @@ from ..schemas import (
     InsightJobFailureRequest,
     InsightJobHeartbeatRequest,
     InsightJobResponse,
+    InsightJobStatus,
     InsightJobSystemStatus,
     InsightReportResponse,
 )
@@ -27,7 +29,7 @@ def jobs_enabled() -> bool:
     return os.getenv("INSIGHT_JOBS_ENABLED", "false").lower() in {"1", "true", "yes", "on"}
 
 
-def require_worker_token(authorization: str | None = Header(default=None)) -> None:
+def require_worker_token(authorization: Optional[str] = Header(default=None)) -> None:
     configured = os.getenv("INSIGHT_WORKER_TOKEN", "")
     if not configured:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Insight worker token is not configured")
@@ -63,6 +65,15 @@ def create_insight_job(request: InsightJobCreate, db: Session = Depends(get_db))
         stream_count=request.stream_count,
         requested_by=request.requested_by,
     )
+
+
+@router.get("", response_model=list[InsightJobResponse])
+def list_insight_jobs(
+    job_status: Optional[InsightJobStatus] = Query(default=None, alias="status"),
+    limit: int = Query(default=50, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    return service.list_jobs(db, job_status=job_status, limit=limit)
 
 
 @router.get("/{job_id}", response_model=InsightJobResponse)
