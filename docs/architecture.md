@@ -15,7 +15,7 @@ GitHub is the source of truth for code. Production directories are deployments o
 
 The latest dated dataset directory is the authoritative source. Railway contains derived dashboard aggregates and application state, not a second manually maintained source dataset.
 
-During Mac development, the shared root is `/Users/han/Desktop/code/supplychain-data`. It is adjacent to the three code repositories and is never itself committed to Git. A production server may mount the same layout elsewhere by changing `SUPPLYCHAIN_DATA_ROOT`; no code path depends on the Mac absolute path.
+During Mac development, the shared root is `/Users/han/Desktop/code/hkust/supplychain/supplychain-data`. It is adjacent to the code repositories and is never itself committed to Git. A production server may mount the same layout elsewhere by changing `SUPPLYCHAIN_DATA_ROOT`; no code path depends on the Mac absolute path.
 
 ```text
 $SUPPLYCHAIN_DATA_ROOT/
