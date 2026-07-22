@@ -14,7 +14,7 @@ def get_system_status():
     enabled = chat_model.model_enabled()
     return {
         "enabled": enabled,
-        "message": "Direct laboratory model access is ready" if enabled else "Direct chat is disabled",
+        "message": "Direct laboratory Codex Agent is ready" if enabled else "Direct chat is disabled",
     }
 
 
