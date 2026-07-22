@@ -65,6 +65,8 @@ The landing page has a lightweight marketing header with section links and one `
 
 The landing page is visually distinct from the data workspace: a dark editorial hero, authentic semiconductor photography, warm neutral content sections, and one clear path into the product. Its hierarchy is headline, short explanation, primary CTA, industry image, then three product capabilities. Marketing treatment must stop at the workspace boundary; dashboard controls remain quiet and utilitarian.
 
+The landing page has exactly four product entry points. `Overview` is the single primary action in the hero. `Research`, `Explore`, and `Companies` appear once each in the lower workspace grid. Do not repeat these destinations in the header, capability strip, explanatory sections, or footer.
+
 ### Filter bar
 
 Show the current period, direction, and primary scope inline. `All filters` opens the complete existing filter set in a temporary drawer. The data canvas must never be permanently narrowed by filters.

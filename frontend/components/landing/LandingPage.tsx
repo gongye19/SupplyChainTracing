@@ -22,99 +22,74 @@ function LandingPage({ onEnterWorkspace }: LandingPageProps) {
 
   const copy = isZh
     ? {
-        navPlatform: '平台',
-        navCoverage: '数据能力',
-        navResearch: '研究',
-        open: '进入工作区',
         eyebrow: '半导体供应链情报平台',
         titleA: '在供应链变化之前，',
         titleB: '先看见它。',
         intro: '追踪全球贸易流、企业关系与产品变化，把分散的供应链数据变成可验证、可研究的证据。',
-        explore: '探索贸易数据',
-        company: '查看企业网络',
+        overview: '进入 Overview',
         imageLabel: '晶圆级视角',
         imageTitle: '从一片晶圆，看到一条全球供应链',
         imageBody: '在国家、产品与企业三个维度之间切换，定位依赖关系、集中度与结构变化。',
         signal: '研究视角',
         signalValue: '贸易流 · 产品 · 企业',
         strip: ['全球贸易流', '产品级 HS 数据', '企业关系网络', 'AI 辅助研究'],
-        sectionEyebrow: '一个工作区，完整研究路径',
-        sectionTitle: '从原始记录到可用判断',
-        sectionBody: '不需要在地图、表格和报告之间来回拼接。SemiconFlow 把供应链分析最常用的步骤放进同一套工作流。',
+        sectionEyebrow: '三个专业工作区',
+        sectionTitle: '根据问题，选择下一步',
+        sectionBody: 'Overview 提供全局视角；需要深入时，再进入 Research、Explore 或 Companies，沿着同一份数据继续分析。',
         features: [
-          ['观察贸易结构', '按市场、时间与产品拆解进出口流向，快速发现集中度和变化趋势。'],
-          ['理解企业关系', '从品牌出发查看供应商、交易对手与跨境连接，形成可追踪的企业网络。'],
-          ['提出研究问题', '带着当前页面的筛选范围直接提问，让 AI 在明确上下文中辅助分析。'],
+          ['Research', '输入一个明确问题，启动深度研究，并在需要时查看历史记录与研究结果。'],
+          ['Explore', '按市场、时间与产品拆解进出口流向，发现集中度、依赖关系和变化趋势。'],
+          ['Companies', '从品牌出发查看供应商、交易对手与跨境连接，形成可追踪的企业网络。'],
         ],
         coverageEyebrow: '为半导体供应链而设计',
         coverageTitle: '同一份证据，三种分析尺度。',
         coverageBody: '先从全球流向发现异常，再深入到产品类别与公司关系。每一步都保留当前分析范围，减少重复筛选。',
         coverageItems: ['国家与市场：比较双边贸易和区域暴露', '产品与 HS Code：追踪品类迁移和季度变化', '公司网络：识别供应商与交易对手关系'],
-        researchEyebrow: 'Research workspace',
-        researchTitle: '把一个明确问题，变成一条研究路径。',
-        researchBody: '深度研究入口保持简单：输入一个问题，启动研究，需要时再查看历史记录。',
-        researchCta: '开始研究',
         footer: 'SemiconFlow · Semiconductor supply-chain intelligence',
         photo: '图片：Maxence Pira / Unsplash',
       }
     : {
-        navPlatform: 'Platform',
-        navCoverage: 'Coverage',
-        navResearch: 'Research',
-        open: 'Open workspace',
         eyebrow: 'Semiconductor supply-chain intelligence',
         titleA: 'See the supply chain',
         titleB: 'before it shifts.',
         intro: 'Trace global trade flows, company relationships and product movement—then turn fragmented supply-chain data into research-ready evidence.',
-        explore: 'Explore trade data',
-        company: 'View company network',
+        overview: 'Open Overview',
         imageLabel: 'Wafer-level perspective',
         imageTitle: 'From one wafer to a global supply chain',
         imageBody: 'Move between countries, products and companies to locate dependencies, concentration and structural change.',
         signal: 'Research lenses',
         signalValue: 'Trade · Products · Companies',
         strip: ['Global trade flows', 'Product-level HS data', 'Company relationship maps', 'AI-assisted research'],
-        sectionEyebrow: 'One workspace, one research path',
-        sectionTitle: 'From raw records to a usable view',
-        sectionBody: 'Stop stitching together maps, tables and reports. SemiconFlow keeps the core steps of supply-chain analysis in one coherent workflow.',
+        sectionEyebrow: 'Three specialist workspaces',
+        sectionTitle: 'Choose the next step for the question',
+        sectionBody: 'Overview gives you the global view. Move into Research, Explore or Companies when the question needs a more focused workflow.',
         features: [
-          ['Observe trade structure', 'Break down import and export flows by market, period and product to surface concentration and change.'],
-          ['Understand companies', 'Start with a brand and trace suppliers, counterparties and cross-border relationships.'],
-          ['Ask in context', 'Ask AI from the view you are already using, with the active analysis scope carried into the conversation.'],
+          ['Research', 'Enter one focused question, start a deep research run, and open history or results only when needed.'],
+          ['Explore', 'Break down import and export flows by market, period and product to surface concentration, dependencies and change.'],
+          ['Companies', 'Start with a brand and trace suppliers, counterparties and cross-border relationships.'],
         ],
         coverageEyebrow: 'Built for semiconductor supply chains',
         coverageTitle: 'The same evidence at three analytical scales.',
         coverageBody: 'Start with global movement, then move into product categories and company relationships. Your analysis scope stays with you as the question gets more specific.',
         coverageItems: ['Countries & markets: compare bilateral trade and regional exposure', 'Products & HS codes: track category shifts and quarterly movement', 'Company networks: identify suppliers and trading counterparties'],
-        researchEyebrow: 'Research workspace',
-        researchTitle: 'Turn one focused question into a research path.',
-        researchBody: 'Deep research stays intentionally simple: enter one question, start the run, and open history only when you need it.',
-        researchCta: 'Start research',
         footer: 'SemiconFlow · Semiconductor supply-chain intelligence',
         photo: 'Photo: Maxence Pira / Unsplash',
       };
 
-  const featureIcons = [BarChart3, Building2, FileSearch];
+  const featureIcons = [FileSearch, BarChart3, Building2];
+  const featureRoutes: WorkspaceView[] = ['insight-reports', 'map-country', 'company-dashboard'];
 
   return (
     <div className="landing-shell">
       <header className="landing-header">
         <div className="landing-header-inner">
-          <a className="landing-brand" href="#top" aria-label="SemiconFlow home">
+          <div className="landing-brand">
             <span className="product-brand-mark" aria-hidden="true"><i /><i /><i /></span>
             <span>SemiconFlow</span>
-          </a>
-          <nav className="landing-nav" aria-label={isZh ? '首页导航' : 'Landing navigation'}>
-            <a href="#platform">{copy.navPlatform}</a>
-            <a href="#coverage">{copy.navCoverage}</a>
-            <a href="#research">{copy.navResearch}</a>
-          </nav>
+          </div>
           <div className="landing-header-actions">
             <button type="button" className="landing-language" onClick={() => setLanguage(isZh ? 'en' : 'zh')}>
               {isZh ? 'EN' : '中文'}
-            </button>
-            <button type="button" className="landing-open" onClick={() => onEnterWorkspace('global-stats')}>
-              {copy.open}<ArrowRight size={15} />
             </button>
           </div>
         </div>
@@ -127,11 +102,8 @@ function LandingPage({ onEnterWorkspace }: LandingPageProps) {
             <h1>{copy.titleA}<br /><em>{copy.titleB}</em></h1>
             <p className="landing-intro">{copy.intro}</p>
             <div className="landing-hero-actions">
-              <button type="button" className="landing-primary-cta" onClick={() => onEnterWorkspace('map-country')}>
-                {copy.explore}<ArrowRight size={16} />
-              </button>
-              <button type="button" className="landing-secondary-cta" onClick={() => onEnterWorkspace('company-dashboard')}>
-                {copy.company}
+              <button type="button" className="landing-primary-cta" onClick={() => onEnterWorkspace('global-stats')}>
+                {copy.overview}<ArrowRight size={16} />
               </button>
             </div>
           </div>
@@ -148,9 +120,7 @@ function LandingPage({ onEnterWorkspace }: LandingPageProps) {
               <Network size={18} />
               <span><small>{copy.signal}</small><strong>{copy.signalValue}</strong></span>
             </div>
-            <a className="landing-photo-credit" href="https://unsplash.com/s/photos/semiconductor-wafer" target="_blank" rel="noreferrer">
-              {copy.photo}
-            </a>
+            <span className="landing-photo-credit">{copy.photo}</span>
           </div>
         </section>
 
@@ -176,8 +146,8 @@ function LandingPage({ onEnterWorkspace }: LandingPageProps) {
                   <Icon size={21} />
                   <h3>{title}</h3>
                   <p>{body}</p>
-                  <button type="button" onClick={() => onEnterWorkspace((['map-country', 'company-dashboard', 'global-stats'] as WorkspaceView[])[index])}>
-                    {isZh ? '打开' : 'Open'}<ArrowRight size={14} />
+                  <button type="button" onClick={() => onEnterWorkspace(featureRoutes[index])}>
+                    {isZh ? `进入 ${title}` : `Open ${title}`}<ArrowRight size={14} />
                   </button>
                 </article>
               );
@@ -205,16 +175,6 @@ function LandingPage({ onEnterWorkspace }: LandingPageProps) {
           </div>
         </section>
 
-        <section className="landing-research" id="research">
-          <div>
-            <p>{copy.researchEyebrow}</p>
-            <h2>{copy.researchTitle}</h2>
-            <span>{copy.researchBody}</span>
-          </div>
-          <button type="button" onClick={() => onEnterWorkspace('insight-reports')}>
-            {copy.researchCta}<ArrowRight size={16} />
-          </button>
-        </section>
       </main>
 
       <footer className="landing-footer">
