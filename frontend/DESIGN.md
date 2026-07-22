@@ -6,11 +6,13 @@ SemiconFlow is a professional semiconductor trade-data workspace. It should feel
 
 ## Information architecture
 
+- The root route is a public-facing landing page. It introduces the product and sends users into a specific workspace view.
 - Use one persistent top application bar.
 - Primary destinations are Overview, Explore, Companies, and Research.
 - Country and product analysis are dimensions inside Explore, not separate primary destinations.
 - Never add a second permanent sidebar. Advanced filters use a temporary drawer.
-- Quick Answer is opened from Search / Ask. Long-running Insight Factory work lives in Research.
+- Quick Answer is opened only from the black `Ask this view` action in the page heading. Do not duplicate it in the top application bar.
+- Long-running Insight Factory work lives in Research.
 
 ## Color roles
 
@@ -57,7 +59,11 @@ Use the accent only for selected state, focus, links, and data emphasis. Use sem
 
 ### Navigation
 
-One top application bar contains brand, primary navigation, Search / Ask, data status, and language. On mobile, primary navigation collapses into a temporary dropdown.
+The landing page has a lightweight marketing header with section links and one `Open workspace` action. Inside the product, one top application bar contains brand, primary navigation, data status, and language. On mobile, primary navigation collapses into a temporary dropdown.
+
+### Landing page
+
+The landing page is visually distinct from the data workspace: a dark editorial hero, authentic semiconductor photography, warm neutral content sections, and one clear path into the product. Its hierarchy is headline, short explanation, primary CTA, industry image, then three product capabilities. Marketing treatment must stop at the workspace boundary; dashboard controls remain quiet and utilitarian.
 
 ### Filter bar
 
@@ -84,7 +90,7 @@ Company discovery starts with one full-width search bar using the same border, r
 
 ## Responsive behavior
 
-- Below 900px, navigation becomes a temporary dropdown and Search / Ask becomes an icon button.
+- Below 900px, workspace navigation becomes a temporary dropdown.
 - Filters remain horizontally scrollable; advanced filters become a full-width drawer on small screens.
 - Data visualizations preserve their functional minimum width and may scroll when collapsing would destroy readability.
 

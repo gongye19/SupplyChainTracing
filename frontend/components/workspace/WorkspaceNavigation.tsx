@@ -21,7 +21,7 @@ interface WorkspaceNavigationProps {
   onToggleMobile: () => void;
   onCloseMobile: () => void;
   onNavigate: (view: WorkspaceView) => void;
-  onOpenAssistant: () => void;
+  onGoHome: () => void;
   onToggleLanguage: () => void;
 }
 
@@ -39,7 +39,7 @@ function WorkspaceNavigation({
   onToggleMobile,
   onCloseMobile,
   onNavigate,
-  onOpenAssistant,
+  onGoHome,
   onToggleLanguage,
 }: WorkspaceNavigationProps) {
   const isZh = language === 'zh';
@@ -64,7 +64,7 @@ function WorkspaceNavigation({
           {mobileOpen ? <X size={18} /> : <Menu size={18} />}
         </button>
 
-        <button type="button" className="product-brand" onClick={() => navigate('global-stats')}>
+        <button type="button" className="product-brand" onClick={onGoHome}>
           <span className="product-brand-mark" aria-hidden="true">
             <i />
             <i />
@@ -94,11 +94,6 @@ function WorkspaceNavigation({
         </nav>
 
         <div className="product-header-actions">
-          <button type="button" className="product-command" onClick={onOpenAssistant}>
-            <Search size={15} />
-            <span>{isZh ? '搜索或提问' : 'Search or ask'}</span>
-            <kbd>⌘K</kbd>
-          </button>
           <span className="product-data-status" title={isZh ? '数据服务正常' : 'Data service online'}>
             <i />
             {isZh ? '数据已更新' : 'Data current'}

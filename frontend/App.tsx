@@ -12,6 +12,7 @@ import { logger } from './utils/logger';
 import { DEFAULT_COMPANY_CONTROLS } from './utils/companyDashboardFilters';
 import AnimatedContent from './components/motion/AnimatedContent';
 import WorkspaceNavigation, { WorkspaceView } from './components/workspace/WorkspaceNavigation';
+import LandingPage from './components/landing/LandingPage';
 
 const SupplyMap = lazy(() => import('./components/SupplyMap'));
 const AIAssistant = lazy(() => import('./components/AIAssistant'));
@@ -105,12 +106,14 @@ type CacheEntry<T> = {
   ts: number;
 };
 
-const App: React.FC = () => {
+interface DashboardAppProps {
+  initialView: WorkspaceView;
+  onGoHome: () => void;
+}
+
+const DashboardApp: React.FC<DashboardAppProps> = ({ initialView, onGoHome }) => {
   const { language, setLanguage, t } = useLanguage();
-  const [activeView, setActiveView] = useState<WorkspaceView>(() => {
-    const requested = new URLSearchParams(window.location.search).get('view') as WorkspaceView | null;
-    return requested && WORKSPACE_VIEWS.includes(requested) ? requested : 'global-stats';
-  });
+  const [activeView, setActiveView] = useState<WorkspaceView>(initialView);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   
@@ -1404,7 +1407,7 @@ const App: React.FC = () => {
         onToggleMobile={() => setMobileNavOpen((open) => !open)}
         onCloseMobile={() => setMobileNavOpen(false)}
         onNavigate={handleViewChange}
-        onOpenAssistant={() => setAssistantLoaded(true)}
+        onGoHome={onGoHome}
         onToggleLanguage={() => setLanguage(isZh ? 'en' : 'zh')}
       />
 
@@ -1913,6 +1916,43 @@ const App: React.FC = () => {
       ) : null}
     </div>
   );
+};
+
+const getRouteView = (): WorkspaceView | null => {
+  const requested = new URLSearchParams(window.location.search).get('view') as WorkspaceView | null;
+  return requested && WORKSPACE_VIEWS.includes(requested) ? requested : null;
+};
+
+const App: React.FC = () => {
+  const [routeView, setRouteView] = useState<WorkspaceView | null>(() => getRouteView());
+
+  useEffect(() => {
+    const handlePopState = () => setRouteView(getRouteView());
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const navigateToWorkspace = useCallback((view: WorkspaceView) => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('view', view);
+    window.history.pushState({ view }, '', url);
+    setRouteView(view);
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }, []);
+
+  const goHome = useCallback(() => {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('view');
+    window.history.pushState({}, '', url);
+    setRouteView(null);
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }, []);
+
+  if (!routeView) {
+    return <LandingPage onEnterWorkspace={navigateToWorkspace} />;
+  }
+
+  return <DashboardApp initialView={routeView} onGoHome={goHome} />;
 };
 
 export default App;
