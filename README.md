@@ -91,12 +91,12 @@ The local database is intentionally empty on first start. Publish synthetic/samp
 
 The Research workspace exposes two AI modes with distinct execution paths:
 
-- **Quick answer** opens as a contextual research panel from the navigation, command bar, or current view. It calls `/api/chat`; the Northflank backend calls the laboratory model synchronously through Tailscale and returns the answer without a polling queue.
+- **Quick answer** opens as a contextual research panel from the navigation, command bar, or current view. It calls `/api/chat`; the Northflank backend calls the laboratory Codex Agent synchronously through Tailscale. Codex can query the dashboard's structured country, HS-code, and company data through read-only MCP tools and returns the answer without a polling queue.
 - **Deep reports** is a dedicated workspace for long-running Insight Factory jobs, progress, history, and generated reports backed by `/api/insight-jobs`.
 
 Job submission is disabled by default. Set `INSIGHT_JOBS_ENABLED=true`, `DEFAULT_DATASET_VERSION`, and a strong `INSIGHT_WORKER_TOKEN` in Northflank only after the server worker is deployed.
 
-Lightweight chat is disabled by default. Set `CHAT_MODEL_ENABLED=true`, `CHAT_MODEL_BASE_URL`, `CHAT_MODEL_NAME`, and `CHAT_MODEL_API_KEY` only on the Northflank backend service. The legacy `CHAT_JOBS_*` settings are retained solely for rollback and should remain disabled during direct operation.
+Lightweight chat is disabled by default. Set `CHAT_MODEL_ENABLED=true`, `CHAT_MODEL_BASE_URL`, `CHAT_MODEL_NAME`, and `CHAT_MODEL_API_KEY` only on the Northflank backend service. `CHAT_MODEL_BASE_URL` points to the OpenAI-compatible Codex Agent gateway on the laboratory server, not directly to the raw model. The legacy `CHAT_JOBS_*` settings are retained solely for rollback and should remain disabled during direct operation.
 
 ## Data ownership
 

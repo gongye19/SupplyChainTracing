@@ -40,7 +40,7 @@ Only the latest date directory is kept. Cleaning outputs and reports live in Dat
 
 Insight Factory reports have their own **Insight Reports** dashboard. The floating Agent remains a separate, lightweight question-and-answer experience and does not own or render long-running reports.
 
-The floating Agent uses `/api/chat`: the Northflank FastAPI service calls the laboratory model gateway directly over Tailscale and returns the answer in the same request. It does not use the Insight Factory workflow or the long-running report queue.
+The floating Agent uses `/api/chat`: the Northflank FastAPI service calls the laboratory Codex Agent gateway directly over Tailscale and returns the answer in the same request. The gateway invokes one ephemeral Codex run. Codex uses a dedicated read-only MCP server to query structured dashboard data through the Northflank API. It does not use the Insight Factory workflow or the long-running report queue.
 
 The model gateway binds only to the laboratory server's Tailscale address. It is not exposed on a public interface. Administrative access remains through the private network/SSH.
 

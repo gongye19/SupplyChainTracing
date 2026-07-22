@@ -11,7 +11,7 @@ This repository contains the public dashboard application only.
 
 Raw datasets, news cleaning, trade aggregation, and database publication belong in the separate private `supplychain-data-pipeline` repository. Codex analysis and report generation belong in the separate private `insight-factory` repository. Do not reintroduce those responsibilities here.
 
-Lightweight chat is served directly by this FastAPI backend through the project's Tailscale connection to the laboratory model gateway. Keep model credentials in Northflank secrets and never expose the model gateway publicly. The legacy `chat_jobs` protocol remains only as a temporary rollback path; do not re-enable its polling worker without explicit approval.
+Lightweight chat is served synchronously by this FastAPI backend through the project's Tailscale connection to the laboratory Codex Agent gateway. The agent uses dedicated read-only MCP tools for structured dashboard data; it must not run Insight Factory reports. Keep gateway credentials in Northflank secrets and never expose the gateway outside the Tailnet. The legacy `chat_jobs` protocol remains only as a temporary rollback path; do not re-enable its polling worker without explicit approval.
 
 ## Local development
 
