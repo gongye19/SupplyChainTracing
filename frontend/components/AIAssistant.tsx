@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MessageCircle, X, Send, Bot, Trash2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface Message {
@@ -285,6 +286,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({
                     <div className={`text-[14px] leading-relaxed ${message.role === 'assistant' ? 'prose prose-sm max-w-none' : ''}`}>
                       {message.role === 'assistant' ? (
                         <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
                           components={{
                             p: ({ children }) => <p className="mb-2 last:mb-0 text-[#1D1D1F]">{children}</p>,
                             h1: ({ children }) => <h1 className="text-lg font-bold mb-2 mt-3 first:mt-0 text-[#1D1D1F]">{children}</h1>,
