@@ -6,13 +6,12 @@ import CompanyDashboardSidebar from './components/CompanyDashboardSidebar';
 import type { TopCountriesDatum } from './components/TopCountriesHorizontalBar';
 import { CompanyDashboardControls, Filters, HSCodeCategory, CountryLocation, Location, Shipment, CountryMonthlyTradeStat, CountryTradeStatSummary, CountryTradeTrend, TopCountry, CountryTradeFilters, CountryQuarterTop, CountryAggregate, CountryQuarterAggregate, HSAggregate, HSQuarterAggregate } from './types';
 import { shipmentsAPI, hsCodeCategoriesAPI, countryLocationsAPI, chatAPI, ChatMessage, countryTradeStatsAPI } from './services/api';
-import { Filter, Menu, MessageCircle, Search, SlidersHorizontal, Sparkles } from 'lucide-react';
+import { ChevronDown, Search, SlidersHorizontal, Sparkles, X } from 'lucide-react';
 import { useLanguage } from './contexts/LanguageContext';
 import { getCountriesFromCodes } from './utils/countryCoordinates';
 import { logger } from './utils/logger';
 import { DEFAULT_COMPANY_CONTROLS } from './utils/companyDashboardFilters';
 import AnimatedContent from './components/motion/AnimatedContent';
-import SpotlightPanel from './components/motion/SpotlightPanel';
 import WorkspaceNavigation, { WorkspaceView } from './components/workspace/WorkspaceNavigation';
 
 const SupplyMap = lazy(() => import('./components/SupplyMap'));
@@ -114,6 +113,7 @@ const App: React.FC = () => {
     return requested && WORKSPACE_VIEWS.includes(requested) ? requested : 'global-stats';
   });
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -228,6 +228,15 @@ const App: React.FC = () => {
       window.removeEventListener('keydown', handleShortcut);
     };
   }, []);
+
+  useEffect(() => {
+    if (!filtersOpen) return undefined;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setFiltersOpen(false);
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [filtersOpen]);
 
   // Refs for preview/final scheduling
   const currentMapFilters = activeView === 'map-country' ? mapCountryFilters : mapHsFilters;
@@ -1320,121 +1329,171 @@ const App: React.FC = () => {
           ? `${currentMeta.title}; period ${companyDashboardFilters.startDate} to ${companyDashboardFilters.endDate}; selected brand ${companyDashboardControls.selectedBrand || 'all'}`
           : currentMeta.title;
 
+  const isExplore = activeView === 'map-country' || activeView === 'map-hscode';
+  const pageTitle = isExplore
+    ? (isZh ? '贸易数据探索器' : 'Trade data explorer')
+    : (isZh ? currentMeta.zhTitle : currentMeta.title);
+  const pageDescription = isExplore
+    ? (isZh ? '在同一个工作区内按市场、产品和贸易方向分析全球半导体流动。' : 'Analyze global semiconductor flows by market, product and direction in one workspace.')
+    : (isZh ? currentMeta.zhDescription : currentMeta.description);
+
+  const filterSummary = activeView === 'global-stats'
+    ? {
+        period: `${countryTradeFilters.startYearMonth} — ${countryTradeFilters.endYearMonth}`,
+        direction: countryTradeFilters.tradeDirection === 'import' ? (isZh ? '进口' : 'Import') : (isZh ? '出口' : 'Export'),
+        focus: countryTradeFilters.hsCode.length > 0
+          ? `${countryTradeFilters.hsCode.slice(0, 2).join(', ')}${countryTradeFilters.hsCode.length > 2 ? ` +${countryTradeFilters.hsCode.length - 2}` : ''}`
+          : (isZh ? '全部产品' : 'All products'),
+        count: countryTradeFilters.hsCode.length,
+      }
+    : activeView === 'map-country'
+      ? {
+          period: `${mapCountryFilters.startDate} — ${mapCountryFilters.endDate}`,
+          direction: mapCountryFilters.tradeDirection === 'import' ? (isZh ? '进口' : 'Import') : (isZh ? '出口' : 'Export'),
+          focus: mapCountryFilters.selectedCountries.length > 0
+            ? `${mapCountryFilters.selectedCountries.slice(0, 2).join(', ')}${mapCountryFilters.selectedCountries.length > 2 ? ` +${mapCountryFilters.selectedCountries.length - 2}` : ''}`
+            : (isZh ? '全部国家' : 'All countries'),
+          count: mapCountryFilters.selectedCountries.length + mapCountryFilters.selectedHSCodes.length,
+        }
+      : activeView === 'map-hscode'
+        ? {
+            period: `${mapHsFilters.startDate} — ${mapHsFilters.endDate}`,
+            direction: mapHsFilters.tradeDirection === 'import' ? (isZh ? '进口' : 'Import') : (isZh ? '出口' : 'Export'),
+            focus: mapHsFilters.selectedHSCodes.length > 0
+              ? `${mapHsFilters.selectedHSCodes.slice(0, 2).join(', ')}${mapHsFilters.selectedHSCodes.length > 2 ? ` +${mapHsFilters.selectedHSCodes.length - 2}` : ''}`
+              : (isZh ? '全部 HS Code' : 'All HS codes'),
+            count: mapHsFilters.selectedHSCodes.length + mapHsFilters.selectedCountries.length,
+          }
+        : {
+            period: `${companyDashboardFilters.startDate} — ${companyDashboardFilters.endDate}`,
+            direction: isZh ? '企业关系' : 'Company network',
+            focus: companyDashboardControls.selectedBrand || (isZh ? '全部公司' : 'All companies'),
+            count: companyDashboardControls.selectedBrand ? 1 : 0,
+          };
+
+  const filterControls = activeView === 'global-stats' ? (
+    <CountryTradeSidebar filters={countryTradeFilters} setFilters={setCountryTradeFilters} />
+  ) : activeView === 'map-country' ? (
+    <SidebarFilters
+      filters={mapCountryFilters}
+      setFilters={setMapCountryFilters}
+      hsCodeCategories={hsCodeCategories}
+      availableHSCodes={availableHSCodes}
+      countries={countries}
+      shipments={shipments}
+      mode="country"
+    />
+  ) : activeView === 'map-hscode' ? (
+    <SidebarFilters
+      filters={mapHsFilters}
+      setFilters={setMapHsFilters}
+      hsCodeCategories={hsCodeCategories}
+      availableHSCodes={availableHSCodes}
+      countries={countries}
+      shipments={shipments}
+      mode="hscode"
+    />
+  ) : (
+    <CompanyDashboardSidebar
+      filters={companyDashboardFilters}
+      setFilters={setCompanyDashboardFilters}
+      controls={companyDashboardControls}
+      setControls={setCompanyDashboardControls}
+    />
+  );
+
   return (
-    <div className="intel-shell">
+    <div className="product-shell">
       <WorkspaceNavigation
         activeView={activeView}
         language={language}
         mobileOpen={mobileNavOpen}
+        onToggleMobile={() => setMobileNavOpen((open) => !open)}
         onCloseMobile={() => setMobileNavOpen(false)}
         onNavigate={handleViewChange}
         onOpenAssistant={() => setAssistantLoaded(true)}
+        onToggleLanguage={() => setLanguage(isZh ? 'en' : 'zh')}
       />
 
-      <div className="workspace-stage">
-        <header className="workspace-topbar">
-          <button
-            type="button"
-            className="workspace-mobile-trigger"
-            onClick={() => setMobileNavOpen(true)}
-            aria-label={isZh ? '打开导航' : 'Open navigation'}
-          >
-            <Menu size={19} />
-          </button>
-          <div className="workspace-topbar-context">
-            <span className="workspace-topbar-product">Semiconductor supply chain</span>
-            <span className="workspace-topbar-separator">/</span>
-            <span>{currentMeta.eyebrow.split(' / ').at(-1)}</span>
+      <main className="product-main">
+        <section className="product-page-heading">
+          <div>
+            <p className="product-eyebrow">{currentMeta.eyebrow}</p>
+            <h1>{pageTitle}</h1>
+            <p>{pageDescription}</p>
           </div>
-          <button type="button" className="workspace-command" onClick={() => setAssistantLoaded(true)}>
-            <Search size={16} />
-            <span>{isZh ? '询问当前供应链数据…' : 'Ask about supply chain data…'}</span>
-            <kbd>⌘ K</kbd>
+          <button type="button" className="product-ask-action" onClick={() => setAssistantLoaded(true)}>
+            <Sparkles size={15} />
+            {isZh ? '询问此页面' : 'Ask this view'}
           </button>
-          <div className="workspace-topbar-actions">
-            <span className="workspace-freshness"><span /> {isZh ? '数据已更新' : 'Data current'}</span>
+        </section>
+
+        {isExplore && (
+          <div className="product-dimension-switch" aria-label={isZh ? '分析维度' : 'Analysis dimension'}>
+            <span>{isZh ? '分析维度' : 'Dimension'}</span>
             <button
               type="button"
-              className="workspace-language"
-              onClick={() => setLanguage(isZh ? 'en' : 'zh')}
-              title={isZh ? 'Switch to English' : '切换到中文'}
+              className={activeView === 'map-country' ? 'is-active' : ''}
+              onClick={() => handleViewChange('map-country')}
             >
-              {isZh ? 'EN' : '中文'}
+              {isZh ? '国家与市场' : 'Countries & markets'}
+            </button>
+            <button
+              type="button"
+              className={activeView === 'map-hscode' ? 'is-active' : ''}
+              onClick={() => handleViewChange('map-hscode')}
+            >
+              {isZh ? '产品与 HS Code' : 'Products & HS codes'}
             </button>
           </div>
-        </header>
+        )}
 
-        <main className={`workspace-main${activeView === 'insight-reports' ? ' without-filter' : ''}`}>
-          {activeView !== 'insight-reports' && (
-            <aside className="workspace-filter-panel">
-              <div className="workspace-filter-heading">
-                <div>
-                  <p>{isZh ? '分析范围' : 'Analysis scope'}</p>
-                  <span>{isZh ? '更改后自动刷新' : 'Updates automatically'}</span>
-                </div>
-                <SlidersHorizontal size={17} />
+        {activeView === 'insight-reports' ? (
+          <div className="product-research-modes">
+            <button type="button" onClick={() => setAssistantLoaded(true)}>
+              <Search size={15} />
+              {isZh ? '快速问答' : 'Quick answer'}
+            </button>
+            <button type="button" className="is-active">
+              {isZh ? '深度研究' : 'Deep research'}
+            </button>
+            <span>{isZh ? '深度任务可能需要较长时间' : 'Deep jobs may take considerable time'}</span>
+          </div>
+        ) : activeView === 'company-dashboard' ? null : (
+          <div className="product-filter-bar">
+            <button type="button" className="product-filter-token" onClick={() => setFiltersOpen(true)}>
+              <span>{isZh ? '时间' : 'Period'}</span>
+              <strong>{filterSummary.period}</strong>
+              <ChevronDown size={14} />
+            </button>
+            <button type="button" className="product-filter-token" onClick={() => setFiltersOpen(true)}>
+              <span>{isZh ? '方向' : 'Direction'}</span>
+              <strong>{filterSummary.direction}</strong>
+              <ChevronDown size={14} />
+            </button>
+            <button type="button" className="product-filter-token" onClick={() => setFiltersOpen(true)}>
+              <span>{isExplore ? (activeView === 'map-country' ? (isZh ? '市场' : 'Market') : 'HS Code') : (isZh ? '范围' : 'Scope')}</span>
+              <strong>{filterSummary.focus}</strong>
+              <ChevronDown size={14} />
+            </button>
+            <button type="button" className="product-all-filters" onClick={() => setFiltersOpen(true)}>
+              <SlidersHorizontal size={15} />
+              {isZh ? '全部筛选' : 'All filters'}
+              {filterSummary.count > 0 && <span>{filterSummary.count}</span>}
+            </button>
+            {activeView === 'map-country' && (
+              <div className="product-inline-metrics" aria-label={isZh ? '当前范围统计' : 'Current scope statistics'}>
+                <span><strong>{stats.transactions.toLocaleString()}</strong> {isZh ? '交易' : 'flows'}</span>
+                <span><strong>{stats.suppliers.toLocaleString()}</strong> {isZh ? '节点' : 'nodes'}</span>
+                <span><strong>{stats.categories.toLocaleString()}</strong> {isZh ? '类别' : 'categories'}</span>
               </div>
-              <div className="workspace-filter-scroll">
-                {activeView === 'global-stats' ? (
-                  <CountryTradeSidebar filters={countryTradeFilters} setFilters={setCountryTradeFilters} />
-                ) : activeView === 'map-country' ? (
-                  <SidebarFilters
-                    filters={mapCountryFilters}
-                    setFilters={setMapCountryFilters}
-                    hsCodeCategories={hsCodeCategories}
-                    availableHSCodes={availableHSCodes}
-                    countries={countries}
-                    shipments={shipments}
-                    mode="country"
-                  />
-                ) : activeView === 'map-hscode' ? (
-                  <SidebarFilters
-                    filters={mapHsFilters}
-                    setFilters={setMapHsFilters}
-                    hsCodeCategories={hsCodeCategories}
-                    availableHSCodes={availableHSCodes}
-                    countries={countries}
-                    shipments={shipments}
-                    mode="hscode"
-                  />
-                ) : (
-                  <CompanyDashboardSidebar
-                    filters={companyDashboardFilters}
-                    setFilters={setCompanyDashboardFilters}
-                    controls={companyDashboardControls}
-                    setControls={setCompanyDashboardControls}
-                  />
-                )}
-              </div>
-              {activeView === 'map-country' && (
-                <div className="workspace-scope-summary">
-                  <div><span>{isZh ? '交易记录' : 'Transactions'}</span><strong>{stats.transactions.toLocaleString()}</strong></div>
-                  <div><span>{isZh ? '节点' : 'Nodes'}</span><strong>{stats.suppliers.toLocaleString()}</strong></div>
-                  <div><span>{isZh ? '类别' : 'Categories'}</span><strong>{stats.categories.toLocaleString()}</strong></div>
-                </div>
-              )}
-            </aside>
-          )}
+            )}
+          </div>
+        )}
 
-          <section className="workspace-content">
-            <SpotlightPanel className="workspace-page-heading">
-              <AnimatedContent>
-                <p className="workspace-eyebrow">{currentMeta.eyebrow}</p>
-                <div className="workspace-title-row">
-                  <div>
-                    <h1>{isZh ? currentMeta.zhTitle : currentMeta.title}</h1>
-                    <p>{isZh ? currentMeta.zhDescription : currentMeta.description}</p>
-                  </div>
-                  <button type="button" className="workspace-ask-action" onClick={() => setAssistantLoaded(true)}>
-                    <Sparkles size={16} />
-                    {isZh ? '询问此页面' : 'Ask this view'}
-                  </button>
-                </div>
-              </AnimatedContent>
-            </SpotlightPanel>
-
-            <AnimatedContent key={activeView} className="workspace-view" delay={70}>
-              <Suspense fallback={lazyFallback}>
+        <section className="product-content">
+          <AnimatedContent key={activeView} className="workspace-view" delay={40}>
+            <Suspense fallback={lazyFallback}>
           {activeView === 'map-country' || activeView === 'map-hscode' ? (
             <div className="flex flex-col gap-6 pr-4">
               {/* 地图内容 */}
@@ -1618,17 +1677,6 @@ const App: React.FC = () => {
                             : 'Total within selected filter range'}
                         </p>
                         <div className="h-[510px] pb-5 relative">
-                          <div className="absolute left-3 top-3 z-30 w-fit">
-                            <div className="bg-white border border-black/10 rounded-[14px] shadow-md px-4 py-3 text-[11px] text-[#1D1D1F]">
-                              <div className="text-[10px] uppercase tracking-wider text-[#86868B] font-bold mb-1 flex items-center gap-1.5">
-                                <Filter className="w-3.5 h-3.5" />
-                                Filter Control
-                              </div>
-                              <div><span className="text-[#86868B]">Time:</span> {hsCodeMapFilterSummary.time}</div>
-                              <div><span className="text-[#86868B]">Direction:</span> {hsCodeMapFilterSummary.direction}</div>
-                              <div className="max-w-[340px] truncate"><span className="text-[#86868B]">HS Code:</span> {hsCodeMapFilterSummary.hsCodes}</div>
-                            </div>
-                          </div>
                           <div className="absolute inset-0">
                             <CountryTradeMap
                               stats={displayedHsCodeMapStats}
@@ -1747,6 +1795,15 @@ const App: React.FC = () => {
           ) : activeView === 'global-stats' ? (
             <div className="flex flex-col gap-6 pr-4">
               <>
+                {displayedCountryTradeSummary !== null && (
+                  <CountryTradeStatsPanel
+                    stats={countryTradeStats}
+                    summary={displayedCountryTradeSummary}
+                    trends={countryTradeTrends}
+                    topCountries={topCountries}
+                    topCountriesQuarterly={topCountriesQuarterly}
+                  />
+                )}
                 <div className="bg-white border border-black/5 rounded-[28px] p-6 shadow-sm h-[600px] overflow-hidden">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-[18px] font-bold text-[#1D1D1F]">{t('countryTrade.tradeMap')}</h3>
@@ -1799,15 +1856,6 @@ const App: React.FC = () => {
                     </div>
                   </div>
 
-                {displayedCountryTradeSummary !== null && (
-                  <CountryTradeStatsPanel
-                    stats={countryTradeStats}
-                    summary={displayedCountryTradeSummary}
-                    trends={countryTradeTrends}
-                    topCountries={topCountries}
-                    topCountriesQuarterly={topCountriesQuarterly}
-                  />
-                )}
                 </>
             </div>
           ) : activeView === 'company-dashboard' ? (
@@ -1820,11 +1868,39 @@ const App: React.FC = () => {
           ) : activeView === 'insight-reports' ? (
             <InsightsDashboard />
           ) : null}
-              </Suspense>
-            </AnimatedContent>
-          </section>
-        </main>
-      </div>
+            </Suspense>
+          </AnimatedContent>
+        </section>
+      </main>
+
+      {filtersOpen && activeView !== 'insight-reports' && (
+        <div className="product-filter-overlay" role="presentation" onMouseDown={() => setFiltersOpen(false)}>
+          <aside
+            className="product-filter-drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-label={isZh ? '分析筛选' : 'Analysis filters'}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <header>
+              <div>
+                <p>{isZh ? '分析范围' : 'Analysis scope'}</p>
+                <span>{isZh ? '更改筛选后数据会自动刷新' : 'Data refreshes automatically when filters change'}</span>
+              </div>
+              <button type="button" onClick={() => setFiltersOpen(false)} aria-label={isZh ? '关闭筛选' : 'Close filters'}>
+                <X size={18} />
+              </button>
+            </header>
+            <div className="product-filter-drawer-content custom-scrollbar">
+              {filterControls}
+            </div>
+            <footer>
+              <span>{filterSummary.count > 0 ? `${filterSummary.count} ${isZh ? '个条件已选' : 'filters applied'}` : (isZh ? '使用默认范围' : 'Using default scope')}</span>
+              <button type="button" onClick={() => setFiltersOpen(false)}>{isZh ? '查看结果' : 'View results'}</button>
+            </footer>
+          </aside>
+        </div>
+      )}
 
       {((activeView === 'map-country' && filterLoading) || (activeView === 'map-hscode' && hsCodeMapLoading) || (activeView === 'global-stats' && countryTradeLoading)) && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center pointer-events-none">
@@ -1836,6 +1912,8 @@ const App: React.FC = () => {
         <Suspense fallback={null}>
           <AIAssistant
             initialOpen
+            showLauncher={false}
+            onClose={() => setAssistantLoaded(false)}
             context={assistantContext}
             onSendMessage={async (
               message: string,
@@ -1848,16 +1926,7 @@ const App: React.FC = () => {
             }}
           />
         </Suspense>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setAssistantLoaded(true)}
-          className="workspace-assistant-launcher"
-          aria-label={t('ai.assistant')}
-        >
-          <MessageCircle className="w-6 h-6 text-white" />
-        </button>
-      )}
+      ) : null}
     </div>
   );
 };

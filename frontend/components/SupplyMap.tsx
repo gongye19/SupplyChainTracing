@@ -20,12 +20,10 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
   shipments, 
   selectedCountries, 
   countries, 
-  filters,
   isPreview = false 
 }) => {
   const { t, language } = useLanguage();
   const containerRef = useRef<HTMLDivElement>(null);
-  const filterCardRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const projectionRef = useRef<d3.GeoProjection | null>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
@@ -791,113 +789,8 @@ const SupplyMap: React.FC<SupplyMapProps> = React.memo(({
       }
   }, [shipments, selectedCountries, countries, isPreview, visibleCategories]);
 
-  // 将筛选卡片做成“随滚动吸顶”的浮层，避免下滑后看不到配置
-  useEffect(() => {
-    const updateFilterCardPosition = () => {
-      const container = containerRef.current;
-      const card = filterCardRef.current;
-      if (!container || !card) return;
-
-      const rect = container.getBoundingClientRect();
-      const stickyTop = 80; // 顶部导航下方安全距离
-      const targetTop = Math.max(stickyTop, rect.top + 24);
-      const targetLeft = Math.max(16, rect.left + 24);
-      const isVisible = rect.bottom > stickyTop + 40 && rect.top < window.innerHeight - 40;
-
-      card.style.top = `${targetTop}px`;
-      card.style.left = `${targetLeft}px`;
-      card.style.opacity = isVisible ? '1' : '0';
-      card.style.visibility = isVisible ? 'visible' : 'hidden';
-    };
-
-    updateFilterCardPosition();
-    window.addEventListener('scroll', updateFilterCardPosition, { passive: true });
-    window.addEventListener('resize', updateFilterCardPosition);
-
-    return () => {
-      window.removeEventListener('scroll', updateFilterCardPosition);
-      window.removeEventListener('resize', updateFilterCardPosition);
-    };
-  }, []);
-
   return (
     <div ref={containerRef} className="w-full h-full relative overflow-hidden rounded-[24px] border border-black/5 bg-white shadow-[0_4px_24px_rgba(0,0,0,0.04)]">
-      {/* 固定筛选信息 - 左上角 */}
-      <div ref={filterCardRef} className="fixed z-20 transition-opacity duration-150">
-        <div className="bg-white/95 backdrop-blur-xl p-4 rounded-[18px] border border-black/[0.05] shadow-lg min-w-[200px] max-w-[280px] pointer-events-auto">
-          <div className="mb-3 pb-2.5 border-b border-black/10">
-            <span className="text-[12px] text-[#1D1D1F] font-bold uppercase tracking-widest">{t('map.activeFilters') || 'Filter Control'}</span>
-          </div>
-          <div className="flex flex-col gap-2.5 text-[11px]">
-            {/* 时间范围 */}
-            {filters && (
-              <>
-                <div className="flex items-start gap-2">
-                  <span className="text-[#86868B] font-semibold min-w-[60px]">Time:</span>
-                  <span className="text-[#1D1D1F]">{filters.startDate} ~ {filters.endDate}</span>
-                </div>
-                
-                {/* 国家 */}
-                {filters.selectedCountries.length > 0 && (
-                  <div className="flex items-start gap-2">
-                    <span className="text-[#86868B] font-semibold min-w-[60px]">Country/Region:</span>
-                    <span className="text-[#1D1D1F]">
-                      {(() => {
-                        const selectedCountryNames = filters.selectedCountries.map(
-                          (code) => countryCodeToName.get(code) || code
-                        );
-                        return selectedCountryNames.length <= 2
-                          ? selectedCountryNames.join(', ')
-                          : `${selectedCountryNames.slice(0, 2).join(', ')} +${selectedCountryNames.length - 2}`;
-                      })()}
-                    </span>
-                  </div>
-                )}
-                
-                {/* 公司 */}
-                {filters.selectedCompanies.length > 0 && (
-                  <div className="flex items-start gap-2">
-                    <span className="text-[#86868B] font-semibold min-w-[60px]">Company:</span>
-                    <span className="text-[#1D1D1F]">
-                      {filters.selectedCompanies.length <= 1 
-                        ? filters.selectedCompanies.join(', ')
-                        : `${filters.selectedCompanies[0]} +${filters.selectedCompanies.length - 1}`}
-                    </span>
-                  </div>
-                )}
-                
-                {/* 大类 */}
-                {filters.selectedHSCodeCategories.length > 0 && (
-                  <div className="flex items-start gap-2">
-                    <span className="text-[#86868B] font-semibold min-w-[60px]">Category:</span>
-                    <span className="text-[#1D1D1F]">
-                      {filters.selectedHSCodeCategories.map(code => `HS${code}`).join(', ')}
-                    </span>
-                  </div>
-                )}
-                
-                {/* 小类 */}
-                {filters.selectedHSCodeSubcategories.length > 0 && (
-                  <div className="flex items-start gap-2">
-                    <span className="text-[#86868B] font-semibold min-w-[60px]">Subcategory:</span>
-                    <span className="text-[#1D1D1F]">
-                      {filters.selectedHSCodeSubcategories.join(', ')}
-                    </span>
-                  </div>
-                )}
-                
-                {/* 无筛选时显示 */}
-                {filters.selectedCountries.length === 0 && 
-                 filters.selectedCompanies.length === 0 && 
-                 filters.selectedHSCodeCategories.length === 0 && 
-                 filters.selectedHSCodeSubcategories.length === 0 && (
-                  <div className="text-[#86868B] text-[10px] italic">No filters selected</div>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-      </div>
       <div className="absolute bottom-4 left-4 z-10 pointer-events-auto">
         <div className="bg-white/95 backdrop-blur-xl p-3 rounded-[14px] border border-black/[0.05] shadow-md text-[10px] text-[#1D1D1F] leading-relaxed">
           <div className="font-bold uppercase tracking-wide text-[#86868B] mb-1">Legend</div>

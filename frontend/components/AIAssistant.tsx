@@ -13,6 +13,8 @@ interface Message {
 interface AIAssistantProps {
   initialOpen?: boolean;
   context?: string;
+  showLauncher?: boolean;
+  onClose?: () => void;
   // 保留 chunk 回调，便于后续把直接模型响应升级为流式输出。
   onSendMessage?: (
     message: string,
@@ -23,7 +25,13 @@ interface AIAssistantProps {
   ) => Promise<void>;
 }
 
-const AIAssistant: React.FC<AIAssistantProps> = ({ initialOpen = false, context, onSendMessage }) => {
+const AIAssistant: React.FC<AIAssistantProps> = ({
+  initialOpen = false,
+  context,
+  showLauncher = true,
+  onClose,
+  onSendMessage,
+}) => {
   const { t, language } = useLanguage();
   const [isOpen, setIsOpen] = useState(initialOpen);
   const [messages, setMessages] = useState<Message[]>([
@@ -201,10 +209,15 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ initialOpen = false, context,
     ]);
   };
 
+  const handleClose = () => {
+    setIsOpen(false);
+    onClose?.();
+  };
+
   return (
     <>
       {/* 浮动按钮 */}
-      {!isOpen && (
+      {showLauncher && !isOpen && (
         <button
           onClick={() => setIsOpen(true)}
           className="workspace-assistant-launcher"
@@ -242,7 +255,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ initialOpen = false, context,
                 <Trash2 className="w-4 h-4" />
               </button>
               <button
-                onClick={() => setIsOpen(false)}
+                onClick={handleClose}
                 className="assistant-icon-button"
                 title={t('ai.close')}
               >

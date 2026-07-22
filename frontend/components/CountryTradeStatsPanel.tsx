@@ -188,8 +188,8 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
   return (
     <div className="space-y-6">
       {/* KPI卡片 */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white border border-black/5 p-6 rounded-[20px] shadow-sm">
+      <div className="overview-kpi-row grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="overview-kpi bg-white border border-black/5 p-6 rounded-[20px] shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[12px] font-medium text-[#86868B] uppercase">{t('countryTrade.totalTradeValue')}</span>
             <DollarSign className="w-5 h-5 text-[#007AFF]" />
@@ -199,7 +199,7 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
           </div>
         </div>
 
-        <div className="bg-white border border-black/5 p-6 rounded-[20px] shadow-sm">
+        <div className="overview-kpi bg-white border border-black/5 p-6 rounded-[20px] shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[12px] font-medium text-[#86868B] uppercase">{t('countryTrade.participatingCountries')}</span>
             <Globe className="w-5 h-5 text-[#34C759]" />
@@ -209,7 +209,7 @@ const CountryTradeStatsPanel: React.FC<CountryTradeStatsPanelProps> = ({
           </div>
         </div>
 
-        <div className="bg-white border border-black/5 p-6 rounded-[20px] shadow-sm">
+        <div className="overview-kpi bg-white border border-black/5 p-6 rounded-[20px] shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[12px] font-medium text-[#86868B] uppercase">{t('countryTrade.transactionCount')}</span>
             <Package className="w-5 h-5 text-[#FF9500]" />

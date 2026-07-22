@@ -193,21 +193,6 @@ export function InsightsDashboard() {
 
   return (
     <div className="research-workspace flex min-h-0 flex-col gap-5">
-      <div className="research-toolbar">
-        <div className="research-toolbar-copy">
-          <span>{locale === 'zh' ? '深度研究模式' : 'Deep research mode'}</span>
-          <p>{locale === 'zh' ? '适合需要完整证据链和可复用报告的问题，任务可能需要较长时间。' : 'For questions that need a complete evidence trail and reusable report. Jobs may take considerable time.'}</p>
-        </div>
-        <button
-          type="button"
-          onClick={() => void loadJobs(true)}
-          className="research-refresh"
-        >
-          <RefreshCw className="h-4 w-4" />
-          {locale === 'zh' ? '刷新' : 'Refresh'}
-        </button>
-      </div>
-
       {!systemStatus?.enabled && systemStatus && (
         <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
@@ -261,17 +246,27 @@ export function InsightsDashboard() {
         <section className="flex min-h-0 flex-col rounded-[24px] border border-black/5 bg-white shadow-sm">
           <div className="flex items-center justify-between gap-3 border-b border-black/5 p-4">
             <h3 className="font-bold text-[#1D1D1F]">{locale === 'zh' ? '任务与报告' : 'Jobs & reports'}</h3>
-            <select
-              aria-label={locale === 'zh' ? '按状态筛选' : 'Filter by status'}
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
-              className="rounded-lg border border-black/10 bg-white px-2 py-1 text-xs text-[#1D1D1F]"
-            >
-              <option value="all">{locale === 'zh' ? '全部' : 'All'}</option>
-              {(Object.keys(STATUS_LABELS) as InsightJobStatus[]).map((status) => (
-                <option key={status} value={status}>{STATUS_LABELS[status][locale]}</option>
-              ))}
-            </select>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void loadJobs(true)}
+                className="research-refresh"
+                aria-label={locale === 'zh' ? '刷新任务' : 'Refresh jobs'}
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+              </button>
+              <select
+                aria-label={locale === 'zh' ? '按状态筛选' : 'Filter by status'}
+                value={statusFilter}
+                onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
+                className="rounded-lg border border-black/10 bg-white px-2 py-1 text-xs text-[#1D1D1F]"
+              >
+                <option value="all">{locale === 'zh' ? '全部' : 'All'}</option>
+                {(Object.keys(STATUS_LABELS) as InsightJobStatus[]).map((status) => (
+                  <option key={status} value={status}>{STATUS_LABELS[status][locale]}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div className="max-h-[760px] overflow-y-auto p-3">
