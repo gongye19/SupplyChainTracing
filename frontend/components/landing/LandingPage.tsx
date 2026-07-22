@@ -40,10 +40,6 @@ function LandingPage({ onEnterWorkspace }: LandingPageProps) {
           ['Explore', '按市场、时间与产品拆解进出口流向，发现集中度、依赖关系和变化趋势。'],
           ['Companies', '从品牌出发查看供应商、交易对手与跨境连接，形成可追踪的企业网络。'],
         ],
-        coverageEyebrow: '为半导体供应链而设计',
-        coverageTitle: '同一份证据，三种分析尺度。',
-        coverageBody: '先从全球流向发现异常，再深入到产品类别与公司关系。每一步都保留当前分析范围，减少重复筛选。',
-        coverageItems: ['国家与市场：比较双边贸易和区域暴露', '产品与 HS Code：追踪品类迁移和季度变化', '公司网络：识别供应商与交易对手关系'],
         researchBadge: '特色能力',
         researchEyebrow: 'Research workspace',
         researchTitle: '把一个明确问题，变成一条完整研究路径。',
@@ -72,10 +68,6 @@ function LandingPage({ onEnterWorkspace }: LandingPageProps) {
           ['Explore', 'Break down import and export flows by market, period and product to surface concentration, dependencies and change.'],
           ['Companies', 'Start with a brand and trace suppliers, counterparties and cross-border relationships.'],
         ],
-        coverageEyebrow: 'Built for semiconductor supply chains',
-        coverageTitle: 'The same evidence at three analytical scales.',
-        coverageBody: 'Start with global movement, then move into product categories and company relationships. Your analysis scope stays with you as the question gets more specific.',
-        coverageItems: ['Countries & markets: compare bilateral trade and regional exposure', 'Products & HS codes: track category shifts and quarterly movement', 'Company networks: identify suppliers and trading counterparties'],
         researchBadge: 'Signature capability',
         researchEyebrow: 'Research workspace',
         researchTitle: 'Turn one focused question into a complete research path.',
@@ -162,26 +154,6 @@ function LandingPage({ onEnterWorkspace }: LandingPageProps) {
                 </article>
               );
             })}
-          </div>
-        </section>
-
-        <section className="landing-coverage" id="coverage">
-          <div className="landing-coverage-map" aria-hidden="true">
-            <span className="landing-orbit orbit-one" />
-            <span className="landing-orbit orbit-two" />
-            <span className="landing-map-node node-one">NL</span>
-            <span className="landing-map-node node-two">TW</span>
-            <span className="landing-map-node node-three">KR</span>
-            <span className="landing-map-node node-four">US</span>
-            <div className="landing-map-core"><Globe2 size={25} /><strong>SemiconFlow</strong><small>Global evidence layer</small></div>
-          </div>
-          <div className="landing-coverage-copy">
-            <p>{copy.coverageEyebrow}</p>
-            <h2>{copy.coverageTitle}</h2>
-            <span>{copy.coverageBody}</span>
-            <ul>
-              {copy.coverageItems.map((item) => <li key={item}><ArrowRight size={14} />{item}</li>)}
-            </ul>
           </div>
         </section>
 

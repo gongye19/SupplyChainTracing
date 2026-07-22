@@ -59,13 +59,13 @@ Use the accent only for selected state, focus, links, and data emphasis. Use sem
 
 ### Navigation
 
-The landing page has a lightweight marketing header with section links and one `Open workspace` action. Inside the product, one top application bar contains brand, primary navigation, data status, and language. On mobile, primary navigation collapses into a temporary dropdown.
+The landing page has a lightweight header with brand and language only; product entry points belong in the page content. Inside the product, one top application bar contains brand, primary navigation, data status, and language. On mobile, primary navigation collapses into a temporary dropdown.
 
 ### Landing page
 
-The landing page is visually distinct from the data workspace: a dark editorial hero, authentic semiconductor photography, warm neutral content sections, and one clear path into the product. Its hierarchy is headline, short explanation, primary CTA, industry image, then three product capabilities. Marketing treatment must stop at the workspace boundary; dashboard controls remain quiet and utilitarian.
+The landing page is visually distinct from the data workspace: a dark editorial hero, authentic semiconductor photography, warm neutral content sections, and a clear path into the product. Its hierarchy is headline, short explanation, Overview CTA, industry image, Explore and Companies, then the signature Research section. Marketing treatment must stop at the workspace boundary; dashboard controls remain quiet and utilitarian.
 
-The landing page has exactly four product entry points. `Overview` is the single primary action in the hero. The middle workspace grid contains only `Explore` and `Companies`. `Research` appears once as a visually distinctive signature capability at the bottom of the page. Do not repeat these destinations in the header, capability strip, explanatory sections, or footer.
+The landing page has exactly four product entry points. `Overview` is the single primary action in the hero. The middle workspace grid contains only `Explore` and `Companies`. `Research` appears once as a visually distinctive signature capability at the bottom of the page. Do not insert an additional coverage explainer between the workspace grid and Research, and do not repeat destinations in the header, capability strip, explanatory sections, or footer.
 
 ### Filter bar
 
