@@ -69,7 +69,11 @@ Charts, maps, rankings, and tables sit on white surfaces with hairline borders. 
 
 ### Research
 
-Quick Answer and Deep Research are visibly different modes. Long-running jobs must state that they can take considerable time and must never be triggered by a normal dashboard interaction.
+The Research page has one primary input for starting a deep research run. Previous questions, job status, and completed reports stay out of the main canvas; they are available only through an explicit History drawer and report dialog. Long-running jobs must state that they can take considerable time and must never be triggered by a normal dashboard interaction.
+
+### Companies
+
+Company discovery starts with one full-width search bar using the same border, radius, density, and actions as the shared data filter bar. Secondary company filters live in a temporary drawer. Do not present a separate grid of filter cards above the search experience.
 
 ## Motion
 

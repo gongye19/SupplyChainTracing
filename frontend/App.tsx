@@ -2,11 +2,10 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense } from 'react';
 import SidebarFilters from './components/SidebarFilters';
 import CountryTradeSidebar from './components/CountryTradeSidebar';
-import CompanyDashboardSidebar from './components/CompanyDashboardSidebar';
 import type { TopCountriesDatum } from './components/TopCountriesHorizontalBar';
 import { CompanyDashboardControls, Filters, HSCodeCategory, CountryLocation, Location, Shipment, CountryMonthlyTradeStat, CountryTradeStatSummary, CountryTradeTrend, TopCountry, CountryTradeFilters, CountryQuarterTop, CountryAggregate, CountryQuarterAggregate, HSAggregate, HSQuarterAggregate } from './types';
 import { shipmentsAPI, hsCodeCategoriesAPI, countryLocationsAPI, chatAPI, ChatMessage, countryTradeStatsAPI } from './services/api';
-import { ChevronDown, Search, SlidersHorizontal, Sparkles, X } from 'lucide-react';
+import { ChevronDown, SlidersHorizontal, Sparkles, X } from 'lucide-react';
 import { useLanguage } from './contexts/LanguageContext';
 import { getCountriesFromCodes } from './utils/countryCoordinates';
 import { logger } from './utils/logger';
@@ -90,11 +89,11 @@ const VIEW_META: Record<WorkspaceView, { eyebrow: string; title: string; descrip
     zhDescription: '分析企业布局、供应商以及跨境关联关系。',
   },
   'insight-reports': {
-    eyebrow: 'Research / Deep reports',
-    title: 'Research workspace',
-    description: 'Review long-running analyses and turn questions into reusable research outputs.',
-    zhTitle: '研究工作台',
-    zhDescription: '管理深度分析任务，并将问题沉淀为可复用的研究成果。',
+    eyebrow: 'Research',
+    title: 'Deep research',
+    description: 'Ask one focused question and start a rigorous research run.',
+    zhTitle: '深度研究',
+    zhDescription: '输入一个明确问题并启动深度研究。',
   },
 };
 
@@ -205,6 +204,7 @@ const App: React.FC = () => {
 
   const handleViewChange = useCallback((view: WorkspaceView) => {
     setActiveView(view);
+    setFiltersOpen(false);
     const url = new URL(window.location.href);
     url.searchParams.set('view', view);
     window.history.pushState({ view }, '', url);
@@ -1393,14 +1393,7 @@ const App: React.FC = () => {
       shipments={shipments}
       mode="hscode"
     />
-  ) : (
-    <CompanyDashboardSidebar
-      filters={companyDashboardFilters}
-      setFilters={setCompanyDashboardFilters}
-      controls={companyDashboardControls}
-      setControls={setCompanyDashboardControls}
-    />
-  );
+  ) : null;
 
   return (
     <div className="product-shell">
@@ -1422,10 +1415,12 @@ const App: React.FC = () => {
             <h1>{pageTitle}</h1>
             <p>{pageDescription}</p>
           </div>
-          <button type="button" className="product-ask-action" onClick={() => setAssistantLoaded(true)}>
-            <Sparkles size={15} />
-            {isZh ? '询问此页面' : 'Ask this view'}
-          </button>
+          {activeView !== 'insight-reports' && (
+            <button type="button" className="product-ask-action" onClick={() => setAssistantLoaded(true)}>
+              <Sparkles size={15} />
+              {isZh ? '询问此页面' : 'Ask this view'}
+            </button>
+          )}
         </section>
 
         {isExplore && (
@@ -1448,18 +1443,7 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {activeView === 'insight-reports' ? (
-          <div className="product-research-modes">
-            <button type="button" onClick={() => setAssistantLoaded(true)}>
-              <Search size={15} />
-              {isZh ? '快速问答' : 'Quick answer'}
-            </button>
-            <button type="button" className="is-active">
-              {isZh ? '深度研究' : 'Deep research'}
-            </button>
-            <span>{isZh ? '深度任务可能需要较长时间' : 'Deep jobs may take considerable time'}</span>
-          </div>
-        ) : activeView === 'company-dashboard' ? null : (
+        {activeView === 'insight-reports' || activeView === 'company-dashboard' ? null : (
           <div className="product-filter-bar">
             <button type="button" className="product-filter-token" onClick={() => setFiltersOpen(true)}>
               <span>{isZh ? '时间' : 'Period'}</span>
@@ -1860,8 +1844,8 @@ const App: React.FC = () => {
             </div>
           ) : activeView === 'company-dashboard' ? (
             <CompanyDashboard
-              startDate={companyDashboardFilters.startDate}
-              endDate={companyDashboardFilters.endDate}
+              filters={companyDashboardFilters}
+              setFilters={setCompanyDashboardFilters}
               controls={companyDashboardControls}
               setControls={setCompanyDashboardControls}
             />

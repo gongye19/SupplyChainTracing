@@ -1,21 +1,23 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Building2, ChevronDown, ChevronLeft, ChevronRight, Package, Search, TrendingUp, Users, X } from 'lucide-react';
+import { Building2, ChevronDown, ChevronLeft, ChevronRight, Package, Search, SlidersHorizontal, TrendingUp, Users, X } from 'lucide-react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { companiesAPI } from '../services/api';
-import { CompanyDashboardControls, CompanyDashboardData, CompanyRankItem, CompanyRankMetric, CompanySearchResult } from '../types';
+import { CompanyDashboardControls, CompanyDashboardData, CompanyRankItem, CompanyRankMetric, CompanySearchResult, Filters } from '../types';
+import MonthRangeSlider from './MonthRangeSlider';
 import {
   COMPANY_CATEGORY_BY_HS_CODE,
   COMPANY_CATEGORY_BY_ID,
   COMPANY_CATEGORY_OPTIONS,
   CONTINENT_OPTIONS,
+  RANK_METRIC_OPTIONS,
   ROLE_OPTIONS,
   getCompanyActiveCountries,
   getCompanyCategoryHsCodes,
 } from '../utils/companyDashboardFilters';
 
 interface CompanyDashboardProps {
-  startDate: string;
-  endDate: string;
+  filters: Filters;
+  setFilters: React.Dispatch<React.SetStateAction<Filters>>;
   controls: CompanyDashboardControls;
   setControls: React.Dispatch<React.SetStateAction<CompanyDashboardControls>>;
 }
@@ -52,8 +54,10 @@ const categorySummary = (categoryLabels?: string[]) => (
 
 const RESULTS_PER_PAGE = 10;
 
-const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate, controls, setControls }) => {
+const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ filters, setFilters, controls, setControls }) => {
+  const { startDate, endDate } = filters;
   const [searchInput, setSearchInput] = useState('');
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [filterOptions, setFilterOptions] = useState<{
     brands: { brandName: string }[];
     countries: { countryCode: string }[];
@@ -85,6 +89,15 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!filtersOpen) return undefined;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setFiltersOpen(false);
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [filtersOpen]);
 
   useEffect(() => {
     let active = true;
@@ -381,17 +394,47 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
     () => results.slice((resultPage - 1) * RESULTS_PER_PAGE, resultPage * RESULTS_PER_PAGE),
     [resultPage, results]
   );
+  const appliedFilterCount = [
+    controls.selectedBrand,
+    controls.selectedContinent,
+    controls.selectedCountry,
+    controls.selectedHsPrefix,
+    controls.selectedRole,
+    controls.rankMetric !== 'trade_value' ? controls.rankMetric : '',
+  ].filter(Boolean).length;
 
   return (
     <div className="company-workspace flex-1 flex flex-col gap-5">
-      <div className="flex items-center gap-2 text-[12px] text-[#86868B] bg-white/80 backdrop-blur px-4 py-2.5 rounded-[12px] border border-black/5 w-fit shadow-sm">
-        <span className="font-bold uppercase tracking-wider">Time Range</span>
-        <span className="text-black/20">|</span>
-        <span className="font-semibold text-[#1D1D1F]">{startDate} - {endDate}</span>
-      </div>
-
-      <div className="w-full max-w-4xl mx-auto">
-        <div className="mb-3 grid grid-cols-1 lg:grid-cols-2 gap-3">
+      <div className="w-full">
+        {filtersOpen && (
+          <div className="product-filter-overlay" role="presentation" onMouseDown={() => setFiltersOpen(false)}>
+            <aside
+              className="product-filter-drawer"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Company filters"
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <header>
+                <div>
+                  <p>Company filters</p>
+                  <span>Refine the company universe and ranking method</span>
+                </div>
+                <button type="button" onClick={() => setFiltersOpen(false)} aria-label="Close company filters">
+                  <X size={18} />
+                </button>
+              </header>
+              <div className="product-filter-drawer-content custom-scrollbar">
+                <MonthRangeSlider
+                  title="Time Range"
+                  startLabel="START"
+                  endLabel="END"
+                  minMonth="2021-01"
+                  startMonth={startDate || '2021-01'}
+                  endMonth={endDate}
+                  onChange={(startMonth, endMonth) => setFilters((previous) => ({ ...previous, startDate: startMonth, endDate: endMonth }))}
+                />
+                <div className="company-drawer-controls grid grid-cols-1 gap-3">
           <div className="lg:col-span-2">
             <BrandSelect
               label="Brand"
@@ -432,10 +475,26 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
               label: option.label,
             }))}
           />
+          <FilterChips
+            label="Rank by"
+            value={controls.rankMetric}
+            onChange={(value) => updateControls({ rankMetric: value as CompanyDashboardControls['rankMetric'] })}
+            options={RANK_METRIC_OPTIONS}
+            includeAll={false}
+          />
         </div>
+              </div>
+              <footer>
+                <span>{appliedFilterCount > 0 ? `${appliedFilterCount} filters applied` : 'Using all companies'}</span>
+                <button type="button" onClick={() => setFiltersOpen(false)}>View results</button>
+              </footer>
+            </aside>
+          </div>
+        )}
 
-        <div className="bg-white rounded-[18px] border border-black/[0.08] shadow-[0_4px_24px_rgba(0,0,0,0.06)] p-3">
-          <div className="relative flex items-center bg-[#F5F5F7] rounded-[12px] border border-transparent focus-within:bg-white focus-within:border-[#007AFF]/30 transition-colors">
+        <div className="company-query-wrap">
+          <div className="company-query-bar">
+          <div className="company-search-shell relative flex items-center">
             <Search className="w-5 h-5 text-[#86868B] ml-4 shrink-0" />
             <input
               type="text"
@@ -455,7 +514,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
                 if (event.key === 'Enter') runSearch();
                 if (event.key === 'Escape') setShowSuggestions(false);
               }}
-              placeholder="No company name yet? Select filters above, then click Search to browse companies"
+              placeholder="Search a company by name"
               className="flex-1 min-w-0 px-3 py-3 text-[15px] font-medium text-[#1D1D1F] placeholder:text-[#C7C7CC] bg-transparent outline-none"
             />
             {searchInput && (
@@ -480,7 +539,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
             <button
               onClick={runSearch}
               disabled={loading}
-              className="mr-1.5 min-w-[84px] px-4 py-2 bg-[#007AFF] text-white text-[13px] font-semibold rounded-[10px] hover:bg-[#0066CC] transition-colors disabled:opacity-60 shrink-0"
+              className="company-search-submit mr-1.5 min-w-[84px] px-4 py-2 text-white text-[13px] font-semibold transition-colors disabled:opacity-60 shrink-0"
             >
               {loading || searching ? 'Loading' : 'Search'}
             </button>
@@ -508,9 +567,15 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
               </div>
             )}
           </div>
+          <button type="button" className="company-filter-trigger" onClick={() => setFiltersOpen(true)}>
+            <SlidersHorizontal size={15} />
+            Filters
+            {appliedFilterCount > 0 && <span>{appliedFilterCount}</span>}
+          </button>
+          </div>
           {error && (
-            <div className="mt-3 flex justify-center">
-              <div className="w-fit max-w-full rounded-[12px] bg-[#FFF2F2] border border-[#FF3B30]/15 px-4 py-3 text-center text-[13px] font-semibold text-[#FF3B30]">
+            <div className="mt-3">
+              <div className="w-full rounded-[8px] bg-[#FFF2F2] border border-[#FF3B30]/15 px-4 py-3 text-[13px] font-semibold text-[#FF3B30]">
                 {error}
               </div>
             </div>
@@ -585,12 +650,12 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
       </div>
 
       {!company && !error && (
-        <div className="flex flex-col items-center justify-start flex-1 pt-16 pb-24 gap-5 text-center">
-          <div>
-            <p className="text-[18px] font-bold text-[#1D1D1F] mb-1">Company Dashboard</p>
-            <p className="text-[14px] text-[#86868B] max-w-sm">Search a company to view categories, suppliers, customers, and monthly trend.</p>
+        <div className="company-discovery flex flex-col gap-4">
+          <div className="company-section-heading">
+            <p>Leading companies</p>
+            <span>Select a company to inspect its products, markets and counterparties.</span>
           </div>
-          <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-3 text-left">
+          <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-3 text-left">
             <TopCompaniesPreview
               title="Top 3 by Trade Value"
               items={topByValue}
@@ -865,11 +930,12 @@ const FilterChips: React.FC<{
   options: Array<{ value: string; label: string }>;
   disabled?: boolean;
   emptyText?: string;
-}> = ({ label, value, onChange, options, disabled = false, emptyText = 'No options' }) => (
+  includeAll?: boolean;
+}> = ({ label, value, onChange, options, disabled = false, emptyText = 'No options', includeAll = true }) => (
   <div className={`rounded-[14px] border border-black/[0.08] bg-white p-3 min-w-0 ${disabled ? 'opacity-75' : ''}`}>
     <div className="flex items-center justify-between gap-3 mb-2">
       <span className="text-[10px] font-bold uppercase tracking-wider text-[#86868B]">{label}</span>
-      {value && !disabled && (
+      {value && !disabled && includeAll && (
         <button
           type="button"
           onClick={() => onChange('')}
@@ -886,15 +952,17 @@ const FilterChips: React.FC<{
         </span>
       ) : (
         <>
-          <button
-            type="button"
-            onClick={() => onChange('')}
-            className={`px-2.5 py-1.5 rounded-[8px] text-[11px] font-semibold transition-colors ${
-              value === '' ? 'bg-[#007AFF] text-white' : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-black/10'
-            }`}
-          >
-            All
-          </button>
+          {includeAll && (
+            <button
+              type="button"
+              onClick={() => onChange('')}
+              className={`px-2.5 py-1.5 rounded-[8px] text-[11px] font-semibold transition-colors ${
+                value === '' ? 'bg-[#007AFF] text-white' : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-black/10'
+              }`}
+            >
+              All
+            </button>
+          )}
           {options.map((option) => (
             <button
               type="button"
