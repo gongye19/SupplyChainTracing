@@ -6,12 +6,12 @@ This repository contains the public dashboard application only.
 
 - `frontend/`: React 19 + TypeScript + Vite + D3 + Recharts
 - `backend/app/`: FastAPI + SQLAlchemy + Pydantic
-- PostgreSQL: local Docker on port 5433; Railway in production
-- Deployment: Vercel frontend + Railway backend/database
+- PostgreSQL: local Docker on port 5433; Northflank in production
+- Deployment: Northflank frontend, backend, and database
 
 Raw datasets, news cleaning, trade aggregation, and database publication belong in the separate private `supplychain-data-pipeline` repository. Codex analysis and report generation belong in the separate private `insight-factory` repository. Do not reintroduce those responsibilities here.
 
-The lightweight Codex process belongs in `supplychain-chat-worker`. This repository owns only the `chat_jobs` Railway protocol and frontend polling client; it must never invoke Codex or a private model directly.
+Lightweight chat is served directly by this FastAPI backend through the project's Tailscale connection to the laboratory model gateway. Keep model credentials in Northflank secrets and never expose the model gateway publicly. The legacy `chat_jobs` protocol remains only as a temporary rollback path; do not re-enable its polling worker without explicit approval.
 
 ## Local development
 

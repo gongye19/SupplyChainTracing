@@ -6,7 +6,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 import os
 import re
 
-from .routes import chat_jobs, hs_code_categories, country_locations as port_locations_route, country_locations_compat, shipments, country_trade_stats, companies, insight_jobs
+from .routes import chat, chat_jobs, hs_code_categories, country_locations as port_locations_route, country_locations_compat, shipments, country_trade_stats, companies, insight_jobs
 from .utils.logger import get_logger
 
 app = FastAPI(title="Supply Chain API", version="1.0.0")
@@ -132,6 +132,7 @@ async def general_exception_handler(request: Request, exc: Exception):
     return response
 
 # 注册路由（仅保留当前数据链路使用的接口）
+app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 app.include_router(chat_jobs.router, prefix="/api/chat-jobs", tags=["chat-jobs"])
 app.include_router(chat_jobs.internal_router, prefix="/api/internal/chat-jobs", tags=["internal-chat-jobs"])
 app.include_router(shipments.router, prefix="/api/shipments", tags=["shipments"])

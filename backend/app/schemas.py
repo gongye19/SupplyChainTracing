@@ -176,6 +176,10 @@ class ChatJobCreate(BaseModel):
     history: List[ChatMessagePayload] = Field(default_factory=list, max_length=20)
 
 
+class ChatDirectResponse(BaseModel):
+    response: str
+
+
 class ChatJobResponse(BaseModel):
     job_id: str
     status: ChatJobStatus

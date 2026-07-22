@@ -1,10 +1,45 @@
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.routes import chat_jobs
+from app.routes import chat, chat_jobs
 
 
 client = TestClient(app)
+
+
+def test_direct_chat_is_disabled_by_default(monkeypatch) -> None:
+    monkeypatch.delenv("CHAT_MODEL_ENABLED", raising=False)
+    response = client.get("/api/chat/status")
+    assert response.status_code == 200
+    assert response.json()["enabled"] is False
+
+    response = client.post("/api/chat", json={"message": "What changed?", "history": []})
+    assert response.status_code == 503
+
+
+def test_direct_chat_returns_model_answer(monkeypatch) -> None:
+    captured = {}
+    monkeypatch.setenv("CHAT_MODEL_ENABLED", "true")
+
+    def fake_generate_answer(message, history):
+        captured.update(message=message, history=history)
+        return "Trade concentration increased."
+
+    monkeypatch.setattr(chat.chat_model, "generate_answer", fake_generate_answer)
+    response = client.post(
+        "/api/chat",
+        json={
+            "message": " What changed? ",
+            "history": [{"role": "assistant", "content": "Previous answer"}],
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"response": "Trade concentration increased."}
+    assert captured == {
+        "message": "What changed?",
+        "history": [{"role": "assistant", "content": "Previous answer"}],
+    }
 
 
 def test_chat_jobs_are_disabled_by_default(monkeypatch) -> None:

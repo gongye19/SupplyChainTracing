@@ -240,18 +240,6 @@ export interface ChatResponse {
   response: string;
 }
 
-type ChatJobStatus = 'queued' | 'running' | 'completed' | 'failed';
-
-interface ChatJobPayload {
-  job_id: string;
-  status: ChatJobStatus;
-  answer?: string | null;
-  error_message?: string | null;
-}
-
-const CHAT_POLL_INTERVAL_MS = 1_000;
-const CHAT_TIMEOUT_MS = 120_000;
-
 export const chatAPI = {
   sendMessage: async (
     message: string,
@@ -266,34 +254,18 @@ export const chatAPI = {
     };
 
     try {
-      const created = await fetchAPI<ChatJobPayload>('/api/chat-jobs', {
+      const result = await fetchAPI<ChatResponse>('/api/chat', {
         method: 'POST',
         body: JSON.stringify(request),
       });
-      logger.debug('[Chat] Queued job:', created.job_id);
-
-      const deadline = Date.now() + CHAT_TIMEOUT_MS;
-      while (Date.now() < deadline) {
-        await new Promise((resolve) => window.setTimeout(resolve, CHAT_POLL_INTERVAL_MS));
-        const job = await fetchAPI<ChatJobPayload>(`/api/chat-jobs/${encodeURIComponent(created.job_id)}`);
-        if (job.status === 'completed') {
-          if (!job.answer) {
-            onError('Chat worker completed without an answer');
-            return;
-          }
-          onChunk(job.answer);
-          onComplete();
-          return;
-        }
-        if (job.status === 'failed') {
-          onError(job.error_message || 'Chat worker failed');
-          return;
-        }
+      if (!result.response) {
+        onError('The laboratory model returned an empty answer');
+        return;
       }
-
-      onError('Chat request timed out while waiting for the server worker');
+      onChunk(result.response);
+      onComplete();
     } catch (error) {
-      logger.error('[Chat] Job error:', error);
+      logger.error('[Chat] Direct model error:', error);
       onError(error instanceof Error ? error.message : 'Unknown error');
     }
   },
