@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import threading
 from typing import Any
 
 import httpx
@@ -19,6 +20,15 @@ class ChatModelConfigurationError(RuntimeError):
 
 class ChatModelRequestError(RuntimeError):
     pass
+
+
+class ChatModelBusyError(RuntimeError):
+    pass
+
+
+_MODEL_SLOTS = threading.BoundedSemaphore(
+    value=max(1, int(os.getenv("CHAT_MODEL_MAX_CONCURRENCY", "1")))
+)
 
 
 def model_enabled() -> bool:
@@ -61,16 +71,23 @@ def generate_answer(message: str, history: list[dict[str, str]]) -> str:
         "stream": False,
     }
 
+    queue_timeout = float(os.getenv("CHAT_MODEL_QUEUE_TIMEOUT_SECONDS", "5"))
+    if not _MODEL_SLOTS.acquire(timeout=queue_timeout):
+        raise ChatModelBusyError("The laboratory model is busy; please retry shortly")
+
     try:
-        with httpx.Client(timeout=timeout) as client:
-            response = client.post(f"{base_url}/chat/completions", headers=headers, json=payload)
-            response.raise_for_status()
-    except httpx.TimeoutException as exc:
-        raise ChatModelRequestError("The laboratory model timed out") from exc
-    except httpx.HTTPStatusError as exc:
-        raise ChatModelRequestError(f"The laboratory model returned HTTP {exc.response.status_code}") from exc
-    except httpx.RequestError as exc:
-        raise ChatModelRequestError("The laboratory model is unreachable") from exc
+        try:
+            with httpx.Client(timeout=timeout) as client:
+                response = client.post(f"{base_url}/chat/completions", headers=headers, json=payload)
+                response.raise_for_status()
+        except httpx.TimeoutException as exc:
+            raise ChatModelRequestError("The laboratory model timed out") from exc
+        except httpx.HTTPStatusError as exc:
+            raise ChatModelRequestError(f"The laboratory model returned HTTP {exc.response.status_code}") from exc
+        except httpx.RequestError as exc:
+            raise ChatModelRequestError("The laboratory model is unreachable") from exc
+    finally:
+        _MODEL_SLOTS.release()
 
     try:
         data = response.json()
