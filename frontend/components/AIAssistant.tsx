@@ -12,6 +12,7 @@ interface Message {
 
 interface AIAssistantProps {
   initialOpen?: boolean;
+  context?: string;
   // 保留 chunk 回调，便于后续把直接模型响应升级为流式输出。
   onSendMessage?: (
     message: string,
@@ -22,7 +23,7 @@ interface AIAssistantProps {
   ) => Promise<void>;
 }
 
-const AIAssistant: React.FC<AIAssistantProps> = ({ initialOpen = false, onSendMessage }) => {
+const AIAssistant: React.FC<AIAssistantProps> = ({ initialOpen = false, context, onSendMessage }) => {
   const { t, language } = useLanguage();
   const [isOpen, setIsOpen] = useState(initialOpen);
   const [messages, setMessages] = useState<Message[]>([
@@ -93,8 +94,11 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ initialOpen = false, onSendMe
         // 当前后端一次性返回完整答案。
         let accumulatedContent = '';
         
+        const contextualMessage = context
+          ? `[Current dashboard context: ${context}]\n\n${userInput}`
+          : userInput;
         await onSendMessage(
-          userInput,
+          contextualMessage,
           history,
           // onChunk: 每次收到新的内容块时调用
           (chunk: string) => {
@@ -203,7 +207,8 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ initialOpen = false, onSendMe
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-br from-[#007AFF] to-[#5856D6] rounded-full shadow-lg hover:shadow-xl transition-all flex items-center justify-center hover:scale-110 z-50"
+          className="workspace-assistant-launcher"
+          aria-label={t('ai.assistant')}
         >
           <MessageCircle className="w-6 h-6 text-white" />
         </button>
@@ -213,56 +218,55 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ initialOpen = false, onSendMe
       {isOpen && (
         <div
           ref={dialogRef}
-          style={{
-            position: 'fixed',
-            right: '24px',
-            bottom: '24px',
-            zIndex: 1000
-          }}
-          className="w-96 h-[600px] bg-white rounded-[24px] shadow-2xl border border-black/5 flex flex-col overflow-hidden"
+          className="assistant-panel"
+          role="dialog"
+          aria-label={t('ai.assistant')}
         >
           {/* 头部 */}
-          <div className="bg-gradient-to-r from-[#007AFF] to-[#5856D6] px-6 py-4 flex items-center justify-between">
+          <div className="assistant-panel-header">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-                <Bot className="w-5 h-5 text-white" />
+              <div className="assistant-panel-icon">
+                <Bot className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-white font-bold text-[16px]">{t('ai.assistant')}</h3>
-                <p className="text-white/80 text-[11px]">{t('ai.supplyChainAnalysis')}</p>
+                <h3>{t('ai.assistant')}</h3>
+                <p><span /> {language === 'zh' ? '实验室模型已连接' : 'Laboratory model connected'}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={handleClearChat}
-                className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all"
+                className="assistant-icon-button"
                 title={t('ai.clearChat')}
               >
-                <Trash2 className="w-4 h-4 text-white" />
+                <Trash2 className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setIsOpen(false)}
-                className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all"
+                className="assistant-icon-button"
                 title={t('ai.close')}
               >
-                <X className="w-4 h-4 text-white" />
+                <X className="w-4 h-4" />
               </button>
             </div>
           </div>
 
+          {context && (
+            <div className="assistant-context">
+              <span>{language === 'zh' ? '当前页面上下文' : 'Current view context'}</span>
+              <p>{context}</p>
+            </div>
+          )}
+
           {/* 消息列表 */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar bg-[#F5F5F7]">
+          <div className="assistant-messages custom-scrollbar">
             {messages.map((message) => (
               <div
                 key={message.id}
                 className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`max-w-[80%] rounded-[18px] px-4 py-3 flex flex-col ${
-                    message.role === 'user'
-                      ? 'bg-[#007AFF] text-white'
-                      : 'bg-white text-[#1D1D1F] border border-black/5'
-                  }`}
+                  className={`assistant-message ${message.role === 'user' ? 'is-user' : 'is-assistant'}`}
                 >
                   {message.content && (
                     <div className={`text-[14px] leading-relaxed ${message.role === 'assistant' ? 'prose prose-sm max-w-none' : ''}`}>
@@ -302,9 +306,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ initialOpen = false, onSendMe
                       )}
                     </div>
                   )}
-                  <p className={`text-[10px] mt-1.5 ${
-                    message.role === 'user' ? 'text-white/60' : 'text-[#86868B]'
-                  }`}>
+                  <p className="assistant-message-time">
                     {message.timestamp.toLocaleTimeString('zh-CN', { 
                       hour: '2-digit', 
                       minute: '2-digit' 
@@ -315,7 +317,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ initialOpen = false, onSendMe
             ))}
             {isLoading && (
               <div className="flex justify-start">
-                <div className="bg-white border border-black/5 rounded-[18px] px-4 py-3">
+                <div className="assistant-message is-assistant">
                   <div className="flex gap-1.5">
                     <div className="w-2 h-2 bg-[#86868B] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
                     <div className="w-2 h-2 bg-[#86868B] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
@@ -328,14 +330,14 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ initialOpen = false, onSendMe
           </div>
 
           {/* 输入框 */}
-          <div className="p-4 bg-white border-t border-black/5">
-            <div className="flex items-end gap-2">
+          <div className="assistant-composer">
+            <div className="assistant-composer-row">
               <textarea
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                onKeyPress={handleKeyPress}
+                onKeyDown={handleKeyPress}
                 placeholder={t('ai.placeholder')}
-                className="flex-1 resize-none rounded-[16px] border border-black/10 px-4 py-3 text-[14px] focus:outline-none focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20 transition-all"
+                className="assistant-input"
                 rows={1}
                 style={{
                   minHeight: '44px',
@@ -350,7 +352,8 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ initialOpen = false, onSendMe
               <button
                 onClick={handleSend}
                 disabled={!inputValue.trim() || isLoading}
-                className="w-11 h-11 bg-[#007AFF] rounded-full flex items-center justify-center hover:bg-[#0051D5] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="assistant-send"
+                aria-label={language === 'zh' ? '发送问题' : 'Send question'}
               >
                 <Send className="w-5 h-5 text-white" />
               </button>

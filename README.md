@@ -1,6 +1,6 @@
-# Supply Chain Intelligence Platform
+# SemiconFlow — Supply Chain Intelligence
 
-Public dashboard and API for semiconductor supply-chain trade intelligence.
+Public research workspace and API for semiconductor supply-chain trade intelligence. The frontend is organized around Overview, Explore (countries, products, and companies), and Research (quick answers and deep reports).
 
 This repository owns the user-facing application only. Raw datasets, cleaning, aggregation, and production data publication live in the private `supplychain-data-pipeline` repository. Long-running Codex analysis lives in the private `insight-factory` repository.
 
@@ -89,10 +89,10 @@ The local database is intentionally empty on first start. Publish synthetic/samp
 5. The worker uploads reviewed Markdown and HTML.
 6. The frontend polls job status and displays the completed report.
 
-The frontend deliberately exposes two separate AI experiences:
+The Research workspace exposes two AI modes with distinct execution paths:
 
-- The floating assistant in the lower-right corner calls `/api/chat`; the Northflank backend calls the laboratory model synchronously through Tailscale and returns the answer without a polling queue.
-- **Insight Reports** is a full dashboard for long-running Insight Factory jobs, progress, history, and generated reports backed by `/api/insight-jobs`.
+- **Quick answer** opens as a contextual research panel from the navigation, command bar, or current view. It calls `/api/chat`; the Northflank backend calls the laboratory model synchronously through Tailscale and returns the answer without a polling queue.
+- **Deep reports** is a dedicated workspace for long-running Insight Factory jobs, progress, history, and generated reports backed by `/api/insight-jobs`.
 
 Job submission is disabled by default. Set `INSIGHT_JOBS_ENABLED=true`, `DEFAULT_DATASET_VERSION`, and a strong `INSIGHT_WORKER_TOKEN` in Northflank only after the server worker is deployed.
 

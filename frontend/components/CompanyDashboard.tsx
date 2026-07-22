@@ -383,7 +383,7 @@ const CompanyDashboard: React.FC<CompanyDashboardProps> = ({ startDate, endDate,
   );
 
   return (
-    <div className="flex-1 flex flex-col overflow-y-auto bg-[#F5F5F7] p-6 gap-6">
+    <div className="company-workspace flex-1 flex flex-col gap-5">
       <div className="flex items-center gap-2 text-[12px] text-[#86868B] bg-white/80 backdrop-blur px-4 py-2.5 rounded-[12px] border border-black/5 w-fit shadow-sm">
         <span className="font-bold uppercase tracking-wider">Time Range</span>
         <span className="text-black/20">|</span>

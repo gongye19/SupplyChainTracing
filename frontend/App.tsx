@@ -6,11 +6,14 @@ import CompanyDashboardSidebar from './components/CompanyDashboardSidebar';
 import type { TopCountriesDatum } from './components/TopCountriesHorizontalBar';
 import { CompanyDashboardControls, Filters, HSCodeCategory, CountryLocation, Location, Shipment, CountryMonthlyTradeStat, CountryTradeStatSummary, CountryTradeTrend, TopCountry, CountryTradeFilters, CountryQuarterTop, CountryAggregate, CountryQuarterAggregate, HSAggregate, HSQuarterAggregate } from './types';
 import { shipmentsAPI, hsCodeCategoriesAPI, countryLocationsAPI, chatAPI, ChatMessage, countryTradeStatsAPI } from './services/api';
-import { Globe, Map as MapIcon, Package, TrendingUp, Users, ChevronRight, Filter, Building2, MessageCircle, FileText } from 'lucide-react';
+import { Filter, Menu, MessageCircle, Search, SlidersHorizontal, Sparkles } from 'lucide-react';
 import { useLanguage } from './contexts/LanguageContext';
 import { getCountriesFromCodes } from './utils/countryCoordinates';
 import { logger } from './utils/logger';
 import { DEFAULT_COMPANY_CONTROLS } from './utils/companyDashboardFilters';
+import AnimatedContent from './components/motion/AnimatedContent';
+import SpotlightPanel from './components/motion/SpotlightPanel';
+import WorkspaceNavigation, { WorkspaceView } from './components/workspace/WorkspaceNavigation';
 
 const SupplyMap = lazy(() => import('./components/SupplyMap'));
 const AIAssistant = lazy(() => import('./components/AIAssistant'));
@@ -50,6 +53,52 @@ const formatTradeValue = (value: number) => {
   return `$${value.toFixed(0)}`;
 };
 
+const WORKSPACE_VIEWS: WorkspaceView[] = [
+  'global-stats',
+  'map-country',
+  'map-hscode',
+  'company-dashboard',
+  'insight-reports',
+];
+
+const VIEW_META: Record<WorkspaceView, { eyebrow: string; title: string; description: string; zhTitle: string; zhDescription: string }> = {
+  'global-stats': {
+    eyebrow: 'Workspace / Overview',
+    title: 'Global trade intelligence',
+    description: 'Monitor semiconductor trade concentration, momentum and structural shifts.',
+    zhTitle: '全球贸易情报',
+    zhDescription: '监控半导体贸易集中度、变化趋势与结构性转移。',
+  },
+  'map-country': {
+    eyebrow: 'Explore / Countries',
+    title: 'Countries & trade flows',
+    description: 'Trace bilateral flows, counterparties and changes across the selected market.',
+    zhTitle: '国家与贸易流',
+    zhDescription: '追踪选定市场的双边贸易、交易对手与结构变化。',
+  },
+  'map-hscode': {
+    eyebrow: 'Explore / Products',
+    title: 'Products & HS codes',
+    description: 'Compare product categories, geographic exposure and quarterly movement.',
+    zhTitle: '产品与 HS Code',
+    zhDescription: '比较产品类别、地域敞口与季度变化。',
+  },
+  'company-dashboard': {
+    eyebrow: 'Explore / Companies',
+    title: 'Company network',
+    description: 'Investigate company footprints, suppliers and cross-border relationships.',
+    zhTitle: '公司网络',
+    zhDescription: '分析企业布局、供应商以及跨境关联关系。',
+  },
+  'insight-reports': {
+    eyebrow: 'Research / Deep reports',
+    title: 'Research workspace',
+    description: 'Review long-running analyses and turn questions into reusable research outputs.',
+    zhTitle: '研究工作台',
+    zhDescription: '管理深度分析任务，并将问题沉淀为可复用的研究成果。',
+  },
+};
+
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const MAX_CACHE_ENTRIES = 24;
 
@@ -60,7 +109,11 @@ type CacheEntry<T> = {
 
 const App: React.FC = () => {
   const { language, setLanguage, t } = useLanguage();
-  const [activeView, setActiveView] = useState<'map-country' | 'map-hscode' | 'global-stats' | 'company-dashboard' | 'insight-reports'>('global-stats');
+  const [activeView, setActiveView] = useState<WorkspaceView>(() => {
+    const requested = new URLSearchParams(window.location.search).get('view') as WorkspaceView | null;
+    return requested && WORKSPACE_VIEWS.includes(requested) ? requested : 'global-stats';
+  });
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -149,6 +202,32 @@ const App: React.FC = () => {
   const [hsCodeOverallValueQuarterPlaying, setHsCodeOverallValueQuarterPlaying] = useState(false);
   const [hsCodeOverallValueQuarterPaused, setHsCodeOverallValueQuarterPaused] = useState(false);
   const [hsCodeOverallValueQuarterIndex, setHsCodeOverallValueQuarterIndex] = useState(0);
+
+  const handleViewChange = useCallback((view: WorkspaceView) => {
+    setActiveView(view);
+    const url = new URL(window.location.href);
+    url.searchParams.set('view', view);
+    window.history.pushState({ view }, '', url);
+  }, []);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const requested = new URLSearchParams(window.location.search).get('view') as WorkspaceView | null;
+      setActiveView(requested && WORKSPACE_VIEWS.includes(requested) ? requested : 'global-stats');
+    };
+    const handleShortcut = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setAssistantLoaded(true);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    window.addEventListener('keydown', handleShortcut);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('keydown', handleShortcut);
+    };
+  }, []);
 
   // Refs for preview/final scheduling
   const currentMapFilters = activeView === 'map-country' ? mapCountryFilters : mapHsFilters;
@@ -1229,162 +1308,133 @@ const App: React.FC = () => {
     </div>
   );
 
+  const currentMeta = VIEW_META[activeView];
+  const isZh = language === 'zh';
+  const assistantContext = activeView === 'map-country'
+    ? `${currentMeta.title}; period ${mapCountryFilters.startDate} to ${mapCountryFilters.endDate}; direction ${mapCountryFilters.tradeDirection}; countries ${mapCountryFilters.selectedCountries.join(', ') || 'all'}`
+    : activeView === 'map-hscode'
+      ? `${currentMeta.title}; period ${mapHsFilters.startDate} to ${mapHsFilters.endDate}; direction ${mapHsFilters.tradeDirection}; HS codes ${mapHsFilters.selectedHSCodes.join(', ') || 'all'}`
+      : activeView === 'global-stats'
+        ? `${currentMeta.title}; period ${countryTradeFilters.startYearMonth} to ${countryTradeFilters.endYearMonth}; direction ${countryTradeFilters.tradeDirection}; HS codes ${countryTradeFilters.hsCode.join(', ') || 'all'}`
+        : activeView === 'company-dashboard'
+          ? `${currentMeta.title}; period ${companyDashboardFilters.startDate} to ${companyDashboardFilters.endDate}; selected brand ${companyDashboardControls.selectedBrand || 'all'}`
+          : currentMeta.title;
+
   return (
-    <div className="min-h-screen flex flex-col bg-[#F5F5F7] text-[#1D1D1F]">
-      {/* Header */}
-      <header className="h-16 border-b border-black/5 bg-white/80 backdrop-blur-xl flex items-center justify-between px-8 sticky top-0 z-50">
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-[#1D1D1F] rounded-[10px] flex items-center justify-center">
-               <Globe className="text-white w-5 h-5" />
-            </div>
-            <h1 className="text-lg font-bold tracking-tight">{t('app.title')}</h1>
+    <div className="intel-shell">
+      <WorkspaceNavigation
+        activeView={activeView}
+        language={language}
+        mobileOpen={mobileNavOpen}
+        onCloseMobile={() => setMobileNavOpen(false)}
+        onNavigate={handleViewChange}
+        onOpenAssistant={() => setAssistantLoaded(true)}
+      />
+
+      <div className="workspace-stage">
+        <header className="workspace-topbar">
+          <button
+            type="button"
+            className="workspace-mobile-trigger"
+            onClick={() => setMobileNavOpen(true)}
+            aria-label={isZh ? '打开导航' : 'Open navigation'}
+          >
+            <Menu size={19} />
+          </button>
+          <div className="workspace-topbar-context">
+            <span className="workspace-topbar-product">Semiconductor supply chain</span>
+            <span className="workspace-topbar-separator">/</span>
+            <span>{currentMeta.eyebrow.split(' / ').at(-1)}</span>
           </div>
-        </div>
-        
-        {/* Language Switcher */}
-        <button
-          onClick={() => setLanguage(language === 'en' ? 'zh' : 'en')}
-          className="px-3 py-1.5 rounded-[8px] text-[13px] font-medium transition-all bg-[#F5F5F7] text-[#86868B] hover:bg-black/5"
-          title={language === 'en' ? 'Switch to Chinese' : '切换到英文'}
-        >
-          {language === 'en' ? '中文' : 'EN'}
-        </button>
-      </header>
+          <button type="button" className="workspace-command" onClick={() => setAssistantLoaded(true)}>
+            <Search size={16} />
+            <span>{isZh ? '询问当前供应链数据…' : 'Ask about supply chain data…'}</span>
+            <kbd>⌘ K</kbd>
+          </button>
+          <div className="workspace-topbar-actions">
+            <span className="workspace-freshness"><span /> {isZh ? '数据已更新' : 'Data current'}</span>
+            <button
+              type="button"
+              className="workspace-language"
+              onClick={() => setLanguage(isZh ? 'en' : 'zh')}
+              title={isZh ? 'Switch to English' : '切换到中文'}
+            >
+              {isZh ? 'EN' : '中文'}
+            </button>
+          </div>
+        </header>
 
-      <main className="flex-1 flex overflow-y-auto overflow-x-hidden">
-        {/* Sidebar - Narrowed from 300px to 250px */}
-        <aside className="w-[280px] border-r border-black/5 bg-white flex flex-col p-5 gap-8 overflow-visible self-start">
-           <div className="flex flex-col gap-1.5">
-             <button 
-               onClick={() => setActiveView('global-stats')}
-               className={`flex items-center justify-between px-4 py-3 rounded-[12px] transition-all text-[14px] font-semibold ${activeView === 'global-stats' ? 'bg-[#007AFF] text-white shadow-lg shadow-blue-500/20' : 'text-[#86868B] hover:bg-black/5'}`}
-             >
-              <div className="flex items-center gap-3 min-w-0">
-                 <Globe className="w-4 h-4" />
-                <span className="whitespace-nowrap">{t('countryTrade.title')}</span>
-               </div>
-               {activeView === 'global-stats' && <ChevronRight className="w-3.5 h-3.5" />}
-             </button>
-             <button 
-               onClick={() => setActiveView('map-country')}
-               className={`flex items-center justify-between px-4 py-3 rounded-[12px] transition-all text-[14px] font-semibold ${activeView === 'map-country' ? 'bg-[#007AFF] text-white shadow-lg shadow-blue-500/20' : 'text-[#86868B] hover:bg-black/5'}`}
-             >
-              <div className="flex items-center gap-3 min-w-0">
-                 <MapIcon className="w-4 h-4" />
-                <span className="whitespace-nowrap">Trade Map by Country</span>
-               </div>
-               {activeView === 'map-country' && <ChevronRight className="w-3.5 h-3.5" />}
-             </button>
-             <button 
-               onClick={() => setActiveView('map-hscode')}
-               className={`flex items-center justify-between px-4 py-3 rounded-[12px] transition-all text-[14px] font-semibold ${activeView === 'map-hscode' ? 'bg-[#007AFF] text-white shadow-lg shadow-blue-500/20' : 'text-[#86868B] hover:bg-black/5'}`}
-             >
-              <div className="flex items-center gap-3 min-w-0">
-                 <Package className="w-4 h-4" />
-                <span className="whitespace-nowrap">Trade Map by HSCode</span>
-               </div>
-               {activeView === 'map-hscode' && <ChevronRight className="w-3.5 h-3.5" />}
-             </button>
-             <button
-               onClick={() => setActiveView('company-dashboard')}
-               className={`flex items-center justify-between px-4 py-3 rounded-[12px] transition-all text-[14px] font-semibold ${activeView === 'company-dashboard' ? 'bg-[#007AFF] text-white shadow-lg shadow-blue-500/20' : 'text-[#86868B] hover:bg-black/5'}`}
-             >
-               <div className="flex items-center gap-3 min-w-0">
-                 <Building2 className="w-4 h-4" />
-                 <span className="whitespace-nowrap">Company Dashboard</span>
-               </div>
-               {activeView === 'company-dashboard' && <ChevronRight className="w-3.5 h-3.5" />}
-             </button>
-             <button
-               onClick={() => setActiveView('insight-reports')}
-               className={`flex items-center justify-between px-4 py-3 rounded-[12px] transition-all text-[14px] font-semibold ${activeView === 'insight-reports' ? 'bg-[#007AFF] text-white shadow-lg shadow-blue-500/20' : 'text-[#86868B] hover:bg-black/5'}`}
-             >
-               <div className="flex items-center gap-3 min-w-0">
-                 <FileText className="w-4 h-4" />
-                 <span className="whitespace-nowrap">Insight Reports</span>
-               </div>
-               {activeView === 'insight-reports' && <ChevronRight className="w-3.5 h-3.5" />}
-             </button>
-           </div>
-
-          <div className="h-[0.5px] bg-black/5"></div>
-          {activeView === 'global-stats' ? (
-            <CountryTradeSidebar
-              filters={countryTradeFilters}
-              setFilters={setCountryTradeFilters}
-            />
-          ) : activeView === 'map-country' ? (
-            <SidebarFilters 
-              filters={mapCountryFilters} 
-              setFilters={setMapCountryFilters}
-              hsCodeCategories={hsCodeCategories}
-              availableHSCodes={availableHSCodes}
-              countries={countries}
-              shipments={shipments}
-              mode="country"
-            />
-          ) : activeView === 'map-hscode' ? (
-            <SidebarFilters 
-              filters={mapHsFilters} 
-              setFilters={setMapHsFilters}
-              hsCodeCategories={hsCodeCategories}
-              availableHSCodes={availableHSCodes}
-              countries={countries}
-              shipments={shipments}
-              mode="hscode"
-            />
-          ) : activeView === 'company-dashboard' ? (
-            <CompanyDashboardSidebar
-              filters={companyDashboardFilters}
-              setFilters={setCompanyDashboardFilters}
-              controls={companyDashboardControls}
-              setControls={setCompanyDashboardControls}
-            />
-          ) : (
-            <div className="rounded-[20px] border border-black/5 bg-[#F5F5F7] p-4">
-              <div className="flex items-center gap-2 text-[#1D1D1F]">
-                <FileText className="h-4 w-4 text-[#007AFF]" />
-                <span className="text-sm font-bold">Insight Factory</span>
+        <main className={`workspace-main${activeView === 'insight-reports' ? ' without-filter' : ''}`}>
+          {activeView !== 'insight-reports' && (
+            <aside className="workspace-filter-panel">
+              <div className="workspace-filter-heading">
+                <div>
+                  <p>{isZh ? '分析范围' : 'Analysis scope'}</p>
+                  <span>{isZh ? '更改后自动刷新' : 'Updates automatically'}</span>
+                </div>
+                <SlidersHorizontal size={17} />
               </div>
-              <p className="mt-2 text-xs leading-5 text-[#86868B]">
-                深度分析报告与右下角的即时问答 Agent 相互独立。
-              </p>
-            </div>
+              <div className="workspace-filter-scroll">
+                {activeView === 'global-stats' ? (
+                  <CountryTradeSidebar filters={countryTradeFilters} setFilters={setCountryTradeFilters} />
+                ) : activeView === 'map-country' ? (
+                  <SidebarFilters
+                    filters={mapCountryFilters}
+                    setFilters={setMapCountryFilters}
+                    hsCodeCategories={hsCodeCategories}
+                    availableHSCodes={availableHSCodes}
+                    countries={countries}
+                    shipments={shipments}
+                    mode="country"
+                  />
+                ) : activeView === 'map-hscode' ? (
+                  <SidebarFilters
+                    filters={mapHsFilters}
+                    setFilters={setMapHsFilters}
+                    hsCodeCategories={hsCodeCategories}
+                    availableHSCodes={availableHSCodes}
+                    countries={countries}
+                    shipments={shipments}
+                    mode="hscode"
+                  />
+                ) : (
+                  <CompanyDashboardSidebar
+                    filters={companyDashboardFilters}
+                    setFilters={setCompanyDashboardFilters}
+                    controls={companyDashboardControls}
+                    setControls={setCompanyDashboardControls}
+                  />
+                )}
+              </div>
+              {activeView === 'map-country' && (
+                <div className="workspace-scope-summary">
+                  <div><span>{isZh ? '交易记录' : 'Transactions'}</span><strong>{stats.transactions.toLocaleString()}</strong></div>
+                  <div><span>{isZh ? '节点' : 'Nodes'}</span><strong>{stats.suppliers.toLocaleString()}</strong></div>
+                  <div><span>{isZh ? '类别' : 'Categories'}</span><strong>{stats.categories.toLocaleString()}</strong></div>
+                </div>
+              )}
+            </aside>
           )}
-          
-          {activeView === 'map-country' && (
-            <div className="mt-auto pt-8 border-t border-black/5 space-y-4">
-             <div className="bg-[#F5F5F7] p-4 rounded-[20px] space-y-3 border border-black/5">
-               <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5 text-[#86868B]">
-                    <TrendingUp className="w-4 h-4 text-[#007AFF]" />
-                    <span className="text-[10px] uppercase font-bold tracking-wider">{t('stats.transactionFlow')}</span>
-                  </div>
-                  <span className="text-sm font-bold">{stats.transactions}</span>
-               </div>
-               <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5 text-[#86868B]">
-                    <Users className="w-4 h-4 text-[#34C759]" />
-                    <span className="text-[10px] uppercase font-bold tracking-wider">{t('stats.nodes')}</span>
-                  </div>
-                  <span className="text-sm font-bold">{stats.suppliers}</span>
-               </div>
-               <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5 text-[#86868B]">
-                    <Package className="w-4 h-4 text-[#FF2D55]" />
-                    <span className="text-[10px] uppercase font-bold tracking-wider">{t('stats.categories')}</span>
-                  </div>
-                  <span className="text-sm font-bold">{stats.categories}</span>
-               </div>
-             </div>
-           </div>
-          )}
-        </aside>
 
-        {/* Main Content Area */}
-        <section className="flex-1 flex flex-col p-6 relative">
-          <Suspense fallback={lazyFallback}>
+          <section className="workspace-content">
+            <SpotlightPanel className="workspace-page-heading">
+              <AnimatedContent>
+                <p className="workspace-eyebrow">{currentMeta.eyebrow}</p>
+                <div className="workspace-title-row">
+                  <div>
+                    <h1>{isZh ? currentMeta.zhTitle : currentMeta.title}</h1>
+                    <p>{isZh ? currentMeta.zhDescription : currentMeta.description}</p>
+                  </div>
+                  <button type="button" className="workspace-ask-action" onClick={() => setAssistantLoaded(true)}>
+                    <Sparkles size={16} />
+                    {isZh ? '询问此页面' : 'Ask this view'}
+                  </button>
+                </div>
+              </AnimatedContent>
+            </SpotlightPanel>
+
+            <AnimatedContent key={activeView} className="workspace-view" delay={70}>
+              <Suspense fallback={lazyFallback}>
           {activeView === 'map-country' || activeView === 'map-hscode' ? (
             <div className="flex flex-col gap-6 pr-4">
               {/* 地图内容 */}
@@ -1396,12 +1446,6 @@ const App: React.FC = () => {
                 <>
                   {activeView === 'map-country' ? (
                     <>
-                      <div className="mb-4">
-                        <h2 className="text-[32px] font-bold tracking-tight text-[#1D1D1F]">Trade Map by Country</h2>
-                        <p className="text-[#86868B] text-[16px] font-medium mt-1">
-                          Country-level trade flow analysis
-                        </p>
-                      </div>
                       <div className="bg-white border border-black/5 rounded-[28px] p-6 shadow-sm h-[640px] overflow-hidden">
                         <div className="flex items-center justify-between mb-2">
                           <h3 className="text-[18px] font-bold text-[#1D1D1F]">Country Trade Flow Map</h3>
@@ -1702,11 +1746,6 @@ const App: React.FC = () => {
             </div>
           ) : activeView === 'global-stats' ? (
             <div className="flex flex-col gap-6 pr-4">
-              <div className="mb-4">
-                <h2 className="text-[32px] font-bold tracking-tight text-[#1D1D1F]">Global Statistics</h2>
-                <p className="text-[#86868B] text-[16px] font-medium mt-1">{t('countryTrade.subtitle')}</p>
-              </div>
-
               <>
                 <div className="bg-white border border-black/5 rounded-[28px] p-6 shadow-sm h-[600px] overflow-hidden">
                   <div className="flex items-center justify-between mb-2">
@@ -1781,10 +1820,11 @@ const App: React.FC = () => {
           ) : activeView === 'insight-reports' ? (
             <InsightsDashboard />
           ) : null}
-          </Suspense>
-
-        </section>
-      </main>
+              </Suspense>
+            </AnimatedContent>
+          </section>
+        </main>
+      </div>
 
       {((activeView === 'map-country' && filterLoading) || (activeView === 'map-hscode' && hsCodeMapLoading) || (activeView === 'global-stats' && countryTradeLoading)) && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center pointer-events-none">
@@ -1796,6 +1836,7 @@ const App: React.FC = () => {
         <Suspense fallback={null}>
           <AIAssistant
             initialOpen
+            context={assistantContext}
             onSendMessage={async (
               message: string,
               history: ChatMessage[],
@@ -1811,7 +1852,7 @@ const App: React.FC = () => {
         <button
           type="button"
           onClick={() => setAssistantLoaded(true)}
-          className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-br from-[#007AFF] to-[#5856D6] rounded-full shadow-lg hover:shadow-xl transition-all flex items-center justify-center hover:scale-110 z-50"
+          className="workspace-assistant-launcher"
           aria-label={t('ai.assistant')}
         >
           <MessageCircle className="w-6 h-6 text-white" />
