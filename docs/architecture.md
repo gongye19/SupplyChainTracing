@@ -42,12 +42,12 @@ Insight Factory reports have their own **Insight Reports** dashboard. The floati
 
 The floating Agent uses `/api/chat`: the Northflank FastAPI service calls the laboratory Codex Agent gateway directly over Tailscale and returns the answer in the same request. The gateway invokes one ephemeral Codex run. Codex uses a dedicated read-only MCP server to query structured dashboard data through the Northflank API. It does not use the Insight Factory workflow or the long-running report queue.
 
-The model gateway binds only to the laboratory server's Tailscale address. It is not exposed on a public interface. Administrative access remains through the private network/SSH.
+The Codex Agent gateway binds to localhost and is forwarded only to the laboratory server's Tailscale address. It is not exposed on a public interface. Administrative access remains through the private network/SSH.
 
 ## Security boundaries
 
 - `INSIGHT_WORKER_TOKEN` exists only on Northflank and the laboratory server.
-- `CHAT_MODEL_API_KEY` exists only on the Northflank backend and the laboratory model service.
+- `CHAT_MODEL_API_KEY`/`CHAT_AGENT_API_KEY` exist only on the Northflank backend and the laboratory Codex Agent gateway.
 - Pipeline database credentials exist only on the server.
 - The public frontend receives only the Northflank API URL.
 - Job submission remains disabled until the worker is supervised and tested.
